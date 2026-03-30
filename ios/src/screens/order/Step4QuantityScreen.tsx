@@ -20,7 +20,7 @@ export default function Step4QuantityScreen() {
   const navigation = useNavigation<Nav>();
   const { order, setQuantity, setIsGift } = useOrder();
 
-  const unitPrice = order.strawberry?.price ?? 0;
+  const unitPrice = 0;
 
   return (
     <StepLayout

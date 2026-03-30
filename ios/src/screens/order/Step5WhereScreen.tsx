@@ -1,8 +1,8 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { COLLECTION_LOCATIONS, CollectionLocation } from '../../data/seed';
+import { fetchLocations } from '../../lib/api';
 import { useOrder } from '../../context/OrderContext';
 import { COLORS, SPACING } from '../../theme';
 import { OrderStackParamList } from '../../types';
@@ -13,92 +13,61 @@ type Nav = NativeStackNavigationProp<OrderStackParamList, 'Step5Where'>;
 export default function Step5WhereScreen() {
   const navigation = useNavigation<Nav>();
   const { order, setLocation } = useOrder();
+  const [locations, setLocations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLocations()
+      .then(setLocations)
+      .catch(() => setLocations([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <StepLayout
       step={5}
-      title="Collection"
+      title="Where"
       onBack={() => navigation.goBack()}
       onContinue={() => navigation.navigate('Step6When')}
-      continueLabel="Continue to Schedule"
-      canContinue={!!order.location}
+      continueLabel="Continue to When"
+      canContinue={!!order.location_id}
     >
       <View style={styles.container}>
-        <Text style={styles.instruction}>Choose your collection point.</Text>
-
-        {COLLECTION_LOCATIONS.map((loc) => {
-          const selected = order.location?.id === loc.id;
-          return (
-            <TouchableOpacity
-              key={loc.id}
-              style={[styles.locationCard, selected && styles.locationSelected]}
-              onPress={() => setLocation(loc)}
-              activeOpacity={0.85}
-            >
-              <View
-                style={[
-                  styles.locDot,
-                  { backgroundColor: selected ? COLORS.white : COLORS.forestGreen },
-                ]}
-              />
-              <View style={styles.locInfo}>
-                <Text
-                  style={[styles.locName, selected && styles.textWhite]}
-                >
+        {loading ? (
+          <ActivityIndicator color={COLORS.forestGreen} />
+        ) : (
+          locations.map((loc) => {
+            const selected = order.location_id === loc.id;
+            return (
+              <TouchableOpacity
+                key={loc.id}
+                style={[styles.option, selected && styles.optionSelected]}
+                onPress={() => setLocation(loc.id, loc.name)}
+                activeOpacity={0.85}
+              >
+                <Text style={[styles.optionName, selected && styles.textWhite]}>
                   {loc.name}
                 </Text>
-                <Text
-                  style={[styles.locDetail, selected && styles.textWhiteMuted]}
-                >
-                  {loc.detail}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+                {loc.detail && (
+                  <Text style={[styles.optionDetail, selected && styles.textWhiteMuted]}>
+                    {loc.detail}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })
+        )}
       </View>
     </StepLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: SPACING.md,
-    gap: SPACING.sm,
-  },
-  instruction: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  locationCard: {
+  container: { padding: SPACING.md, gap: SPACING.sm },
+  option: {
     backgroundColor: COLORS.cardBg,
     borderRadius: 12,
     padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
+    gap: 4,
   },
-  locationSelected: {
-    backgroundColor: COLORS.forestGreen,
-  },
-  locDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  locInfo: { flex: 1, gap: 4 },
-  locName: {
-    fontSize: 18,
-    fontFamily: 'PlayfairDisplay_700Bold',
-    color: COLORS.textDark,
-  },
-  locDetail: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    fontStyle: 'italic',
-  },
-  textWhite: { color: COLORS.white },
-  textWhiteMuted: { color: 'rgba(255,255,255,0.6)' },
-});
+  optionSelected: { ba
