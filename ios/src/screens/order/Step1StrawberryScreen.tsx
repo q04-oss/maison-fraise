@@ -1,15 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
   StyleSheet,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { STRAWBERRIES, Strawberry } from '../../data/seed';
+import { fetchVarieties } from '../../lib/api';
 import { useOrder } from '../../context/OrderContext';
 import { COLORS, SPACING } from '../../theme';
 import { OrderStackParamList } from '../../types';
@@ -17,54 +18,63 @@ import ProgressBar from '../../components/ProgressBar';
 
 type Nav = NativeStackNavigationProp<OrderStackParamList, 'Step1Strawberry'>;
 
-const VARIETY_ID_MAP: Record<string, number> = {
-  'Greenhouse Reserve': 1,
-  'Jewel': 2,
-  'Seascape': 3,
-};
+interface Variety {
+  id: number;
+  name: string;
+  description: string | null;
+  source_farm: string | null;
+  source_location: string | null;
+  price_cents: number;
+  stock_remaining: number;
+  tag: string | null;
+}
 
 function StrawberryOption({
-  strawberry,
+  variety,
   selected,
   onSelect,
 }: {
-  strawberry: Strawberry;
+  variety: Variety;
   selected: boolean;
   onSelect: () => void;
 }) {
+  const farm = [variety.source_farm, variety.source_location].filter(Boolean).join(', ');
+
   return (
     <TouchableOpacity
       style={[
         styles.option,
         selected && styles.optionSelected,
-        strawberry.tag === 'GREENHOUSE' && !selected && styles.optionHighlighted,
+        variety.tag === 'GREENHOUSE' && !selected && styles.optionHighlighted,
       ]}
       onPress={onSelect}
       activeOpacity={0.85}
     >
       <View style={styles.optionHeader}>
         <View style={styles.optionTitleRow}>
-          <Text style={styles.optionFlag}>{strawberry.flag}</Text>
           <Text style={[styles.optionName, selected && styles.textWhite]}>
-            {strawberry.name}
+            {variety.name}
           </Text>
-          {strawberry.tag && (
+          {variety.tag && (
             <View style={[styles.badge, selected ? styles.badgeWhite : styles.badgeGreen]}>
               <Text style={[styles.badgeText, selected ? styles.badgeTextDark : styles.badgeTextGreen]}>
-                {strawberry.tag}
+                {variety.tag}
               </Text>
             </View>
           )}
         </View>
         <Text style={[styles.optionPrice, selected && styles.textWhite]}>
-          CA${strawberry.price.toFixed(2)}
+          CA${(variety.price_cents / 100).toFixed(2)}
         </Text>
       </View>
-      <Text style={[styles.optionFarm, selected && styles.textWhiteMuted]}>
-        {strawberry.farm}
-      </Text>
-      <Text style={[styles.optionDesc, selected && styles.textWhite]}>
-        {strawberry.description}
+      {farm ? (
+        <Text style={[styles.optionFarm, selected && styles.textWhiteMuted]}>{farm}</Text>
+      ) : null}
+      {variety.description ? (
+        <Text style={[styles.optionDesc, selected && styles.textWhite]}>{variety.description}</Text>
+      ) : null}
+      <Text style={[styles.optionStock, selected && styles.textWhiteMuted]}>
+        {variety.stock_remaining} remaining
       </Text>
     </TouchableOpacity>
   );
@@ -74,6 +84,15 @@ export default function Step1StrawberryScreen() {
   const navigation = useNavigation<Nav>();
   const { order, setVariety } = useOrder();
   const insets = useSafeAreaInsets();
+  const [varieties, setVarieties] = useState<Variety[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchVarieties()
+      .then(setVarieties)
+      .catch(() => setVarieties([]))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleBack = () => {
     navigation.getParent()?.navigate('Board' as never);
@@ -95,21 +114,25 @@ export default function Step1StrawberryScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {STRAWBERRIES.map((s) => (
-          <StrawberryOption
-            key={s.id}
-            strawberry={s}
-            selected={order.strawberryName === s.name}
-            onSelect={() => setVariety(VARIETY_ID_MAP[s.name] ?? 0, s.name, Math.round(s.price * 100))}
-          />
-        ))}
+        {loading ? (
+          <ActivityIndicator color={COLORS.forestGreen} style={{ marginTop: 40 }} />
+        ) : (
+          varieties.map((v) => (
+            <StrawberryOption
+              key={v.id}
+              variety={v}
+              selected={order.variety_id === v.id}
+              onSelect={() => setVariety(v.id, v.name, v.price_cents)}
+            />
+          ))
+        )}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         <TouchableOpacity
-          style={[styles.continueBtn, !order.strawberryName && styles.continueBtnDisabled]}
-          onPress={order.strawberryName ? () => navigation.navigate('Step2Chocolate') : undefined}
-          activeOpacity={order.strawberryName ? 0.82 : 1}
+          style={[styles.continueBtn, !order.variety_id && styles.continueBtnDisabled]}
+          onPress={order.variety_id ? () => navigation.navigate('Step2Chocolate') : undefined}
+          activeOpacity={order.variety_id ? 0.82 : 1}
         >
           <Text style={styles.continueBtnText}>Continue to Chocolate  →</Text>
         </TouchableOpacity>
@@ -143,17 +166,17 @@ const styles = StyleSheet.create({
   optionHighlighted: { backgroundColor: '#F5E8C8', borderWidth: 1.5, borderColor: 'rgba(196,151,58,0.4)' },
   optionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   optionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, flexWrap: 'wrap' },
-  optionFlag: { fontSize: 15 },
   optionName: { fontSize: 17, fontFamily: 'PlayfairDisplay_700Bold', color: COLORS.textDark },
   optionPrice: { fontSize: 15, fontWeight: '600', color: COLORS.textDark },
   optionFarm: { fontSize: 12, color: COLORS.textMuted },
   optionDesc: { fontSize: 13, color: COLORS.textDark, fontStyle: 'italic', lineHeight: 19 },
+  optionStock: { fontSize: 11, color: COLORS.textMuted },
   badge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
   badgeGreen: { backgroundColor: COLORS.greenBadgeBg },
   badgeWhite: { backgroundColor: 'rgba(255,255,255,0.22)' },
   badgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  badgeTextGreen: { color: COLORS.greenBadgeText },
   badgeTextDark: { color: COLORS.white },
+  badgeTextGreen: { color: COLORS.greenBadgeText },
   textWhite: { color: COLORS.white },
   textWhiteMuted: { color: 'rgba(255,255,255,0.55)' },
   footer: { backgroundColor: COLORS.cream, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
