@@ -1,0 +1,27 @@
+{
+  "name": "maison-fraise-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.38.3",
+    "express": "^4.21.2",
+    "postgres": "^3.4.5",
+    "stripe": "^16.12.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.17.0",
+    "drizzle-kit": "^0.29.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

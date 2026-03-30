@@ -1,0 +1,91 @@
+import { Router, Request, Response, NextFunction } from 'express';
+import { eq } from 'drizzle-orm';
+import { db } from '../db';
+import { orders, varieties } from '../db/schema';
+
+const router = Router();
+
+const VALID_STATUSES = ['pending', 'paid', 'preparing', 'ready', 'collected', 'cancelled'] as const;
+
+function requirePin(req: Request, res: Response, next: NextFunction): void {
+  const pin = req.headers['x-admin-pin'];
+  if (!pin || pin !== process.env.ADMIN_PIN) {
+    res.status(401).json({ error: 'Invalid or missing X-Admin-PIN header' });
+    return;
+  }
+  next();
+}
+
+router.use(requirePin);
+
+// GET /api/admin/orders — all orders
+router.get('/orders', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(orders).orderBy(orders.created_at);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/orders/:id/status — update order status
+router.patch('/orders/:id/status', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid order id' });
+    return;
+  }
+
+  const { status } = req.body;
+  if (!VALID_STATUSES.includes(status)) {
+    res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(orders)
+      .set({ status })
+      .where(eq(orders.id, id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/varieties/:id/stock — update stock level
+router.patch('/varieties/:id/stock', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid variety id' });
+    return;
+  }
+
+  const { stock_remaining } = req.body;
+  if (typeof stock_remaining !== 'number' || !Number.isInteger(stock_remaining) || stock_remaining < 0) {
+    res.status(400).json({ error: 'stock_remaining must be a non-negative integer' });
+    return;
+  }
+
+  try {
+    const [updated] = await db
+      .update(varieties)
+      .set({ stock_remaining })
+      .where(eq(varieties.id, id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: 'Variety not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+export default router;
