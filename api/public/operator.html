@@ -403,13 +403,6 @@
     document.getElementById('dash-date').textContent = today();
 
     if (role === 'admin') {
-      // Also fetch variety names
-      try {
-        const vRes = await fetch(BASE + '/api/varieties');
-        const vList = await vRes.json();
-        varieties = {};
-        vList.forEach(v => varieties[v.id] = v);
-      } catch (_) {}
       allOrders = data;
       renderAdmin();
     } else if (role === 'chocolatier') {
@@ -449,12 +442,11 @@
   }
 
   function orderCardHtml(o) {
-    const variety = varieties[o.variety_id];
-    const varietyName = variety ? variety.name : `Variety #${o.variety_id}`;
     const choc = CHOCOLATE_NAMES[o.chocolate] || o.chocolate;
     const fin = FINISH_NAMES[o.finish] || o.finish;
     const total = (o.total_cents / 100).toFixed(2);
     const next = STATUS_NEXT[o.status];
+    const slotMeta = o.slot_date && o.slot_time ? `${o.slot_date} at ${o.slot_time}` : `Slot #${o.time_slot_id}`;
 
     const actions = [];
     if (next) {
@@ -474,11 +466,11 @@
           <div class="status-badge s-${o.status}">${STATUS_LABEL[o.status]}</div>
         </div>
         <div class="order-items">
-          <div class="order-variety">${varietyName}</div>
+          <div class="order-variety">${o.variety_name || `Variety #${o.variety_id}`}</div>
           <div class="order-details">${choc} · ${fin} · ×${o.quantity}</div>
           ${o.is_gift ? '<span class="gift-badge">Gift</span>' : ''}
         </div>
-        <div class="order-meta">Slot #${o.time_slot_id}</div>
+        <div class="order-meta">${slotMeta}</div>
         ${actions.length ? `<div class="action-row">${actions.join('')}</div>` : ''}
       </div>
     `;

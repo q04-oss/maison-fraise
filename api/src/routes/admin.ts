@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties } from '../db/schema';
+import { orders, varieties, timeSlots } from '../db/schema';
 
 const router = Router();
 
@@ -18,10 +18,32 @@ function requirePin(req: Request, res: Response, next: NextFunction): void {
 
 router.use(requirePin);
 
-// GET /api/admin/orders — all orders
+// GET /api/admin/orders — all orders enriched with variety name and slot time
 router.get('/orders', async (_req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(orders).orderBy(orders.created_at);
+    const rows = await db
+      .select({
+        id: orders.id,
+        variety_id: orders.variety_id,
+        variety_name: varieties.name,
+        location_id: orders.location_id,
+        time_slot_id: orders.time_slot_id,
+        slot_date: timeSlots.date,
+        slot_time: timeSlots.time,
+        chocolate: orders.chocolate,
+        finish: orders.finish,
+        quantity: orders.quantity,
+        is_gift: orders.is_gift,
+        total_cents: orders.total_cents,
+        stripe_payment_intent_id: orders.stripe_payment_intent_id,
+        status: orders.status,
+        customer_email: orders.customer_email,
+        created_at: orders.created_at,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .leftJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
+      .orderBy(orders.created_at);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
