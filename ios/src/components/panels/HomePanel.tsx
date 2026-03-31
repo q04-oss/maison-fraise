@@ -55,6 +55,7 @@ export default function HomePanel() {
         activeOpacity={0.9}
       >
         <Animated.View style={[styles.cursor, { opacity: cursorAnim }]} />
+        <Text style={styles.searchPlaceholder}>Ask about today's strawberries…</Text>
       </TouchableOpacity>
 
       {/* Shortcut pills */}
@@ -108,18 +109,18 @@ export default function HomePanel() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 8 },
+  container: { flex: 1, paddingTop: 8, backgroundColor: '#F5F0E8' },
   searchBar: {
     marginHorizontal: SPACING.md,
     marginBottom: 10,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.05)',
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   cursor: {
     width: 2,
@@ -133,12 +134,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pill: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.06)',
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   pillText: {
     fontSize: 13,
@@ -165,6 +166,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
     fontFamily: fonts.dmSans,
+  },
+  searchPlaceholder: {
+    fontSize: 14,
+    color: colors.muted,
+    fontFamily: fonts.dmSans,
+    marginLeft: 8,
   },
   list: { flex: 1 },
   emptyText: {

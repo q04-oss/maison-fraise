@@ -14,17 +14,6 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_NAME = 'main-sheet';
 const DETENTS: [number, number, number] = [0.12, 0.5, 1];
 
-const MAP_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1a2e20' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#9dbfa9' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1a2e20' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#243b2c' }] },
-  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#1a2e20' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1f14' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#1e3326' }] },
-  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-];
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
@@ -62,7 +51,6 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
-        customMapStyle={MAP_STYLE}
         initialRegion={{
           latitude: 43.65,
           longitude: -79.38,
@@ -122,14 +110,12 @@ export default function MapScreen() {
         detents={DETENTS}
         initialDetentIndex={1}
         cornerRadius={20}
-        backgroundBlur="system-material"
         onDetentChange={({ nativeEvent: { index } }) => setSheetDetentIndex(index)}
         grabber
         grabberOptions={{ color: 'rgba(0,0,0,0.2)' }}
+        style={{ flex: 1, minHeight: SCREEN_HEIGHT * 0.9 }}
       >
-        <View style={{ height: SCREEN_HEIGHT }}>
-          <PanelNavigator />
-        </View>
+        <PanelNavigator />
       </TrueSheet>
     </View>
   );
