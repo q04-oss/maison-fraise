@@ -15,9 +15,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.maisonfraise.app",
-      "entitlements": {
-        "com.apple.developer.nfc.readersession.formats": ["TAG"]
-      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Camera access is not used by this app.",
@@ -41,7 +38,6 @@
     "plugins": [
       "expo-font",
       "expo-notifications",
-      "react-native-nfc-manager",
       [
         "expo-location",
         {
