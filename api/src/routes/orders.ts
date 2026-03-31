@@ -164,7 +164,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
           totalCents: order.total_cents,
           slotDate: slot.date,
           slotTime: slot.time,
-        }).catch(err => logger.error('Confirmation email failed', err));
+        }).catch((err: unknown) => logger.error('Confirmation email failed', err));
       }
     }
 
