@@ -153,6 +153,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
     if (!isReview) {
       const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, order.time_slot_id));
       const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
+      logger.info(`confirm ${id}: slot=${!!slot} variety=${!!variety} email=${order.customer_email}`);
       if (slot && variety) {
         sendOrderConfirmation({
           to: order.customer_email,
