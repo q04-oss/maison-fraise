@@ -25,6 +25,16 @@ function formatSlot(date: string, time: string): string {
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()} at ${time}`;
 }
 
+function row(label: string, value: string): string {
+  return `
+  <tr>
+    <td style="padding:14px 0;border-bottom:1px solid #D0C8B8;">
+      <p style="margin:0 0 4px;font-size:11px;color:#888880;letter-spacing:1.8px;text-transform:uppercase;font-family:Georgia,serif;">${label}</p>
+      <p style="margin:0;font-size:15px;color:#1a1a1a;font-family:Georgia,serif;">${value}</p>
+    </td>
+  </tr>`;
+}
+
 function baseTemplate(content: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -34,25 +44,25 @@ function baseTemplate(content: string): string {
   <title>Maison Fraise</title>
 </head>
 <body style="margin:0;padding:0;background:#E8E0D0;font-family:Georgia,serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#E8E0D0;padding:40px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#E8E0D0;padding:48px 0;">
     <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
+      <td align="center" style="padding:0 16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
 
           <!-- Header -->
           <tr>
-            <td style="background:#1C3A2A;padding:36px 40px;border-radius:14px 14px 0 0;">
-              <p style="margin:0;color:rgba(255,255,255,0.45);font-size:11px;letter-spacing:3px;text-transform:uppercase;">Maison Fraise</p>
-              <p style="margin:8px 0 0;color:#E8E0D0;font-size:28px;font-style:italic;line-height:1.2;">Marché Atwater</p>
+            <td style="background:#1C3A2A;padding:32px 36px 28px;border-radius:14px 14px 0 0;">
+              <p style="margin:0 0 2px;color:rgba(232,224,208,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;font-family:Georgia,serif;">Maison Fraise</p>
+              <p style="margin:0;color:#E8E0D0;font-size:26px;font-style:italic;line-height:1.3;font-family:Georgia,serif;">Order confirmed.</p>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
-            <td style="background:#EDE6D8;padding:36px 40px;border-radius:0 0 14px 14px;">
+            <td style="background:#EDE6D8;padding:32px 36px 36px;border-radius:0 0 14px 14px;">
               ${content}
-              <p style="margin:32px 0 0;font-size:12px;color:#888880;border-top:1px solid #D0C8B8;padding-top:24px;">
-                Maison Fraise · Marché Atwater, Montréal · <a href="https://fraise.maison" style="color:#1C3A2A;">fraise.maison</a>
+              <p style="margin:28px 0 0;font-size:11px;color:#888880;letter-spacing:0.3px;border-top:1px solid #D0C8B8;padding-top:20px;font-family:Georgia,serif;">
+                Maison Fraise &nbsp;·&nbsp; Marché Atwater, Montréal &nbsp;·&nbsp; <a href="https://fraise.maison" style="color:#1C3A2A;text-decoration:none;">fraise.maison</a>
               </p>
             </td>
           </tr>
@@ -81,49 +91,34 @@ export async function sendOrderConfirmation(params: {
   const slot = formatSlot(slotDate, slotTime);
 
   const content = `
-    <p style="margin:0 0 6px;color:#888880;font-size:12px;letter-spacing:2px;text-transform:uppercase;">Order confirmed</p>
-    <p style="margin:0 0 28px;color:#1a1a1a;font-size:24px;font-style:italic;">${varietyName}</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      ${row('Strawberry', varietyName)}
+      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
+      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${row('Quantity', String(quantity))}
+      ${isGift ? row('Gift', 'Handwritten note included') : ''}
+      ${row('Collection', slot)}
+    </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <!-- Total card -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Chocolate</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">${CHOCOLATE_LABELS[chocolate] ?? chocolate}</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Finish</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">${FINISH_LABELS[finish] ?? finish}</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Quantity</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">${quantity}</span>
-        </td>
-      </tr>
-      ${isGift ? `<tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Gift</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">Handwritten note included</span>
-        </td>
-      </tr>` : ''}
-      <tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Collection</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">${slot}</span>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding:12px 0;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Total</span><br/>
-          <span style="font-size:20px;color:#1C3A2A;font-style:italic;">CA$${total}</span>
+        <td style="background:#1C3A2A;border-radius:12px;padding:18px 20px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <p style="margin:0;font-size:11px;color:rgba(232,224,208,0.55);letter-spacing:1.8px;text-transform:uppercase;font-family:Georgia,serif;">Total</p>
+              </td>
+              <td align="right">
+                <p style="margin:0;font-size:22px;color:#E8E0D0;font-style:italic;font-family:Georgia,serif;">CA$${total}</p>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
 
-    <p style="margin:28px 0 0;font-size:14px;color:#444;line-height:1.7;">
+    <p style="margin:0;font-size:14px;color:#555;line-height:1.75;font-family:Georgia,serif;">
       We'll dip your strawberries fresh when you arrive. Come to the chocolate counter at Marché Atwater — we'll have them ready.
     </p>
   `;
