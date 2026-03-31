@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { View, TouchableOpacity, Text, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
@@ -21,7 +21,13 @@ export default function MapScreen() {
   const [userId, setUserId] = useState<string | undefined>(undefined);
   const [verified, setVerified] = useState(false);
   const [sheetDetentIndex, setSheetDetentIndex] = useState(1);
+  const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.5);
   const mapRef = useRef<MapView>(null);
+
+  const onSheetLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) setContentHeight(h);
+  }, []);
 
   useEffect(() => {
     getUserId().then(setUserId).catch(() => {});
@@ -113,9 +119,10 @@ export default function MapScreen() {
         onDetentChange={({ nativeEvent: { index } }) => setSheetDetentIndex(index)}
         grabber
         grabberOptions={{ color: 'rgba(0,0,0,0.2)' }}
-        style={{ flex: 1, minHeight: SCREEN_HEIGHT * 0.9 }}
       >
-        <PanelNavigator />
+        <View style={{ height: contentHeight }} onLayout={onSheetLayout}>
+          <PanelNavigator />
+        </View>
       </TrueSheet>
     </View>
   );
