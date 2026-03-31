@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, varieties, timeSlots } from '../db/schema';
+import { logger } from '../lib/logger';
+import { sendOrderReady } from '../lib/resend';
 
 const router = Router();
 
@@ -50,6 +52,23 @@ router.get('/orders', async (_req: Request, res: Response) => {
   }
 });
 
+async function sendReadyNotification(pushToken: string, orderSummary: string) {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        to: pushToken,
+        title: 'Your order is ready.',
+        body: `${orderSummary} — ready for collection at Marché Atwater.`,
+        sound: 'default',
+      }),
+    });
+  } catch (err) {
+    logger.error('Push notification failed', err);
+  }
+}
+
 // PATCH /api/admin/orders/:id/status — update order status
 router.patch('/orders/:id/status', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
@@ -74,6 +93,26 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Order not found' });
       return;
     }
+
+    // Send push notification + email when order becomes ready
+    if (status === 'ready') {
+      const [variety] = await db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, updated.variety_id));
+      const [slot] = await db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, updated.time_slot_id));
+      const varietyName = variety?.name ?? 'your order';
+
+      if (updated.push_token) {
+        const summary = `${updated.quantity}× ${varietyName}`;
+        sendReadyNotification(updated.push_token, summary); // fire-and-forget
+      }
+
+      sendOrderReady({
+        to: updated.customer_email,
+        varietyName,
+        quantity: updated.quantity,
+        slotTime: slot?.time ?? '',
+      }).catch(err => logger.error('Ready email failed', err));
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

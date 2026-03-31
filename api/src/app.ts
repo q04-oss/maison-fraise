@@ -39,4 +39,12 @@ app.get('/operator', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/operator.html'));
 });
 
+app.get('/privacy', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/privacy.html'));
+});
+
+app.get('/support', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/support.html'));
+});
+
 export default app;

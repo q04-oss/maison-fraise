@@ -79,6 +79,7 @@ export const orders = pgTable('orders', {
   stripe_payment_intent_id: text('stripe_payment_intent_id'),
   status: orderStatusEnum('status').notNull().default('pending'),
   customer_email: text('customer_email').notNull(),
+  push_token: text('push_token'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

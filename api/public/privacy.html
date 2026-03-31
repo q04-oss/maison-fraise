@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Maison Fraise</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #1C3A2A;
+      --cream: #F5F0E8;
+      --card:  #EDEAE0;
+      --text:  #1C1C1E;
+      --muted: #6B6B6B;
+      --gold:  #C4973A;
+      --border: rgba(28,58,42,0.12);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--cream); color: var(--text); }
+
+    nav {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 40px;
+      background: rgba(245,240,232,0.95);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--green); text-decoration: none; }
+    .nav-back { font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); text-decoration: none; font-weight: 600; }
+    .nav-back:hover { color: var(--green); }
+
+    .page-header { background: var(--green); padding: 80px 40px 60px; }
+    .page-eyebrow { font-size: 11px; letter-spacing: 2.5px; text-transform: uppercase; color: rgba(255,255,255,0.4); font-weight: 600; margin-bottom: 16px; }
+    .page-title { font-family: 'Playfair Display', serif; font-size: clamp(36px, 5vw, 56px); color: white; line-height: 1.1; }
+    .page-date { font-size: 13px; color: rgba(255,255,255,0.35); margin-top: 16px; }
+
+    .content { max-width: 720px; margin: 0 auto; padding: 72px 40px; display: flex; flex-direction: column; gap: 48px; }
+
+    h2 { font-family: 'Playfair Display', serif; font-size: 24px; color: var(--green); margin-bottom: 16px; }
+    p { font-size: 15px; color: var(--muted); line-height: 1.85; margin-bottom: 12px; }
+    p:last-child { margin-bottom: 0; }
+    a { color: var(--green); }
+    ul { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; }
+    li { font-size: 15px; color: var(--muted); line-height: 1.75; }
+
+    .section { border-top: 1px solid var(--border); padding-top: 48px; }
+
+    footer {
+      background: var(--green); padding: 48px 40px;
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;
+    }
+    .footer-logo { font-family: 'Playfair Display', serif; font-size: 20px; color: white; }
+    .footer-links { display: flex; gap: 24px; }
+    .footer-links a { font-size: 12px; color: rgba(255,255,255,0.4); text-decoration: none; letter-spacing: 1px; text-transform: uppercase; }
+    .footer-links a:hover { color: white; }
+
+    @media (max-width: 600px) {
+      nav { padding: 16px 20px; }
+      .page-header { padding: 60px 20px 40px; }
+      .content { padding: 48px 20px; }
+      footer { padding: 40px 20px; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Maison Fraise</a>
+  <a href="/" class="nav-back">← Back</a>
+</nav>
+
+<div class="page-header">
+  <p class="page-eyebrow">Legal</p>
+  <h1 class="page-title">Privacy Policy</h1>
+  <p class="page-date">Effective date: March 30, 2026</p>
+</div>
+
+<div class="content">
+
+  <div>
+    <p>
+      Maison Fraise ("we", "us", "our") operates the Maison Fraise iOS application and the website at fraise.maison.
+      This policy explains what information we collect, how we use it, and your rights with respect to it.
+    </p>
+    <p>
+      We collect only what is necessary to process your order. We do not sell your data. We do not use it for advertising.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Information we collect</h2>
+    <p>When you place an order, we collect:</p>
+    <ul>
+      <li><strong>Email address</strong> — to send your order confirmation and pickup notification.</li>
+      <li><strong>Order details</strong> — variety, chocolate, finish, quantity, collection time. Stored to fulfil your order and display your order history.</li>
+      <li><strong>Payment information</strong> — handled entirely by Stripe. We never see or store your card number. Stripe's privacy policy applies to payment data.</li>
+      <li><strong>Push notification token</strong> — if you grant notification permission, we store a device token to send you a notification when your order is ready. You can revoke this at any time in iOS Settings.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>How we use your information</h2>
+    <ul>
+      <li>To process and fulfil your order.</li>
+      <li>To send you a branded confirmation email and a ready notification when your order is prepared.</li>
+      <li>To display your order history in the app when you enter your email address.</li>
+    </ul>
+    <p>We do not use your information for marketing, profiling, or any purpose beyond fulfilling your order.</p>
+  </div>
+
+  <div class="section">
+    <h2>Third-party services</h2>
+    <ul>
+      <li><strong>Stripe</strong> — payment processing. <a href="https://stripe.com/privacy" target="_blank">stripe.com/privacy</a></li>
+      <li><strong>Resend</strong> — transactional email delivery. <a href="https://resend.com/privacy" target="_blank">resend.com/privacy</a></li>
+      <li><strong>Expo</strong> — push notification infrastructure. <a href="https://expo.dev/privacy" target="_blank">expo.dev/privacy</a></li>
+      <li><strong>Railway</strong> — server and database hosting. <a href="https://railway.app/legal/privacy" target="_blank">railway.app/legal/privacy</a></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Data retention</h2>
+    <p>
+      Order records are retained for business and legal purposes. If you would like your data deleted,
+      contact us at <a href="mailto:austin@fraise.maison">austin@fraise.maison</a> and we will remove it within 30 days.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Children</h2>
+    <p>The Maison Fraise app is not directed at children under 13. We do not knowingly collect information from children.</p>
+  </div>
+
+  <div class="section">
+    <h2>Changes to this policy</h2>
+    <p>
+      If we make material changes to this policy, we will update the effective date above.
+      Continued use of the app after changes constitutes acceptance.
+    </p>
+  </div>
+
+  <div class="section">
+    <h2>Contact</h2>
+    <p>
+      Questions about this policy? Email us at <a href="mailto:austin@fraise.maison">austin@fraise.maison</a>.
+    </p>
+  </div>
+
+</div>
+
+<footer>
+  <div class="footer-logo">Maison Fraise</div>
+  <div class="footer-links">
+    <a href="/privacy">Privacy</a>
+    <a href="/support">Support</a>
+  </div>
+</footer>
+
+</body>
+</html>
