@@ -127,7 +127,9 @@ export default function MapScreen() {
         grabber
         grabberOptions={{ color: 'rgba(0,0,0,0.2)' }}
       >
-        <PanelNavigator />
+        <View style={{ height: SCREEN_HEIGHT }}>
+          <PanelNavigator />
+        </View>
       </TrueSheet>
     </View>
   );
