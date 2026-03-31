@@ -1,15 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import NfcManager, { NfcTech } from 'react-native-nfc-manager';
 import { usePanel } from '../../context/PanelContext';
-import { verifyNfc } from '../../lib/api';
-import { getUserId, setVerified } from '../../lib/userId';
 import { colors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
 export default function NFCPanel() {
-  const { goBack, showPanel, order } = usePanel();
-  const [error, setError] = useState('');
+  const { goBack, showPanel } = usePanel();
   const pulse = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -19,27 +15,7 @@ export default function NFCPanel() {
         Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
       ])
     ).start();
-    startScan();
-    return () => { NfcManager.cancelTechnologyRequest().catch(() => {}); };
   }, []);
-
-  const startScan = async () => {
-    try {
-      await NfcManager.start();
-      await NfcManager.requestTechnology(NfcTech.Ndef);
-      const tag = await NfcManager.getTag();
-      const nfcToken = tag?.id ?? tag?.ndefMessage?.[0]?.payload?.toString();
-      if (!nfcToken) throw new Error('Could not read tag.');
-      const userId = await getUserId();
-      await verifyNfc(nfcToken, userId);
-      await setVerified();
-      showPanel('verified');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Could not read the chip.');
-    } finally {
-      NfcManager.cancelTechnologyRequest().catch(() => {});
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -60,15 +36,6 @@ export default function NFCPanel() {
         </View>
 
         <Text style={styles.subtitle}>Hold your phone to the NFC chip inside the lid.</Text>
-
-        {error !== '' && (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => { setError(''); startScan(); }}>
-              <Text style={styles.retryText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         <TouchableOpacity style={styles.simulateBtn} onPress={() => showPanel('verified')} activeOpacity={0.7}>
           <Text style={styles.simulateText}>Simulate tap →</Text>
@@ -91,10 +58,6 @@ const styles = StyleSheet.create({
   pulseInner: { width: 96, height: 96, borderRadius: 48, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.gold },
   boxIcon: { fontSize: 38, color: colors.gold },
   subtitle: { fontSize: 15, color: colors.muted, fontFamily: fonts.dmSans, textAlign: 'center', lineHeight: 24 },
-  errorCard: { backgroundColor: colors.card, borderRadius: 14, padding: SPACING.md, gap: 12, width: '100%', alignItems: 'center' },
-  errorText: { fontSize: 14, color: '#C0392B', textAlign: 'center', fontFamily: fonts.dmSans },
-  retryBtn: { backgroundColor: colors.green, borderRadius: 22, paddingVertical: 12, paddingHorizontal: 28 },
-  retryText: { color: colors.cream, fontSize: 13, fontFamily: fonts.dmSans, fontWeight: '600' },
   simulateBtn: { paddingVertical: 12 },
   simulateText: { color: colors.muted, fontSize: 13, fontFamily: fonts.dmSans },
 });
