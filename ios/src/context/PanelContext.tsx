@@ -109,7 +109,6 @@ const PanelContext = createContext<PanelContextValue | null>(null);
 export function PanelProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<PanelId[]>(['home']);
   const [currentPanel, setCurrentPanel] = useState<PanelId>('home');
-  const [prevPanel, setPrevPanel] = useState<PanelId | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
   const [order, setOrderState] = useState<OrderState>(defaultOrder);
   const [varieties, setVarieties] = useState<Variety[]>([]);
@@ -125,7 +124,6 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const showPanel = useCallback((id: PanelId) => {
     if (isAnimating) return;
     setIsAnimating(true);
-    setPrevPanel(currentPanel);
     slideAnim.setValue(1);
     setCurrentPanel(id);
     setStack(prev => [...prev, id]);

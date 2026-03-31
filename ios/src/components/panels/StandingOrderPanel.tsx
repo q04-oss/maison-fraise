@@ -219,11 +219,17 @@ export default function StandingOrderPanel() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {!userDbId && (
+        <View style={[styles.notSignedInBanner, { backgroundColor: c.cardDark }]}>
+          <Text style={[styles.notSignedInText, { color: c.muted }]}>Sign in with Apple in your profile to set up standing orders.</Text>
+        </View>
+      )}
+
       <View style={[styles.footer, { borderTopColor: c.border }]}>
         <TouchableOpacity
-          style={[styles.confirmBtn, { backgroundColor: c.text }, submitting && styles.confirmBtnDisabled]}
+          style={[styles.confirmBtn, { backgroundColor: c.text }, (!userDbId || submitting) && styles.confirmBtnDisabled]}
           onPress={handleConfirm}
-          disabled={submitting}
+          disabled={!userDbId || submitting}
           activeOpacity={0.85}
         >
           <Text style={[styles.confirmBtnText, { color: c.ctaText }]}>{submitting ? 'Setting up...' : 'Confirm & Pay'}</Text>
@@ -272,9 +278,11 @@ const styles = StyleSheet.create({
   totalSub: { fontSize: 12, fontFamily: fonts.dmSans },
   totalAmount: { fontSize: 24, fontFamily: fonts.playfair },
   footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
-  confirmBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  confirmBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   confirmBtnDisabled: { opacity: 0.5 },
   confirmBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
   backLink: { alignItems: 'center', paddingVertical: 4 },
   backLinkText: { fontSize: 15, fontFamily: fonts.dmSans },
+  notSignedInBanner: { marginHorizontal: SPACING.md, marginBottom: 8, borderRadius: 12, padding: 12 },
+  notSignedInText: { fontSize: 13, fontFamily: fonts.dmSans, textAlign: 'center', lineHeight: 20 },
 });

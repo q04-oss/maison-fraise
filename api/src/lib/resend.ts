@@ -28,14 +28,14 @@ function formatSlot(date: string, time: string): string {
 function row(label: string, value: string): string {
   return `
   <tr>
-    <td style="padding:14px 0;border-bottom:1px solid #D0C8B8;">
-      <p style="margin:0 0 4px;font-size:11px;color:#888880;letter-spacing:1.8px;text-transform:uppercase;font-family:Georgia,serif;">${label}</p>
-      <p style="margin:0;font-size:15px;color:#1a1a1a;font-family:Georgia,serif;">${value}</p>
+    <td style="padding:14px 0;border-bottom:1px solid #2A2A2E;">
+      <p style="margin:0 0 5px;font-size:10px;color:#8A8A8E;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">${label}</p>
+      <p style="margin:0;font-size:15px;color:#F2F2F7;font-family:Georgia,'Times New Roman',serif;">${value}</p>
     </td>
   </tr>`;
 }
 
-function baseTemplate(content: string): string {
+function baseTemplate(content: string, heading: string): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -43,26 +43,26 @@ function baseTemplate(content: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Maison Fraise</title>
 </head>
-<body style="margin:0;padding:0;background:#E8E0D0;font-family:Georgia,serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#E8E0D0;padding:48px 0;">
+<body style="margin:0;padding:0;background:#111113;font-family:Georgia,'Times New Roman',serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#111113;padding:48px 0;">
     <tr>
       <td align="center" style="padding:0 16px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
 
           <!-- Header -->
           <tr>
-            <td style="background:#1C3A2A;padding:32px 36px 28px;border-radius:14px 14px 0 0;">
-              <p style="margin:0 0 2px;color:rgba(232,224,208,0.5);font-size:10px;letter-spacing:3px;text-transform:uppercase;font-family:Georgia,serif;">Maison Fraise</p>
-              <p style="margin:0;color:#E8E0D0;font-size:26px;font-style:italic;line-height:1.3;font-family:Georgia,serif;">Order confirmed.</p>
+            <td style="background:#0C0C0E;padding:32px 36px 28px;border-radius:14px 14px 0 0;border-bottom:1px solid #2A2A2E;">
+              <p style="margin:0 0 8px;color:#C9973A;font-size:10px;letter-spacing:3px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Maison Fraise</p>
+              <p style="margin:0;color:#F2F2F7;font-size:26px;font-style:italic;line-height:1.3;font-family:Georgia,'Times New Roman',serif;">${heading}</p>
             </td>
           </tr>
 
           <!-- Body -->
           <tr>
-            <td style="background:#EDE6D8;padding:32px 36px 36px;border-radius:0 0 14px 14px;">
+            <td style="background:#1A1A1C;padding:32px 36px 36px;border-radius:0 0 14px 14px;">
               ${content}
-              <p style="margin:28px 0 0;font-size:11px;color:#888880;letter-spacing:0.3px;border-top:1px solid #D0C8B8;padding-top:20px;font-family:Georgia,serif;">
-                Maison Fraise &nbsp;·&nbsp; Marché Atwater, Montréal &nbsp;·&nbsp; <a href="https://fraise.maison" style="color:#1C3A2A;text-decoration:none;">fraise.maison</a>
+              <p style="margin:28px 0 0;font-size:11px;color:#5A5A5E;letter-spacing:0.3px;border-top:1px solid #2A2A2E;padding-top:20px;font-family:'Courier New',Courier,monospace;">
+                Maison Fraise &nbsp;·&nbsp; Marché Atwater, Montréal &nbsp;·&nbsp; <a href="https://fraise.maison" style="color:#C9973A;text-decoration:none;">fraise.maison</a>
               </p>
             </td>
           </tr>
@@ -91,7 +91,7 @@ export async function sendOrderConfirmation(params: {
   const slot = formatSlot(slotDate, slotTime);
 
   const content = `
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
       ${row('Strawberry', varietyName)}
       ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
       ${row('Finish', FINISH_LABELS[finish] ?? finish)}
@@ -100,17 +100,17 @@ export async function sendOrderConfirmation(params: {
       ${row('Collection', slot)}
     </table>
 
-    <!-- Total card -->
+    <!-- Total card — amber on dark -->
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr>
-        <td style="background:#1C3A2A;border-radius:12px;padding:18px 20px;">
+        <td style="background:#C9973A;border-radius:12px;padding:18px 22px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
               <td>
-                <p style="margin:0;font-size:11px;color:rgba(232,224,208,0.55);letter-spacing:1.8px;text-transform:uppercase;font-family:Georgia,serif;">Total</p>
+                <p style="margin:0;font-size:10px;color:rgba(12,12,14,0.55);letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Total</p>
               </td>
               <td align="right">
-                <p style="margin:0;font-size:22px;color:#E8E0D0;font-style:italic;font-family:Georgia,serif;">CA$${total}</p>
+                <p style="margin:0;font-size:22px;color:#0C0C0E;font-style:italic;font-family:Georgia,'Times New Roman',serif;">CA$${total}</p>
               </td>
             </tr>
           </table>
@@ -118,7 +118,7 @@ export async function sendOrderConfirmation(params: {
       </tr>
     </table>
 
-    <p style="margin:0;font-size:14px;color:#555;line-height:1.75;font-family:Georgia,serif;">
+    <p style="margin:0;font-size:14px;color:rgba(242,242,247,0.5);line-height:1.8;font-family:Georgia,'Times New Roman',serif;">
       We'll dip your strawberries fresh when you arrive. Come to the chocolate counter at Marché Atwater — we'll have them ready.
     </p>
   `;
@@ -128,7 +128,7 @@ export async function sendOrderConfirmation(params: {
     to,
     replyTo: REPLY_TO,
     subject: `Your ${varietyName} — confirmed.`,
-    html: baseTemplate(content),
+    html: baseTemplate(content, 'Order confirmed.'),
   });
 }
 
@@ -141,29 +141,26 @@ export async function sendOrderReady(params: {
   const { to, varietyName, quantity, slotTime } = params;
 
   const content = `
-    <p style="margin:0 0 6px;color:#888880;font-size:12px;letter-spacing:2px;text-transform:uppercase;">Ready for collection</p>
-    <p style="margin:0 0 28px;color:#1a1a1a;font-size:24px;font-style:italic;">Your order is ready.</p>
-
-    <p style="margin:0 0 24px;font-size:16px;color:#1a1a1a;line-height:1.7;">
-      ${quantity}× <strong>${varietyName}</strong> — freshly dipped and waiting for you at the chocolate counter, Marché Atwater.
+    <p style="margin:0 0 28px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      ${quantity}× <strong style="color:#F2F2F7;">${varietyName}</strong> — freshly dipped and waiting for you at the chocolate counter, Marché Atwater.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
       <tr>
-        <td style="padding:12px 0;border-bottom:1px solid #D0C8B8;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Your slot</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">${slotTime}</span>
+        <td style="padding:14px 0;border-bottom:1px solid #2A2A2E;">
+          <p style="margin:0 0 5px;font-size:10px;color:#8A8A8E;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Your slot</p>
+          <p style="margin:0;font-size:15px;color:#F2F2F7;font-family:Georgia,'Times New Roman',serif;">${slotTime}</p>
         </td>
       </tr>
       <tr>
-        <td style="padding:12px 0;">
-          <span style="font-size:11px;color:#888880;letter-spacing:1.5px;text-transform:uppercase;">Where</span><br/>
-          <span style="font-size:15px;color:#1a1a1a;">Marché Atwater · 138 Av. Atwater, Montréal</span>
+        <td style="padding:14px 0;">
+          <p style="margin:0 0 5px;font-size:10px;color:#8A8A8E;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Where</p>
+          <p style="margin:0;font-size:15px;color:#F2F2F7;font-family:Georgia,'Times New Roman',serif;">Marché Atwater · 138 Av. Atwater, Montréal</p>
         </td>
       </tr>
     </table>
 
-    <p style="margin:28px 0 0;font-size:13px;color:#888880;line-height:1.7;">
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
       Strawberries are best enjoyed within the hour. We look forward to seeing you.
     </p>
   `;
@@ -173,6 +170,6 @@ export async function sendOrderReady(params: {
     to,
     replyTo: REPLY_TO,
     subject: 'Your order is ready.',
-    html: baseTemplate(content),
+    html: baseTemplate(content, 'Your order is ready.'),
   });
 }

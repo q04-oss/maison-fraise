@@ -16,7 +16,6 @@ import { DMMono_400Regular } from '@expo-google-fonts/dm-mono';
 import RootNavigator from './src/navigation/RootNavigator';
 import { COLORS } from './src/theme';
 import { enableReviewMode as activateReviewMode } from './src/lib/reviewMode';
-import { getUserId } from './src/lib/userId';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -57,9 +56,6 @@ export default function App() {
   });
 
   useEffect(() => {
-    // Initialize user ID on first launch
-    getUserId().catch(() => {});
-
     registerForPushNotifications().then(token => {
       if (token) setPushToken(token);
     });
@@ -93,15 +89,15 @@ export default function App() {
 
   if (!fontsLoaded && !fontError) {
     return (
-      <View style={{ flex: 1, backgroundColor: COLORS.forestGreen, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={COLORS.cream} />
+      <View style={{ flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color="#D4A843" />
       </View>
     );
   }
 
   return (
     <AppContext.Provider value={{ reviewMode, enableReviewMode: handleEnableReviewMode, pushToken }}>
-      <StripeProvider key={reviewMode ? 'test' : 'live'} publishableKey={publishableKey} merchantIdentifier="merchant.com.maisonfraise">
+      <StripeProvider key={reviewMode ? 'test' : 'live'} publishableKey={publishableKey} merchantIdentifier="merchant.com.maisonfraise.app">
         <SafeAreaProvider>
           <NavigationContainer ref={navigationRef}>
             <RootNavigator />

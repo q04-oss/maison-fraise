@@ -61,7 +61,7 @@ export default function VarietyPanel() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: SPACING.md, paddingTop: 8, paddingBottom: 12 },
-  title: { fontSize: 28, fontFamily: fonts.playfair },
+  title: { fontSize: 32, fontFamily: fonts.playfair },
   source: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', marginTop: 2 },
   body: { paddingHorizontal: SPACING.md, gap: SPACING.md },
   description: { fontSize: 14, fontFamily: fonts.dmSans, fontStyle: 'italic', lineHeight: 22 },
@@ -73,8 +73,8 @@ const styles = StyleSheet.create({
   price: { fontSize: 28, fontFamily: fonts.playfair },
   perItem: { fontSize: 13, fontFamily: fonts.dmSans },
   footer: { padding: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
-  orderBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  orderBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   orderBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
-  backLink: { alignItems: 'center', paddingVertical: 4 },
+  backLink: { alignItems: 'center', paddingVertical: 8 },
   backLinkText: { fontSize: 15, fontFamily: fonts.dmSans },
 });

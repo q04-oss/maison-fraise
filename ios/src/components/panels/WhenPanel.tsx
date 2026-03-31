@@ -63,8 +63,12 @@ export default function WhenPanel() {
         </ScrollView>
 
         <Text style={[styles.sectionLabel, { color: c.muted }]}>TIME</Text>
-        {loadingSlots ? (
+        {!order.location_id ? (
+          <Text style={[styles.noLocationText, { color: c.muted }]}>Select a collection point on the map first.</Text>
+        ) : loadingSlots ? (
           <ActivityIndicator color={c.accent} />
+        ) : slots.length === 0 && order.date ? (
+          <Text style={[styles.noLocationText, { color: c.muted }]}>No slots available for this date.</Text>
         ) : (
           <View style={styles.timeGrid}>
             {slots.map(slot => {
@@ -86,6 +90,7 @@ export default function WhenPanel() {
           </View>
         )}
         <View style={{ height: 8 }} />
+
       </ScrollView>
 
       <View style={[styles.footer, { borderTopColor: c.border }]}>
@@ -109,9 +114,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: SPACING.md, paddingTop: 8, paddingBottom: 12 },
   progress: { flexDirection: 'row', gap: 3, marginBottom: 10 },
-  seg: { flex: 1, height: 2, borderRadius: 1 },
+  seg: { flex: 1, height: 3, borderRadius: 1 },
   stepLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginBottom: 2 },
-  stepTitle: { fontSize: 28, fontFamily: fonts.playfair },
+  stepTitle: { fontSize: 32, fontFamily: fonts.playfair },
   body: { paddingHorizontal: SPACING.md, gap: SPACING.md },
   sectionLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
   dateRow: { gap: 8, paddingVertical: 4 },
@@ -123,9 +128,10 @@ const styles = StyleSheet.create({
   timeText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '600' },
   slotsText: { fontSize: 11, fontFamily: fonts.dmSans },
   footer: { padding: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
-  continueBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  continueBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   continueBtnDisabled: { opacity: 0.3 },
   continueBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
-  backLink: { alignItems: 'center', paddingVertical: 4 },
+  backLink: { alignItems: 'center', paddingVertical: 8 },
   backLinkText: { fontSize: 15, fontFamily: fonts.dmSans },
+  noLocationText: { fontSize: 14, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
 });

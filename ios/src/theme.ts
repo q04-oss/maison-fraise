@@ -1,5 +1,6 @@
 import { useTheme } from './context/ThemeContext';
 
+// Legacy — only used for App.tsx loading screen
 export const COLORS = {
   forestGreen: '#1C3A2A',
   cream: '#FFFFFF',
@@ -26,46 +27,48 @@ export const SPACING = {
   xl: 32,
 };
 
+// Warm amber — references the Claude terminal's warmth + the Or Fin gold finish
+// Used as primary action colour across all panels
 export const lightColors = {
-  accent: '#007AFF',
+  accent: '#C9973A',
   bg: 'transparent',
-  card: 'rgba(255,255,255,0.65)',
-  cardDark: 'rgba(60,60,67,0.06)',
-  text: '#000000',
+  card: 'rgba(255,255,255,0.75)',
+  cardDark: 'rgba(60,60,67,0.07)',
+  text: '#1C1C1E',
   muted: '#8E8E93',
-  border: 'rgba(60,60,67,0.12)',
+  border: 'rgba(60,60,67,0.14)',
   panelBg: 'transparent',
-  optionCard: 'rgba(255,255,255,0.65)',
-  optionCardBorder: 'rgba(60,60,67,0.1)',
-  stripBg: 'rgba(60,60,67,0.06)',
-  searchBg: 'rgba(60,60,67,0.06)',
-  searchBorder: 'rgba(60,60,67,0.1)',
-  pillBg: 'rgba(60,60,67,0.06)',
-  pillBorder: 'rgba(60,60,67,0.1)',
+  optionCard: 'rgba(255,255,255,0.75)',
+  optionCardBorder: 'rgba(60,60,67,0.12)',
+  stripBg: 'rgba(60,60,67,0.07)',
+  searchBg: 'rgba(60,60,67,0.07)',
+  searchBorder: 'rgba(60,60,67,0.12)',
+  pillBg: 'rgba(60,60,67,0.07)',
+  pillBorder: 'rgba(60,60,67,0.12)',
   ctaText: '#FFFFFF',
-  markerBg: '#000000',
-  markerBorder: '#000000',
+  markerBg: '#C9973A',
+  markerBorder: '#C9973A',
 };
 
 export const darkColors = {
-  accent: '#0A84FF',
+  accent: '#D4A843',
   bg: 'transparent',
-  card: 'rgba(28,28,30,0.85)',
-  cardDark: 'rgba(255,255,255,0.08)',
-  text: '#FFFFFF',
+  card: 'rgba(28,28,30,0.92)',
+  cardDark: 'rgba(255,255,255,0.09)',
+  text: '#F2F2F7',
   muted: '#8E8E93',
-  border: 'rgba(255,255,255,0.12)',
+  border: 'rgba(255,255,255,0.13)',
   panelBg: 'transparent',
-  optionCard: 'rgba(44,44,46,0.85)',
-  optionCardBorder: 'rgba(255,255,255,0.1)',
-  stripBg: 'rgba(255,255,255,0.06)',
-  searchBg: 'rgba(255,255,255,0.08)',
-  searchBorder: 'rgba(255,255,255,0.12)',
-  pillBg: 'rgba(255,255,255,0.08)',
-  pillBorder: 'rgba(255,255,255,0.12)',
-  ctaText: '#000000',
-  markerBg: '#FFFFFF',
-  markerBorder: '#FFFFFF',
+  optionCard: 'rgba(44,44,46,0.92)',
+  optionCardBorder: 'rgba(255,255,255,0.11)',
+  stripBg: 'rgba(255,255,255,0.07)',
+  searchBg: 'rgba(255,255,255,0.09)',
+  searchBorder: 'rgba(255,255,255,0.13)',
+  pillBg: 'rgba(255,255,255,0.09)',
+  pillBorder: 'rgba(255,255,255,0.13)',
+  ctaText: '#1C1C1E',
+  markerBg: '#D4A843',
+  markerBorder: '#D4A843',
 };
 
 export const colors = lightColors;

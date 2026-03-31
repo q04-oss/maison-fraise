@@ -4,26 +4,28 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Maison Fraise — Operator</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --green:   #1C3A2A;
-      --green2:  #2A5240;
-      --cream:   #F5F0E8;
-      --card:    #EDEAE0;
-      --text:    #1C1C1E;
-      --muted:   #6B6B6B;
-      --border:  rgba(28,58,42,0.12);
-      --gold:    #C4973A;
-      --red:     #C0392B;
+      --bg:      #0C0C0E;
+      --bg2:     #0A0A0C;
+      --card:    rgba(28,28,30,0.95);
+      --card2:   #1A1A1C;
+      --amber:   #C9973A;
+      --amber2:  #D4A843;
+      --text:    #F2F2F7;
+      --muted:   rgba(242,242,247,0.42);
+      --border:  rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.13);
+      --red:     rgba(220,80,80,0.9);
       --radius:  14px;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--cream);
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
     }
@@ -37,25 +39,65 @@
       justify-content: center;
       padding: 40px 24px;
       gap: 32px;
+      background: var(--bg2);
+      position: relative;
+      overflow: hidden;
     }
 
-    .logo-block { text-align: center; }
+    /* Subtle grid behind PIN */
+    #pin-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* Amber glow */
+    #pin-screen::after {
+      content: '';
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201,151,58,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .logo-block {
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
     .logo-title {
       font-family: 'Playfair Display', serif;
+      font-style: italic;
       font-size: 32px;
-      color: var(--green);
-      letter-spacing: 0.5px;
+      color: var(--text);
+      letter-spacing: 0.3px;
     }
+
     .logo-sub {
-      font-size: 11px;
-      letter-spacing: 2px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 6px;
+      color: var(--amber);
+      margin-top: 8px;
     }
 
     .pin-card {
-      background: white;
+      background: var(--card);
+      border: 1px solid var(--border2);
       border-radius: var(--radius);
       padding: 28px 24px;
       width: 100%;
@@ -63,41 +105,46 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
-      box-shadow: 0 2px 20px rgba(28,58,42,0.08);
+      position: relative;
+      z-index: 1;
     }
 
     .pin-label {
-      font-size: 11px;
-      letter-spacing: 1.8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
       text-transform: uppercase;
       color: var(--muted);
-      font-weight: 600;
     }
 
     .pin-input {
       width: 100%;
       padding: 14px 16px;
-      font-size: 18px;
-      letter-spacing: 6px;
-      border: 1.5px solid var(--border);
+      font-size: 22px;
+      letter-spacing: 8px;
+      border: 1px solid var(--border2);
       border-radius: 10px;
-      background: var(--cream);
+      background: rgba(255,255,255,0.04);
       color: var(--text);
       outline: none;
       text-align: center;
+      font-family: 'DM Mono', monospace;
+      transition: border-color 0.2s;
     }
-    .pin-input:focus { border-color: var(--green); }
+    .pin-input:focus { border-color: var(--amber); }
+    .pin-input::placeholder { opacity: 0.3; }
 
     .pin-btn {
       width: 100%;
-      padding: 15px;
-      background: var(--green);
-      color: white;
+      padding: 16px;
+      background: var(--amber);
+      color: #0C0C0E;
       border: none;
       border-radius: 30px;
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 2px;
       text-transform: uppercase;
       cursor: pointer;
       transition: opacity 0.15s;
@@ -105,50 +152,66 @@
     .pin-btn:active { opacity: 0.8; }
 
     .pin-error {
-      font-size: 13px;
-      color: var(--red);
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: #E05A5A;
       text-align: center;
       min-height: 18px;
+      letter-spacing: 0.5px;
     }
 
     /* ── DASHBOARD SHELL ────────────────────────────── */
     #dashboard { display: none; flex-direction: column; min-height: 100vh; }
 
     .dash-header {
-      background: var(--green);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
       padding: 52px 20px 20px;
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
       gap: 12px;
     }
+
     .dash-header-left { display: flex; flex-direction: column; gap: 4px; }
+
     .dash-role {
-      font-size: 11px;
-      letter-spacing: 2px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.5);
-      font-weight: 600;
+      color: var(--amber);
     }
+
     .dash-title {
       font-family: 'Playfair Display', serif;
       font-size: 30px;
-      color: white;
+      color: var(--text);
     }
-    .dash-date { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+    .dash-date {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 0.3px;
+    }
 
     .logout-btn {
-      background: rgba(255,255,255,0.12);
-      border: none;
-      color: rgba(255,255,255,0.7);
-      font-size: 12px;
-      letter-spacing: 1px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
-      padding: 8px 14px;
+      padding: 9px 16px;
       border-radius: 20px;
       cursor: pointer;
       white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
     }
+    .logout-btn:hover { color: var(--text); border-color: var(--border2); }
 
     .dash-body { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; }
 
@@ -164,107 +227,172 @@
 
     .pill {
       flex-shrink: 0;
-      padding: 6px 14px;
+      padding: 7px 16px;
       border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
       letter-spacing: 0.5px;
       cursor: pointer;
-      border: 1.5px solid var(--border);
-      background: white;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
       color: var(--muted);
       transition: all 0.15s;
     }
-    .pill.active { background: var(--green); color: white; border-color: var(--green); }
+    .pill.active {
+      background: var(--amber);
+      color: #0C0C0E;
+      border-color: var(--amber);
+    }
 
     /* ── ORDER CARD ─────────────────────────────────── */
     .order-card {
-      background: white;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      box-shadow: 0 1px 6px rgba(28,58,42,0.06);
     }
 
     .order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-    .order-id { font-size: 11px; color: var(--muted); font-weight: 600; letter-spacing: 0.5px; }
-    .order-email { font-size: 13px; color: var(--text); font-weight: 500; margin-top: 2px; }
+
+    .order-id {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    .order-email {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+      margin-top: 2px;
+    }
 
     .status-badge {
       flex-shrink: 0;
-      padding: 4px 10px;
+      padding: 4px 11px;
       border-radius: 20px;
+      font-family: 'DM Mono', monospace;
       font-size: 10px;
-      font-weight: 700;
       letter-spacing: 0.8px;
       text-transform: uppercase;
     }
 
     .order-items { display: flex; flex-direction: column; gap: 4px; }
-    .order-variety { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--text); }
-    .order-details { font-size: 13px; color: var(--muted); }
-    .order-meta { font-size: 12px; color: var(--muted); }
+
+    .order-variety {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px;
+      color: var(--text);
+    }
+
+    .order-details {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .order-meta {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+    }
 
     .gift-badge {
       display: inline-block;
-      background: #FFF3CD;
-      color: #856404;
+      background: rgba(201,151,58,0.15);
+      color: var(--amber);
+      font-family: 'DM Mono', monospace;
       font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      padding: 2px 8px;
+      letter-spacing: 0.8px;
+      padding: 3px 9px;
       border-radius: 10px;
       text-transform: uppercase;
     }
 
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
     .action-btn {
-      padding: 7px 14px;
+      padding: 8px 16px;
       border-radius: 20px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.8px;
       text-transform: uppercase;
       cursor: pointer;
-      border: 1.5px solid var(--border);
-      background: var(--cream);
+      border: 1px solid var(--border2);
+      background: rgba(255,255,255,0.05);
       color: var(--text);
       transition: all 0.15s;
     }
     .action-btn:active { opacity: 0.7; }
-    .action-btn.primary { background: var(--green); color: white; border-color: var(--green); }
-    .action-btn.danger { background: var(--red); color: white; border-color: var(--red); }
+
+    .action-btn.primary {
+      background: var(--amber);
+      color: #0C0C0E;
+      border-color: var(--amber);
+    }
+
+    .action-btn.danger {
+      background: transparent;
+      color: rgba(220,100,100,0.85);
+      border-color: rgba(220,80,80,0.3);
+    }
+    .action-btn.danger:active { background: rgba(220,80,80,0.1); }
 
     /* ── ALERT CARD ─────────────────────────────────── */
     .alert-card {
-      background: white;
+      background: var(--card);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 16px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      box-shadow: 0 1px 6px rgba(28,58,42,0.06);
     }
-    .alert-name { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--text); }
-    .alert-farm { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .alert-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 17px;
+      color: var(--text);
+    }
+
+    .alert-farm {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
     .stock-num {
       font-family: 'Playfair Display', serif;
       font-size: 28px;
-      font-weight: 700;
-      color: var(--red);
+      color: #E05A5A;
     }
-    .stock-label { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: 0.5px; text-transform: uppercase; }
+
+    .stock-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
 
     /* ── SLOT GROUP ─────────────────────────────────── */
     .slot-group { display: flex; flex-direction: column; gap: 8px; }
+
     .slot-heading {
-      font-size: 11px;
-      font-weight: 700;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      color: var(--muted);
+      color: var(--amber);
       padding: 0 4px;
     }
 
@@ -272,18 +400,19 @@
     .empty {
       text-align: center;
       color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
       font-size: 14px;
       font-style: italic;
       padding: 40px 0;
     }
 
     /* ── STATUS COLORS ──────────────────────────────── */
-    .s-pending    { background: #F0F0F0; color: #6B6B6B; }
-    .s-paid       { background: #D4EDDA; color: #1A5C2E; }
-    .s-preparing  { background: #FFF0D4; color: #7A4A00; }
-    .s-ready      { background: #D0E8FF; color: #003E7A; }
-    .s-collected  { background: #E8F5E9; color: #1C3A2A; }
-    .s-cancelled  { background: #FDECEA; color: #7A1A1A; }
+    .s-pending   { background: rgba(255,255,255,0.06); color: rgba(242,242,247,0.4); }
+    .s-paid      { background: rgba(201,151,58,0.18); color: #D4A843; }
+    .s-preparing { background: rgba(255,160,50,0.14); color: rgba(255,185,100,0.9); }
+    .s-ready     { background: rgba(100,180,255,0.12); color: rgba(130,200,255,0.85); }
+    .s-collected { background: rgba(100,200,120,0.1); color: rgba(130,210,140,0.75); }
+    .s-cancelled { background: rgba(220,80,80,0.12); color: rgba(220,110,110,0.85); }
   </style>
 </head>
 <body>
@@ -446,7 +575,7 @@
     const fin = FINISH_NAMES[o.finish] || o.finish;
     const total = (o.total_cents / 100).toFixed(2);
     const next = STATUS_NEXT[o.status];
-    const slotMeta = o.slot_date && o.slot_time ? `${o.slot_date} at ${o.slot_time}` : `Slot #${o.time_slot_id}`;
+    const slotMeta = o.slot_date && o.slot_time ? `${o.slot_date} · ${o.slot_time}` : `Slot #${o.time_slot_id}`;
 
     const actions = [];
     if (next) {

@@ -81,6 +81,6 @@ const styles = StyleSheet.create({
   standingBtn: { borderRadius: 14, padding: SPACING.md, width: '100%', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
   standingBtnText: { fontSize: 14, fontFamily: fonts.playfair },
   footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth },
-  doneBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  doneBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   doneBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
 });

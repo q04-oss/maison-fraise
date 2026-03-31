@@ -46,7 +46,8 @@ export default function HomePanel() {
   }, []);
 
   const handleFocus = () => {
-    setFocused(true);
+    Keyboard.dismiss();
+    showPanel('ask');
     TrueSheet.present('main-sheet', 2);
   };
 
@@ -88,7 +89,7 @@ export default function HomePanel() {
         <TextInput
           ref={inputRef}
           style={[styles.searchBar, { backgroundColor: c.searchBg, borderColor: c.searchBorder, color: c.text, flex: 1 }]}
-          placeholder="Ask about today's strawberries…"
+          placeholder=""
           placeholderTextColor={c.muted}
           value={query}
           onChangeText={setQuery}
@@ -173,60 +174,60 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
   },
-  wordmark: { fontSize: 16, fontFamily: fonts.playfairItalic, letterSpacing: 0.5 },
+  wordmark: { fontSize: 18, fontFamily: fonts.playfairItalic, letterSpacing: 0.5 },
   profileBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileIcon: { fontSize: 18 },
+  profileIcon: { fontSize: 20 },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    marginBottom: 8,
+    marginBottom: 10,
     gap: 8,
   },
   searchBar: {
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: fonts.dmSans,
   },
-  cancelBtn: { paddingVertical: 6 },
-  cancelText: { fontSize: 15, fontFamily: fonts.dmSans },
-  pillRow: { paddingHorizontal: SPACING.md, paddingBottom: 8, gap: 8 },
+  cancelBtn: { paddingVertical: 8 },
+  cancelText: { fontSize: 16, fontFamily: fonts.dmSans },
+  pillRow: { paddingHorizontal: SPACING.md, paddingBottom: 10, gap: 8 },
   pill: {
     borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  pillText: { fontSize: 12, fontFamily: fonts.dmSans },
-  locationHeader: { paddingHorizontal: SPACING.md, paddingBottom: 8, gap: 2 },
+  pillText: { fontSize: 13, fontFamily: fonts.dmSans },
+  locationHeader: { paddingHorizontal: SPACING.md, paddingBottom: 10, gap: 3 },
   locationTypeLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
-  locationName: { fontSize: 18, fontFamily: fonts.playfair },
-  locationAddress: { fontSize: 12, fontFamily: fonts.dmSans },
+  locationName: { fontSize: 22, fontFamily: fonts.playfair },
+  locationAddress: { fontSize: 13, fontFamily: fonts.dmSans },
   list: { flex: 1 },
-  emptyText: { fontSize: 14, fontFamily: fonts.dmSans, textAlign: 'center', marginTop: 24, fontStyle: 'italic' },
+  emptyText: { fontSize: 15, fontFamily: fonts.dmSans, textAlign: 'center', marginTop: 24, fontStyle: 'italic' },
   varietyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 10,
+    gap: 12,
   },
-  varietyDot: { width: 6, height: 6, borderRadius: 3 },
-  varietyInfo: { flex: 1, gap: 2 },
-  varietyName: { fontSize: 15, fontFamily: fonts.playfair },
-  varietyFarm: { fontSize: 11, fontFamily: fonts.dmSans },
-  varietyRight: { alignItems: 'flex-end', gap: 2 },
-  varietyPrice: { fontSize: 12, fontFamily: fonts.dmMono },
-  varietyStock: { fontSize: 10, fontFamily: fonts.dmSans },
+  varietyDot: { width: 8, height: 8, borderRadius: 4 },
+  varietyInfo: { flex: 1, gap: 3 },
+  varietyName: { fontSize: 17, fontFamily: fonts.playfair },
+  varietyFarm: { fontSize: 12, fontFamily: fonts.dmSans },
+  varietyRight: { alignItems: 'flex-end', gap: 3 },
+  varietyPrice: { fontSize: 13, fontFamily: fonts.dmMono },
+  varietyStock: { fontSize: 11, fontFamily: fonts.dmSans },
 });

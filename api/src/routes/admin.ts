@@ -119,6 +119,29 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/varieties — create a variety
+router.post('/varieties', async (req: Request, res: Response) => {
+  const { name, description, source_farm, source_location, price_cents, stock_remaining, tag } = req.body;
+  if (!name || !price_cents) {
+    res.status(400).json({ error: 'name and price_cents are required' });
+    return;
+  }
+  try {
+    const [variety] = await db.insert(varieties).values({
+      name,
+      description: description ?? null,
+      source_farm: source_farm ?? null,
+      source_location: source_location ?? null,
+      price_cents,
+      stock_remaining: stock_remaining ?? 0,
+      tag: tag ?? null,
+    }).returning();
+    res.status(201).json(variety);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // PATCH /api/admin/varieties/:id/stock — update stock level
 router.patch('/varieties/:id/stock', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);

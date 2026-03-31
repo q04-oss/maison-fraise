@@ -18,7 +18,7 @@ export default function MapScreen() {
   const { setBusinesses, setActiveLocation, businesses, goHome } = usePanel();
   const { isDark } = useTheme();
   const c = useColors();
-  const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.5);
+  const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
   const mapRef = useRef<MapView>(null);
   const userCoords = useRef<{ latitude: number; longitude: number } | null>(null);
 
@@ -29,7 +29,12 @@ export default function MapScreen() {
 
   useEffect(() => {
     fetchBusinesses()
-      .then((data: any[]) => setBusinesses(data))
+      .then((data: any[]) => {
+        setBusinesses(data);
+        // Auto-select the first collection point so location_id is never null
+        const defaultCollection = data.find(b => b.type === 'collection');
+        if (defaultCollection) setActiveLocation(defaultCollection);
+      })
       .catch(() => {});
   }, []);
 
@@ -82,10 +87,10 @@ export default function MapScreen() {
         ref={mapRef}
         style={StyleSheet.absoluteFill}
         initialRegion={{
-          latitude: 53.5461,
-          longitude: -113.4938,
-          latitudeDelta: 0.08,
-          longitudeDelta: 0.08,
+          latitude: 45.4734,
+          longitude: -73.5773,
+          latitudeDelta: 0.04,
+          longitudeDelta: 0.04,
         }}
         userInterfaceStyle={isDark ? 'dark' : 'light'}
         showsUserLocation
@@ -115,24 +120,12 @@ export default function MapScreen() {
             coordinate={{ latitude: b.lat, longitude: b.lng }}
             onPress={() => handleMarkerPress(b)}
           >
-            <View style={styles.pinPartner}>
+            <View style={[styles.pinPartner, { borderColor: c.markerBg }]}>
               <View style={[styles.pinPartnerDot, { backgroundColor: c.markerBg }]} />
             </View>
           </Marker>
         ))}
       </MapView>
-
-      {/* Floating action buttons — right side, just above sheet */}
-      <View style={[styles.fabStack, { bottom: fabBottom }]}>
-        <TouchableOpacity style={styles.fab} onPress={handleShowAll} activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>🍓</Text>
-          <Text style={styles.fabLabel}>Nearby</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fab} onPress={handleLocateMe} activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>⊕</Text>
-          <Text style={styles.fabLabel}>Locate</Text>
-        </TouchableOpacity>
-      </View>
 
       <TrueSheet
         name={SHEET_NAME}
@@ -148,6 +141,18 @@ export default function MapScreen() {
           <PanelNavigator />
         </View>
       </TrueSheet>
+
+      {/* FABs rendered after TrueSheet so they sit on top */}
+      <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
+        <TouchableOpacity style={styles.fab} onPress={handleShowAll} activeOpacity={0.8}>
+          <Text style={styles.fabIcon}>🍓</Text>
+          <Text style={styles.fabLabel}>Nearby</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.fab} onPress={handleLocateMe} activeOpacity={0.8}>
+          <Text style={styles.fabIcon}>⊕</Text>
+          <Text style={styles.fabLabel}>Locate</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -161,31 +166,50 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    gap: 2,
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    gap: 3,
   },
   fabIcon: {
-    fontSize: 26,
+    fontSize: 28,
   },
   fabLabel: {
-    fontSize: 10,
-    color: '#000',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#1C1C1E',
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
   pinCollection: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  pinCollectionDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#fff',
+  },
+  pinPartner: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -193,29 +217,9 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
   },
-  pinCollectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-  },
-  pinPartner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    shadowOffset: { width: 0, height: 1 },
-  },
   pinPartnerDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
   },
 });
