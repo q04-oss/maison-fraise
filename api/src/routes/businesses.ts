@@ -9,7 +9,11 @@ const router = Router();
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const rows = await db.select().from(businesses);
-    res.json(rows);
+    res.json(rows.map(b => ({
+      ...b,
+      lat: b.latitude ? parseFloat(String(b.latitude)) : null,
+      lng: b.longitude ? parseFloat(String(b.longitude)) : null,
+    })));
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

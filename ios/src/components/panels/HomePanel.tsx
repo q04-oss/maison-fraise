@@ -56,7 +56,13 @@ export default function HomePanel() {
   };
 
   const handleVarietyPress = (v: Variety) => {
-    setOrder({ variety_id: v.id, variety_name: v.name, price_cents: v.price_cents });
+    setOrder({
+      variety_id: v.id,
+      variety_name: v.name,
+      price_cents: v.price_cents,
+      location_id: activeLocation?.id ?? null,
+      location_name: activeLocation?.name ?? null,
+    });
     showPanel('variety');
     TrueSheet.present('main-sheet', 2);
   };

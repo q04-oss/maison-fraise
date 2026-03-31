@@ -59,7 +59,7 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 1.0,
-    freshnessColor: '#C4973A',
+    freshnessColor: '#007AFF',
     isPreOrder: true,
   },
   {
@@ -75,7 +75,7 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 0.72,
-    freshnessColor: '#1C3A2A',
+    freshnessColor: '#007AFF',
   },
   {
     id: 'seascape',
@@ -90,7 +90,7 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 0.48,
-    freshnessColor: '#1C3A2A',
+    freshnessColor: '#007AFF',
   },
 ];
 

@@ -157,6 +157,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
     setCurrentPanel('home');
     slideAnim.setValue(0);
     setIsAnimating(false);
+    setOrderState(defaultOrder);
   }, [slideAnim]);
 
   return (

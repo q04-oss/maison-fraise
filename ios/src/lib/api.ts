@@ -58,18 +58,6 @@ export async function searchVerifiedUsers(q: string) {
   return res.json();
 }
 
-export async function verifyNfc(nfc_token: string, user_id: string) {
-  const res = await fetch(`${BASE_URL}/api/verify/nfc`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nfc_token, user_id }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error ?? 'Verification failed');
-  }
-  return res.json();
-}
 
 export async function generateGiftNote(tone: string, variety_name: string, recipient_context: string) {
   const res = await fetch(`${BASE_URL}/api/gift-note`, {
@@ -168,5 +156,32 @@ export async function confirmOrder(orderId: number) {
     chocolate: string;
     finish: string;
     quantity: number;
+    user_db_id: number;
   }>;
+}
+
+export async function signInWithApple(identity_token: string): Promise<{ user_db_id: number; email: string }> {
+  const res = await fetch(`${BASE_URL}/api/auth/apple`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity_token }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error ?? 'Sign in failed');
+  }
+  return res.json();
+}
+
+export async function verifyNfc(nfc_token: string, user_db_id: number) {
+  const res = await fetch(`${BASE_URL}/api/verify/nfc`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nfc_token, user_id: user_db_id }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error ?? 'Verification failed');
+  }
+  return res.json();
 }

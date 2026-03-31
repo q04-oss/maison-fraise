@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { Animated, StyleSheet, Dimensions } from 'react-native';
 import { usePanel } from '../context/PanelContext';
 import HomePanel from './panels/HomePanel';
 import AskPanel from './panels/AskPanel';
@@ -13,6 +13,8 @@ import ConfirmationPanel from './panels/ConfirmationPanel';
 import NFCPanel from './panels/NFCPanel';
 import VerifiedPanel from './panels/VerifiedPanel';
 import StandingOrderPanel from './panels/StandingOrderPanel';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -30,18 +32,23 @@ const PANELS: Record<string, React.ComponentType<any>> = {
 };
 
 export default function PanelNavigator() {
-  const { currentPanel } = usePanel();
+  const { currentPanel, slideAnim } = usePanel();
   const CurrentComponent = PANELS[currentPanel] ?? HomePanel;
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, {
+      transform: [{
+        translateX: slideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, SCREEN_WIDTH],
+        }),
+      }],
+    }]}>
       <CurrentComponent />
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 });

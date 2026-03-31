@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useApp } from '../../../App';
 import { createOrder, confirmOrder } from '../../lib/api';
@@ -77,6 +78,9 @@ export default function ReviewPanel() {
         nfc_token: confirmed.nfc_token ?? null,
         total_cents: confirmed.total_cents ?? totalCents,
       });
+      if (confirmed.user_db_id) {
+        await AsyncStorage.setItem('user_db_id', String(confirmed.user_db_id));
+      }
       showPanel('confirmation');
     } catch (err: unknown) {
       Alert.alert('Something went wrong.', err instanceof Error ? err.message : 'Try again.');

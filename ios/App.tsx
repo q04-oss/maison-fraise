@@ -3,7 +3,6 @@ import { View, ActivityIndicator, Platform } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import * as Notifications from 'expo-notifications';
 import {
@@ -14,7 +13,6 @@ import {
 } from '@expo-google-fonts/playfair-display';
 import { DMSans_400Regular, DMSans_500Medium } from '@expo-google-fonts/dm-sans';
 import { DMMono_400Regular } from '@expo-google-fonts/dm-mono';
-import { OrderProvider } from './src/context/OrderContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import { COLORS } from './src/theme';
 import { enableReviewMode as activateReviewMode } from './src/lib/reviewMode';
@@ -74,7 +72,7 @@ export default function App() {
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const screen = response.notification.request.content.data?.screen;
       if (screen === 'NFCVerify') {
-        navigationRef.current?.navigate('NFCVerify');
+        navigationRef.current?.navigate('Main');
       }
     });
 
@@ -105,12 +103,9 @@ export default function App() {
     <AppContext.Provider value={{ reviewMode, enableReviewMode: handleEnableReviewMode, pushToken }}>
       <StripeProvider key={reviewMode ? 'test' : 'live'} publishableKey={publishableKey} merchantIdentifier="merchant.com.maisonfraise">
         <SafeAreaProvider>
-          <StatusBar style="light" />
-          <OrderProvider>
-            <NavigationContainer ref={navigationRef}>
-              <RootNavigator />
-            </NavigationContainer>
-          </OrderProvider>
+          <NavigationContainer ref={navigationRef}>
+            <RootNavigator />
+          </NavigationContainer>
         </SafeAreaProvider>
       </StripeProvider>
     </AppContext.Provider>

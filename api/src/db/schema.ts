@@ -123,6 +123,7 @@ export const orders = pgTable('orders', {
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
+  apple_user_id: text('apple_user_id').unique(),
   email: text('email').notNull().unique(),
   verified: boolean('verified').notNull().default(false),
   verified_at: timestamp('verified_at'),

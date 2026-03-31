@@ -16,6 +16,7 @@ import campaignsRouter from './routes/campaigns';
 import businessesRouter from './routes/businesses';
 import posRouter from './routes/pos';
 import askRouter from './routes/ask';
+import authRouter from './routes/auth';
 import { logger } from './lib/logger';
 
 const app = express();
@@ -46,6 +47,7 @@ app.use('/api/campaigns', campaignsRouter);
 app.use('/api/businesses', businessesRouter);
 app.use('/api/pos', posRouter);
 app.use('/api/ask', askRouter);
+app.use('/api/auth', authRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

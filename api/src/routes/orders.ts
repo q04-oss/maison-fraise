@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
-import { orders, varieties, timeSlots, legitimacyEvents } from '../db/schema';
+import { orders, varieties, timeSlots, legitimacyEvents, users } from '../db/schema';
 import { stripe, stripeTest } from '../lib/stripe';
 import { sendOrderConfirmation } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -132,6 +132,16 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
 
     const nfc_token = randomUUID();
 
+    // Upsert user by email so we have a stable numeric ID for verification + standing orders
+    const existingUsers = await db.select({ id: users.id }).from(users).where(eq(users.email, order.customer_email));
+    let dbUserId: number;
+    if (existingUsers.length > 0) {
+      dbUserId = existingUsers[0].id;
+    } else {
+      const [newUser] = await db.insert(users).values({ email: order.customer_email }).returning({ id: users.id });
+      dbUserId = newUser.id;
+    }
+
     await db.transaction(async (tx) => {
       await tx.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
       // In review mode, skip stock/slot mutations so live inventory is unaffected
@@ -145,7 +155,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
           .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
           .where(eq(timeSlots.id, order.time_slot_id));
         await tx.insert(legitimacyEvents).values({
-          user_id: id,
+          user_id: dbUserId,
           event_type: 'order_placed',
           weight: 1,
         });
@@ -173,7 +183,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ ...updated, nfc_token });
+    res.json({ ...updated, nfc_token, user_db_id: dbUserId });
   } catch (err) {
     logger.error('Order confirm error', err);
     res.status(500).json({ error: 'Internal server error' });

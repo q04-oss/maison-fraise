@@ -45,10 +45,6 @@ export const lightColors = {
   ctaText: '#FFFFFF',
   markerBg: '#000000',
   markerBorder: '#000000',
-  // keep for legacy panel refs
-  green: '#1C3A2A',
-  cream: '#FFFFFF',
-  gold: '#C4973A',
 };
 
 export const darkColors = {
@@ -70,10 +66,6 @@ export const darkColors = {
   ctaText: '#000000',
   markerBg: '#FFFFFF',
   markerBorder: '#FFFFFF',
-  // keep for legacy panel refs
-  green: '#2A5C3F',
-  cream: '#FFFFFF',
-  gold: '#D4A955',
 };
 
 export const colors = lightColors;

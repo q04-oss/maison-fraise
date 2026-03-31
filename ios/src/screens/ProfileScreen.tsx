@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Switch,
+  StyleSheet, ActivityIndicator, Switch, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { getUserId } from '../lib/userId';
-import { useColors, colors, fonts } from '../theme';
+import { signInWithApple } from '../lib/api';
+import { setVerified } from '../lib/userId';
+import { useColors, fonts } from '../theme';
 import { useTheme } from '../context/ThemeContext';
 import { SPACING } from '../theme';
 
@@ -15,25 +18,54 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const c = useColors();
   const { isDark, toggleTheme } = useTheme();
-  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isVerified, setIsVerifiedState] = useState(false);
+  const [appleAvailable, setAppleAvailable] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [signingIn, setSigningIn] = useState(false);
 
   useEffect(() => {
-    getUserId()
-      .then(setUserId)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      AsyncStorage.getItem('user_email'),
+      AsyncStorage.getItem('verified'),
+      AppleAuthentication.isAvailableAsync().catch(() => false),
+    ]).then(([email, verified, available]) => {
+      if (email) setUserEmail(email);
+      setIsVerifiedState(verified === 'true');
+      setAppleAvailable(available as boolean);
+    }).finally(() => setLoading(false));
   }, []);
 
-  const initials = userId ? userId.substring(3, 7) : '—';
+  const handleAppleSignIn = async () => {
+    setSigningIn(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('No identity token received.');
+      const result = await signInWithApple(credential.identityToken);
+      await AsyncStorage.setItem('user_db_id', String(result.user_db_id));
+      await AsyncStorage.setItem('user_email', result.email);
+      setUserEmail(result.email);
+    } catch (err: any) {
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
+        Alert.alert('Sign in failed', err.message ?? 'Please try again.');
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: c.green }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>← BACK</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 12, borderBottomColor: c.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+          <Text style={[styles.backText, { color: c.accent }]}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <Text style={[styles.headerTitle, { color: c.text }]}>Profile</Text>
       </View>
 
       <ScrollView
@@ -42,18 +74,48 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {loading ? (
-          <ActivityIndicator color={c.green} style={{ marginTop: 40 }} />
+          <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
+            {/* Identity */}
             <View style={styles.avatarSection}>
               <View style={[styles.avatar, { backgroundColor: c.card, borderColor: c.border }]}>
-                <View style={[styles.avatarHollow, { borderColor: c.muted }]} />
+                {userEmail ? (
+                  <Text style={[styles.avatarInitial, { color: c.accent }]}>
+                    {userEmail[0].toUpperCase()}
+                  </Text>
+                ) : (
+                  <View style={[styles.avatarHollow, { borderColor: c.muted }]} />
+                )}
               </View>
-              <Text style={[styles.userId, { color: c.muted }]}>{userId}</Text>
+              {userEmail ? (
+                <View style={styles.identityText}>
+                  <Text style={[styles.userEmail, { color: c.text }]}>{userEmail}</Text>
+                  {isVerified && (
+                    <Text style={[styles.verifiedBadge, { color: c.accent }]}>Verified member</Text>
+                  )}
+                </View>
+              ) : (
+                <Text style={[styles.guestLabel, { color: c.muted }]}>Not signed in</Text>
+              )}
             </View>
 
+            {/* Sign in with Apple */}
+            {!userEmail && appleAvailable && (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={isDark
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                cornerRadius={14}
+                style={styles.appleBtn}
+                onPress={handleAppleSignIn}
+              />
+            )}
+            {signingIn && <ActivityIndicator color={c.accent} />}
+
             {/* Appearance */}
-            <View style={[styles.card, { backgroundColor: c.card }]}>
+            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={[styles.toggleLabel, { color: c.text }]}>Dark mode</Text>
@@ -62,22 +124,24 @@ export default function ProfileScreen() {
                 <Switch
                   value={isDark}
                   onValueChange={toggleTheme}
-                  trackColor={{ true: c.green }}
-                  thumbColor={c.cream}
+                  trackColor={{ true: c.accent }}
+                  thumbColor="#FFFFFF"
                 />
               </View>
             </View>
 
-            {/* How to get verified */}
-            <View style={[styles.instructionCard, { backgroundColor: c.card }]}>
-              <Text style={[styles.instructionTitle, { color: c.text }]}>How to get verified</Text>
-              <Text style={[styles.instructionText, { color: c.muted }]}>
-                Place an order. When you pick it up, open the box and tap your phone to the NFC chip inside the lid.
-              </Text>
-              <Text style={[styles.instructionText, { color: c.muted }]}>
-                Verification links your order to your account and unlocks standing orders and campaign access.
-              </Text>
-            </View>
+            {/* Verification instructions */}
+            {!isVerified && (
+              <View style={[styles.instructionCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.instructionTitle, { color: c.text }]}>How to get verified</Text>
+                <Text style={[styles.instructionText, { color: c.muted }]}>
+                  Place an order. When you pick it up, open the box and tap your phone to the NFC chip inside the lid.
+                </Text>
+                <Text style={[styles.instructionText, { color: c.muted }]}>
+                  Verification links your order to your account and unlocks standing orders and campaign access.
+                </Text>
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -89,33 +153,33 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: SPACING.md,
-    paddingBottom: 24,
+    paddingBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backBtn: { paddingVertical: 6, marginBottom: 8 },
-  backText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, letterSpacing: 0.5, fontFamily: fonts.dmSans },
-  headerTitle: { color: colors.cream, fontSize: 34, fontFamily: fonts.playfair },
+  backText: { fontSize: 15, fontFamily: fonts.dmSans },
+  headerTitle: { fontSize: 34, fontFamily: fonts.playfair },
   avatarSection: { alignItems: 'center', paddingVertical: SPACING.lg, gap: 12 },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 80, height: 80, borderRadius: 40,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center', justifyContent: 'center',
   },
+  avatarInitial: { fontSize: 32, fontFamily: fonts.playfair },
   avatarHollow: { width: 28, height: 28, borderRadius: 14, borderWidth: 2 },
-  userId: { fontSize: 13, letterSpacing: 1.5, fontFamily: fonts.dmMono },
-  card: { borderRadius: 14, overflow: 'hidden' },
+  identityText: { alignItems: 'center', gap: 4 },
+  userEmail: { fontSize: 15, fontFamily: fonts.dmSans },
+  verifiedBadge: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 1 },
+  guestLabel: { fontSize: 13, fontFamily: fonts.dmSans },
+  appleBtn: { width: '100%', height: 52 },
+  card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 14,
-    gap: 12,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 12,
   },
   toggleLabel: { fontSize: 15, fontFamily: fonts.playfair },
   toggleDesc: { fontSize: 13, lineHeight: 19, fontFamily: fonts.dmSans },
-  instructionCard: { borderRadius: 14, padding: SPACING.md, gap: 12 },
+  instructionCard: { borderRadius: 14, padding: SPACING.md, gap: 12, borderWidth: StyleSheet.hairlineWidth },
   instructionTitle: { fontSize: 16, fontFamily: fonts.playfair },
   instructionText: { fontSize: 14, lineHeight: 22, fontFamily: fonts.dmSans },
 });

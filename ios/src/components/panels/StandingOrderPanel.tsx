@@ -1,10 +1,10 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { searchVerifiedUsers, generateGiftNote, createStandingOrder } from '../../lib/api';
-import { getUserId } from '../../lib/userId';
-import { colors, fonts } from '../../theme';
+import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
 const FREQUENCIES = [
@@ -17,7 +17,15 @@ const TONES = ['warm', 'funny', 'poetic', 'minimal'] as const;
 
 export default function StandingOrderPanel() {
   const { goBack, goHome, order } = usePanel();
+  const c = useColors();
+  const [userDbId, setUserDbId] = useState<number | null>(null);
   const [type, setType] = useState<'personal' | 'gift'>('personal');
+
+  useEffect(() => {
+    AsyncStorage.getItem('user_db_id').then(val => {
+      if (val) setUserDbId(parseInt(val, 10));
+    });
+  }, []);
   const [freq, setFreq] = useState('monthly');
   const [timePref, setTimePref] = useState(TIME_PREFS[0]);
   const [recipientQuery, setRecipientQuery] = useState('');
@@ -63,7 +71,7 @@ export default function StandingOrderPanel() {
       else next.setMonth(today.getMonth() + 1);
 
       await createStandingOrder({
-        sender_id: 0,
+        sender_id: userDbId!,
         recipient_id: type === 'gift' ? selectedRecipient?.id : undefined,
         variety_id: order.variety_id!,
         chocolate: order.chocolate!,
@@ -88,44 +96,48 @@ export default function StandingOrderPanel() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={goBack} style={styles.back}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Standing Order</Text>
+        <Text style={[styles.title, { color: c.text }]}>Standing Order</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {/* Toggle */}
-        <View style={styles.toggle}>
+        <View style={[styles.toggle, { backgroundColor: c.cardDark }]}>
           {(['personal', 'gift'] as const).map(t => (
-            <TouchableOpacity key={t} style={[styles.toggleOpt, type === t && styles.toggleOptActive]} onPress={() => setType(t)} activeOpacity={0.8}>
-              <Text style={[styles.toggleText, type === t && styles.toggleTextActive]}>{t === 'personal' ? 'Myself' : 'A gift'}</Text>
+            <TouchableOpacity
+              key={t}
+              style={[styles.toggleOpt, type === t && [styles.toggleOptActive, { backgroundColor: c.accent }]]}
+              onPress={() => setType(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, { color: type === t ? '#fff' : c.muted }]}>
+                {t === 'personal' ? 'Myself' : 'A gift'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {type === 'gift' && (
-          <View style={styles.card}>
-            <Text style={styles.sectionLabel}>RECIPIENT</Text>
+          <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>RECIPIENT</Text>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: c.text, borderBottomColor: c.border }]}
               placeholder="Search by member ID (MF-...)"
-              placeholderTextColor={colors.muted}
+              placeholderTextColor={c.muted}
               value={recipientQuery}
               onChangeText={handleSearch}
               autoCapitalize="characters"
             />
-            {searchLoading && <ActivityIndicator size="small" color={colors.green} style={{ marginTop: 8 }} />}
+            {searchLoading && <ActivityIndicator size="small" color={c.accent} style={{ marginTop: 8 }} />}
             {recipients.map(r => (
-              <TouchableOpacity key={r.id} style={styles.resultRow} onPress={() => { setSelectedRecipient(r); setRecipientQuery(r.user_id); setRecipients([]); }}>
-                <Text style={styles.resultText}>{r.user_id}</Text>
+              <TouchableOpacity key={r.id} style={[styles.resultRow, { borderBottomColor: c.border }]} onPress={() => { setSelectedRecipient(r); setRecipientQuery(r.user_id); setRecipients([]); }}>
+                <Text style={[styles.resultText, { color: c.text }]}>{r.user_id}</Text>
               </TouchableOpacity>
             ))}
             {selectedRecipient && (
-              <View style={styles.selectedRow}>
-                <Text style={styles.selectedText}>{selectedRecipient.user_id}</Text>
+              <View style={[styles.selectedRow, { backgroundColor: c.cardDark }]}>
+                <Text style={[styles.selectedText, { color: c.accent }]}>{selectedRecipient.user_id}</Text>
                 <TouchableOpacity onPress={() => { setSelectedRecipient(null); setRecipientQuery(''); }}>
-                  <Text style={styles.clearText}>✕</Text>
+                  <Text style={[styles.clearText, { color: c.muted }]}>✕</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -133,60 +145,91 @@ export default function StandingOrderPanel() {
         )}
 
         {/* Frequency */}
-        <Text style={styles.sectionLabel}>FREQUENCY</Text>
+        <Text style={[styles.sectionLabel, { color: c.muted }]}>FREQUENCY</Text>
         {FREQUENCIES.map(f => (
-          <TouchableOpacity key={f.key} style={[styles.freqCard, freq === f.key && styles.freqCardActive]} onPress={() => setFreq(f.key)} activeOpacity={0.8}>
-            <Text style={[styles.freqLabel, freq === f.key && styles.freqLabelActive]}>{f.label}</Text>
-            <Text style={[styles.freqDesc, freq === f.key && styles.freqDescActive]}>{f.desc}</Text>
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.freqCard, { backgroundColor: c.card, borderColor: freq === f.key ? c.accent : 'transparent' }]}
+            onPress={() => setFreq(f.key)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.freqLabel, { color: freq === f.key ? c.accent : c.text }]}>{f.label}</Text>
+            <Text style={[styles.freqDesc, { color: freq === f.key ? c.accent : c.muted }]}>{f.desc}</Text>
           </TouchableOpacity>
         ))}
 
         {/* Time */}
-        <Text style={styles.sectionLabel}>PREFERRED TIME</Text>
+        <Text style={[styles.sectionLabel, { color: c.muted }]}>PREFERRED TIME</Text>
         <View style={styles.timeRow}>
           {TIME_PREFS.map(t => (
-            <TouchableOpacity key={t} style={[styles.timeChip, timePref === t && styles.timeChipActive]} onPress={() => setTimePref(t)} activeOpacity={0.8}>
-              <Text style={[styles.timeText, timePref === t && styles.timeTextActive]}>{t}</Text>
+            <TouchableOpacity
+              key={t}
+              style={[styles.timeChip, { backgroundColor: c.card, borderColor: timePref === t ? c.accent : 'transparent' }]}
+              onPress={() => setTimePref(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.timeText, { color: timePref === t ? c.accent : c.text, fontWeight: timePref === t ? '600' : '400' }]}>{t}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         {type === 'gift' && (
           <>
-            <Text style={styles.sectionLabel}>NOTE TONE</Text>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>NOTE TONE</Text>
             <View style={styles.toneRow}>
               {TONES.map(t => (
-                <TouchableOpacity key={t} style={[styles.toneChip, tone === t && styles.toneChipActive]} onPress={() => { setTone(t); setNotePreview(''); }} activeOpacity={0.8}>
-                  <Text style={[styles.toneText, tone === t && styles.toneTextActive]}>{t}</Text>
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.toneChip, { backgroundColor: c.card, borderColor: tone === t ? c.accent : 'transparent' }]}
+                  onPress={() => { setTone(t); setNotePreview(''); }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.toneText, { color: tone === t ? c.accent : c.text, fontWeight: tone === t ? '600' : '400' }]}>{t}</Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity style={styles.previewBtn} onPress={handlePreview} disabled={noteLoading} activeOpacity={0.8}>
-              {noteLoading ? <ActivityIndicator size="small" color={colors.green} /> : <Text style={styles.previewBtnText}>Preview note</Text>}
+            <TouchableOpacity
+              style={[styles.previewBtn, { backgroundColor: c.card, borderColor: c.border }]}
+              onPress={handlePreview}
+              disabled={noteLoading}
+              activeOpacity={0.8}
+            >
+              {noteLoading
+                ? <ActivityIndicator size="small" color={c.accent} />
+                : <Text style={[styles.previewBtnText, { color: c.accent }]}>Preview note</Text>
+              }
             </TouchableOpacity>
             {notePreview !== '' && (
-              <View style={styles.noteCard}>
-                <Text style={styles.noteLabel}>SAMPLE NOTE</Text>
-                <Text style={styles.noteText}>{notePreview}</Text>
+              <View style={[styles.noteCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.noteLabel, { color: c.muted }]}>SAMPLE NOTE</Text>
+                <Text style={[styles.noteText, { color: c.text }]}>{notePreview}</Text>
               </View>
             )}
           </>
         )}
 
         {/* Total */}
-        <View style={styles.totalCard}>
+        <View style={[styles.totalCard, { backgroundColor: c.card, borderColor: c.border }]}>
           <View>
-            <Text style={styles.totalLabel}>TOTAL PREPAYMENT</Text>
-            <Text style={styles.totalSub}>{selectedFreq.cycles} orders × CA${((order.price_cents ?? 0) * order.quantity / 100).toFixed(2)}</Text>
+            <Text style={[styles.totalLabel, { color: c.muted }]}>TOTAL PREPAYMENT</Text>
+            <Text style={[styles.totalSub, { color: c.muted }]}>{selectedFreq.cycles} orders × CA${((order.price_cents ?? 0) * order.quantity / 100).toFixed(2)}</Text>
           </View>
-          <Text style={styles.totalAmount}>CA${(totalCents / 100).toFixed(2)}</Text>
+          <Text style={[styles.totalAmount, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
         </View>
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={[styles.confirmBtn, submitting && styles.confirmBtnDisabled]} onPress={handleConfirm} disabled={submitting} activeOpacity={0.85}>
-          <Text style={styles.confirmBtnText}>{submitting ? 'Setting up...' : 'Confirm & Pay →'}</Text>
+      <View style={[styles.footer, { borderTopColor: c.border }]}>
+        <TouchableOpacity
+          style={[styles.confirmBtn, { backgroundColor: c.text }, submitting && styles.confirmBtnDisabled]}
+          onPress={handleConfirm}
+          disabled={submitting}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.confirmBtnText, { color: c.ctaText }]}>{submitting ? 'Setting up...' : 'Confirm & Pay'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={goBack} activeOpacity={0.6} style={styles.backLink}>
+          <Text style={[styles.backLinkText, { color: c.accent }]}>Back</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -195,51 +238,43 @@ export default function StandingOrderPanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { backgroundColor: colors.green, paddingHorizontal: SPACING.md, paddingTop: 16, paddingBottom: 24, gap: 4 },
-  back: { paddingVertical: 4, marginBottom: 8 },
-  backText: { color: 'rgba(255,255,255,0.5)', fontSize: 13, fontFamily: fonts.dmSans },
-  title: { color: colors.cream, fontSize: 28, fontFamily: fonts.playfair },
+  header: { paddingHorizontal: SPACING.md, paddingTop: 8, paddingBottom: 12 },
+  title: { fontSize: 28, fontFamily: fonts.playfair },
   body: { padding: SPACING.md, gap: SPACING.md },
-  sectionLabel: { fontSize: 10, color: colors.muted, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
-  toggle: { flexDirection: 'row', backgroundColor: colors.card, borderRadius: 12, padding: 4, gap: 4 },
+  sectionLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
+  toggle: { flexDirection: 'row', borderRadius: 12, padding: 4, gap: 4 },
   toggleOpt: { flex: 1, paddingVertical: 10, borderRadius: 9, alignItems: 'center' },
-  toggleOptActive: { backgroundColor: colors.green },
-  toggleText: { fontSize: 14, color: colors.muted, fontFamily: fonts.dmSans, fontWeight: '600' },
-  toggleTextActive: { color: colors.cream },
-  card: { backgroundColor: colors.card, borderRadius: 14, padding: SPACING.md, gap: 8 },
-  searchInput: { fontSize: 14, color: colors.text, fontFamily: fonts.dmSans, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.1)', paddingVertical: 6 },
-  resultRow: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(0,0,0,0.06)' },
-  resultText: { fontSize: 14, color: colors.text, fontFamily: fonts.dmMono, letterSpacing: 1 },
-  selectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#D4EDD4', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
-  selectedText: { fontSize: 13, color: '#2D5A2D', fontFamily: fonts.dmMono, fontWeight: '600' },
-  clearText: { color: colors.muted, fontSize: 14 },
-  freqCard: { backgroundColor: colors.card, borderRadius: 14, padding: SPACING.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5, borderColor: 'transparent' },
-  freqCardActive: { borderColor: colors.green, backgroundColor: 'rgba(28,58,42,0.06)' },
-  freqLabel: { fontSize: 16, color: colors.text, fontFamily: fonts.playfair },
-  freqLabelActive: { color: colors.green },
-  freqDesc: { fontSize: 13, color: colors.muted, fontFamily: fonts.dmSans },
-  freqDescActive: { color: colors.green },
+  toggleOptActive: {},
+  toggleText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '600' },
+  card: { borderRadius: 14, padding: SPACING.md, gap: 8, borderWidth: StyleSheet.hairlineWidth },
+  searchInput: { fontSize: 14, fontFamily: fonts.dmSans, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 6 },
+  resultRow: { paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  resultText: { fontSize: 14, fontFamily: fonts.dmMono, letterSpacing: 1 },
+  selectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8 },
+  selectedText: { fontSize: 13, fontFamily: fonts.dmMono, fontWeight: '600' },
+  clearText: { fontSize: 14 },
+  freqCard: { borderRadius: 14, padding: SPACING.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1.5 },
+  freqLabel: { fontSize: 16, fontFamily: fonts.playfair },
+  freqDesc: { fontSize: 13, fontFamily: fonts.dmSans },
   timeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  timeChip: { backgroundColor: colors.card, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1.5, borderColor: 'transparent' },
-  timeChipActive: { borderColor: colors.green, backgroundColor: 'rgba(28,58,42,0.06)' },
-  timeText: { fontSize: 13, color: colors.text, fontFamily: fonts.dmSans },
-  timeTextActive: { color: colors.green, fontWeight: '600' },
+  timeChip: { borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, borderWidth: 1.5 },
+  timeText: { fontSize: 13, fontFamily: fonts.dmSans },
   toneRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  toneChip: { backgroundColor: colors.card, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5, borderColor: 'transparent' },
-  toneChipActive: { borderColor: colors.green, backgroundColor: 'rgba(28,58,42,0.06)' },
-  toneText: { fontSize: 13, color: colors.text, fontFamily: fonts.dmSans },
-  toneTextActive: { color: colors.green, fontWeight: '600' },
-  previewBtn: { backgroundColor: colors.card, borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-  previewBtnText: { fontSize: 14, color: colors.green, fontFamily: fonts.playfair },
-  noteCard: { backgroundColor: colors.card, borderRadius: 14, padding: SPACING.md, gap: 8, borderWidth: 1, borderColor: 'rgba(196,151,58,0.3)' },
-  noteLabel: { fontSize: 10, color: colors.muted, fontFamily: fonts.dmMono, letterSpacing: 2 },
-  noteText: { fontSize: 14, color: colors.text, fontFamily: fonts.dmSans, lineHeight: 22, fontStyle: 'italic' },
-  totalCard: { backgroundColor: colors.green, borderRadius: 14, paddingHorizontal: SPACING.md, paddingVertical: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { color: 'rgba(232,224,208,0.6)', fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.8, marginBottom: 3 },
-  totalSub: { color: 'rgba(232,224,208,0.45)', fontSize: 12, fontFamily: fonts.dmSans },
-  totalAmount: { color: colors.cream, fontSize: 24, fontFamily: fonts.playfair },
-  footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(0,0,0,0.06)' },
-  confirmBtn: { backgroundColor: colors.green, borderRadius: 30, paddingVertical: 16, alignItems: 'center' },
+  toneChip: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1.5 },
+  toneText: { fontSize: 13, fontFamily: fonts.dmSans },
+  previewBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
+  previewBtnText: { fontSize: 14, fontFamily: fonts.playfair },
+  noteCard: { borderRadius: 14, padding: SPACING.md, gap: 8, borderWidth: StyleSheet.hairlineWidth },
+  noteLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 2 },
+  noteText: { fontSize: 14, fontFamily: fonts.dmSans, lineHeight: 22, fontStyle: 'italic' },
+  totalCard: { borderRadius: 14, paddingHorizontal: SPACING.md, paddingVertical: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
+  totalLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.8, marginBottom: 3 },
+  totalSub: { fontSize: 12, fontFamily: fonts.dmSans },
+  totalAmount: { fontSize: 24, fontFamily: fonts.playfair },
+  footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  confirmBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   confirmBtnDisabled: { opacity: 0.5 },
-  confirmBtnText: { color: colors.cream, fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '700', letterSpacing: 1 },
+  confirmBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
+  backLink: { alignItems: 'center', paddingVertical: 4 },
+  backLinkText: { fontSize: 15, fontFamily: fonts.dmSans },
 });
