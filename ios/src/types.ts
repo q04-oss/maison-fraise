@@ -15,4 +15,5 @@ export type RootTabParamList = {
   Where: undefined;
   Events: undefined;
   Order: NavigatorScreenParams<OrderStackParamList> | undefined;
+  Orders: undefined;
 };

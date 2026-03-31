@@ -8,6 +8,7 @@ import { COLORS } from '../theme';
 import BoardScreen from '../screens/BoardScreen';
 import WhereScreen from '../screens/WhereScreen';
 import EventsScreen from '../screens/EventsScreen';
+import OrderHistoryScreen from '../screens/OrderHistoryScreen';
 import OrderNavigator from './OrderNavigator';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -20,6 +21,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     Where: 'WHERE',
     Events: 'EVENTS',
     Order: 'ORDER',
+    Orders: 'ORDERS',
   };
 
   return (
@@ -66,6 +68,7 @@ export default function BottomTabNavigator() {
       <Tab.Screen name="Board" component={BoardScreen} />
       <Tab.Screen name="Where" component={WhereScreen} />
       <Tab.Screen name="Events" component={EventsScreen} />
+      <Tab.Screen name="Orders" component={OrderHistoryScreen} />
       <Tab.Screen name="Order" component={OrderNavigator} />
     </Tab.Navigator>
   );

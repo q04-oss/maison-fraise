@@ -13,6 +13,7 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { STRAWBERRIES } from '../data/seed';
 import { fetchVarieties } from '../lib/api';
 import { useOrder } from '../context/OrderContext';
+import { useApp } from '../../App';
 import { COLORS, SPACING } from '../theme';
 import { RootTabParamList } from '../types';
 
@@ -38,10 +39,22 @@ export default function BoardScreen() {
   const [activeTab, setActiveTab] = useState<Tab>('CANADIAN');
   const [liveVarieties, setLiveVarieties] = useState<Record<string, LiveVariety>>({});
   const [loading, setLoading] = useState(true);
+  const [hiddenTapCount, setHiddenTapCount] = useState(0);
   const navigation = useNavigation<Nav>();
   const { setVariety } = useOrder();
+  const { reviewMode, enableReviewMode } = useApp();
   const insets = useSafeAreaInsets();
   const today = formatDate(new Date());
+
+  const handleHiddenTap = () => {
+    if (reviewMode) return;
+    const next = hiddenTapCount + 1;
+    setHiddenTapCount(next);
+    if (next >= 7) {
+      enableReviewMode();
+      setHiddenTapCount(0);
+    }
+  };
 
   useEffect(() => {
     fetchVarieties()
@@ -66,7 +79,16 @@ export default function BoardScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.cream }}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <Text style={styles.dateLabel}>{today}</Text>
+        <View style={styles.dateLabelRow}>
+          <Text style={styles.dateLabel}>{today}</Text>
+          {/* Hidden tap target — 7 taps activates review mode for Apple reviewers */}
+          <TouchableOpacity onPress={handleHiddenTap} activeOpacity={1} style={styles.hiddenTap} />
+        </View>
+        {reviewMode && (
+          <View style={styles.reviewBadge}>
+            <Text style={styles.reviewBadgeText}>REVIEW MODE — TEST CARDS ACTIVE</Text>
+          </View>
+        )}
         <Text style={styles.headerTitle}>{'What is ready\ntoday.'}</Text>
         <Text style={styles.headerSubtitle}>We dip to order. The chocolate is always warm.</Text>
         <View style={styles.tabRow}>
@@ -151,7 +173,11 @@ export default function BoardScreen() {
 
 const styles = StyleSheet.create({
   header: { backgroundColor: COLORS.forestGreen },
-  dateLabel: { color: 'rgba(255,255,255,0.48)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', paddingHorizontal: SPACING.md, marginBottom: 8 },
+  dateLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  dateLabel: { color: 'rgba(255,255,255,0.48)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase', paddingHorizontal: SPACING.md },
+  hiddenTap: { flex: 1, height: 24 },
+  reviewBadge: { backgroundColor: 'rgba(255,200,0,0.18)', borderWidth: 1, borderColor: 'rgba(255,200,0,0.4)', borderRadius: 6, marginHorizontal: SPACING.md, marginBottom: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  reviewBadgeText: { color: '#FFD700', fontSize: 10, fontWeight: '700', letterSpacing: 1.2, textAlign: 'center' },
   headerTitle: { color: COLORS.white, fontSize: 40, fontFamily: 'PlayfairDisplay_700Bold', paddingHorizontal: SPACING.md, lineHeight: 46, marginBottom: 10 },
   headerSubtitle: { color: 'rgba(255,255,255,0.52)', fontSize: 13, fontStyle: 'italic', paddingHorizontal: SPACING.md, marginBottom: 22 },
   tabRow: { flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.18)' },

@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "ec4ad15d-2535-42a4-91a0-70599925e6f5"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.a0.2.maisonfraise",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    }
+  }
+}

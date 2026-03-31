@@ -13,6 +13,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useOrder } from '../../context/OrderContext';
+import { useApp } from '../../../App';
 import { createOrder, confirmOrder } from '../../lib/api';
 import { COLORS, SPACING } from '../../theme';
 import { OrderStackParamList } from '../../types';
@@ -33,6 +34,7 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
 export default function Step7ReviewScreen() {
   const navigation = useNavigation<Nav>();
   const { order, resetOrder, setCustomerEmail } = useOrder();
+  const { pushToken, reviewMode } = useApp();
   const insets = useSafeAreaInsets();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ export default function Step7ReviewScreen() {
     try {
       setCustomerEmail(email);
 
-      // Step 1: create order + get Stripe client_secret
+      // Step 1: create order
       const { order: createdOrder, client_secret } = await createOrder({
         variety_id: order.variety_id,
         location_id: order.location_id,
@@ -66,39 +68,44 @@ export default function Step7ReviewScreen() {
         quantity: order.quantity,
         is_gift: order.isGift,
         customer_email: email,
+        push_token: pushToken,
       });
 
-      // Step 2: init payment sheet
-      const { error: initError } = await initPaymentSheet({
-        merchantDisplayName: 'Maison Fraise',
-        paymentIntentClientSecret: client_secret,
-        defaultBillingDetails: { email },
-        appearance: {
-          colors: {
-            primary: COLORS.forestGreen,
-            background: COLORS.cream,
+      if (reviewMode) {
+        // Review mode — skip Stripe, confirm directly
+        await confirmOrder(createdOrder.id);
+      } else {
+        // Step 2: init payment sheet
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: 'Maison Fraise',
+          paymentIntentClientSecret: client_secret,
+          defaultBillingDetails: { email },
+          appearance: {
+            colors: {
+              primary: COLORS.forestGreen,
+              background: COLORS.cream,
+            },
           },
-        },
-      });
+        });
 
-      if (initError) {
-        throw new Error(initError.message);
-      }
-
-      // Step 3: present payment sheet
-      const { error: presentError } = await presentPaymentSheet();
-
-      if (presentError) {
-        if (presentError.code === 'Canceled') {
-          // User dismissed the sheet — order stays pending, they can retry
-          setLoading(false);
-          return;
+        if (initError) {
+          throw new Error(initError.message);
         }
-        throw new Error(presentError.message);
-      }
 
-      // Step 4: confirm with server
-      await confirmOrder(createdOrder.id);
+        // Step 3: present payment sheet
+        const { error: presentError } = await presentPaymentSheet();
+
+        if (presentError) {
+          if (presentError.code === 'Canceled') {
+            setLoading(false);
+            return;
+          }
+          throw new Error(presentError.message);
+        }
+
+        // Step 4: confirm with server
+        await confirmOrder(createdOrder.id);
+      }
 
       Alert.alert(
         'Order placed.',

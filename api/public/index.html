@@ -424,6 +424,16 @@
       text-align: right;
     }
 
+    .footer-links { display: flex; gap: 24px; margin-top: 8px; }
+    .footer-links a {
+      font-size: 11px;
+      color: rgba(255,255,255,0.3);
+      text-decoration: none;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .footer-links a:hover { color: rgba(255,255,255,0.7); }
+
     /* ── RESPONSIVE ───────────────────────────────────── */
     @media (max-width: 768px) {
       nav { padding: 16px 20px; }
@@ -595,6 +605,10 @@
   <div class="footer-right">
     Chocolate-dipped strawberries.<br />
     Made to order. Collected at the market.
+    <div class="footer-links" style="justify-content:flex-end;margin-top:12px;">
+      <a href="/privacy">Privacy</a>
+      <a href="/support">Support</a>
+    </div>
   </div>
 </footer>
 

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { eq, sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { db } from '../db';
-import { orders, varieties, timeSlots } from '../db/schema';
+import { orders, varieties, timeSlots, legitimacyEvents } from '../db/schema';
 import { stripe, stripeTest } from '../lib/stripe';
 import { sendOrderConfirmation } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -129,8 +130,10 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       }
     }
 
+    const nfc_token = randomUUID();
+
     await db.transaction(async (tx) => {
-      await tx.update(orders).set({ status: 'paid' }).where(eq(orders.id, id));
+      await tx.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
       // In review mode, skip stock/slot mutations so live inventory is unaffected
       if (!isReview) {
         await tx
@@ -141,6 +144,11 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
           .update(timeSlots)
           .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
           .where(eq(timeSlots.id, order.time_slot_id));
+        await tx.insert(legitimacyEvents).values({
+          user_id: id,
+          event_type: 'order_placed',
+          weight: 1,
+        });
       }
     });
 
@@ -165,7 +173,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       }
     }
 
-    res.json(updated);
+    res.json({ ...updated, nfc_token });
   } catch (err) {
     logger.error('Order confirm error', err);
     res.status(500).json({ error: 'Internal server error' });

@@ -8,6 +8,13 @@ import stripeRouter from './routes/stripe';
 import adminRouter from './routes/admin';
 import chocolatierRouter from './routes/chocolatier';
 import supplierRouter from './routes/supplier';
+import verifyRouter from './routes/verify';
+import standingOrdersRouter from './routes/standing-orders';
+import usersRouter from './routes/users';
+import giftNoteRouter from './routes/gift-note';
+import campaignsRouter from './routes/campaigns';
+import businessesRouter from './routes/businesses';
+import posRouter from './routes/pos';
 import { logger } from './lib/logger';
 
 const app = express();
@@ -30,6 +37,13 @@ app.use('/api/stripe', stripeRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/chocolatier', chocolatierRouter);
 app.use('/api/supplier', supplierRouter);
+app.use('/api/verify', verifyRouter);
+app.use('/api/standing-orders', standingOrdersRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/gift-note', giftNoteRouter);
+app.use('/api/campaigns', campaignsRouter);
+app.use('/api/businesses', businessesRouter);
+app.use('/api/pos', posRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

@@ -1,4 +1,11 @@
+import { isReviewMode } from './reviewMode';
+
 const BASE_URL = 'https://maison-fraise-v2-production.up.railway.app';
+
+function reviewHeaders(): Record<string, string> {
+  if (!isReviewMode()) return {};
+  return { 'X-Review-Mode': process.env.EXPO_PUBLIC_REVIEW_PIN ?? '' };
+}
 
 export async function fetchVarieties() {
   const res = await fetch(`${BASE_URL}/api/varieties`);
@@ -18,6 +25,12 @@ export async function fetchSlots(locationId: number, date: string) {
   return res.json();
 }
 
+export async function fetchOrdersByEmail(email: string) {
+  const res = await fetch(`${BASE_URL}/api/orders?email=${encodeURIComponent(email)}`);
+  if (!res.ok) throw new Error('Failed to fetch orders');
+  return res.json();
+}
+
 export async function createOrder(body: {
   variety_id: number;
   location_id: number;
@@ -27,10 +40,11 @@ export async function createOrder(body: {
   quantity: number;
   is_gift: boolean;
   customer_email: string;
+  push_token?: string | null;
 }) {
   const res = await fetch(`${BASE_URL}/api/orders`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...reviewHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -43,6 +57,7 @@ export async function createOrder(body: {
 export async function confirmOrder(orderId: number) {
   const res = await fetch(`${BASE_URL}/api/orders/${orderId}/confirm`, {
     method: 'POST',
+    headers: { ...reviewHeaders() },
   });
   if (!res.ok) throw new Error('Failed to confirm order');
   return res.json();
