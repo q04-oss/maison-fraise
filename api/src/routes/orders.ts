@@ -134,39 +134,39 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
 
     const nfc_token = randomUUID();
 
-    // Upsert user by email so we have a stable numeric ID for verification + standing orders
-    const existingUsers = await db.select({ id: users.id }).from(users).where(eq(users.email, order.customer_email));
-    let dbUserId: number;
-    if (existingUsers.length > 0) {
-      dbUserId = existingUsers[0].id;
-    } else {
-      const [newUser] = await db.insert(users).values({ email: order.customer_email }).returning({ id: users.id });
-      dbUserId = newUser.id;
+    // Mark order paid and update inventory
+    await db.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
+    if (!isReview) {
+      await db
+        .update(varieties)
+        .set({ stock_remaining: sql`${varieties.stock_remaining} - ${order.quantity}` })
+        .where(eq(varieties.id, order.variety_id));
+      await db
+        .update(timeSlots)
+        .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
+        .where(eq(timeSlots.id, order.time_slot_id));
     }
-
-    await db.transaction(async (tx) => {
-      await tx.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
-      // In review mode, skip stock/slot mutations so live inventory is unaffected
-      if (!isReview) {
-        await tx
-          .update(varieties)
-          .set({ stock_remaining: sql`${varieties.stock_remaining} - ${order.quantity}` })
-          .where(eq(varieties.id, order.variety_id));
-        await tx
-          .update(timeSlots)
-          .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
-          .where(eq(timeSlots.id, order.time_slot_id));
-        await tx.insert(legitimacyEvents).values({
-          user_id: dbUserId,
-          event_type: 'order_placed',
-          weight: 1,
-        });
-      }
-    });
 
     const [updated] = await db.select().from(orders).where(eq(orders.id, id));
 
-    // Send branded confirmation email (fire-and-forget, skip in review mode)
+    // User upsert + legitimacy event — non-blocking, don't fail the response
+    let dbUserId: number | undefined;
+    try {
+      const existingUsers = await db.select({ id: users.id }).from(users).where(eq(users.email, order.customer_email));
+      if (existingUsers.length > 0) {
+        dbUserId = existingUsers[0].id;
+      } else {
+        const [newUser] = await db.insert(users).values({ email: order.customer_email }).returning({ id: users.id });
+        dbUserId = newUser.id;
+      }
+      if (!isReview && dbUserId) {
+        await db.insert(legitimacyEvents).values({ user_id: dbUserId, event_type: 'order_placed', weight: 1 });
+      }
+    } catch (userErr) {
+      logger.error('User upsert/legitimacy error (non-fatal)', userErr);
+    }
+
+    // Send confirmation email — fire-and-forget
     if (!isReview) {
       const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, order.time_slot_id));
       const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
