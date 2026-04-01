@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, ActivityIndicator, Switch, Alert,
+  StyleSheet, ActivityIndicator, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -10,14 +10,12 @@ import { useNavigation } from '@react-navigation/native';
 import { signInWithApple } from '../lib/api';
 import { setVerified } from '../lib/userId';
 import { useColors, fonts } from '../theme';
-import { useTheme } from '../context/ThemeContext';
 import { SPACING } from '../theme';
 
 export default function ProfileScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const c = useColors();
-  const { isDark, toggleTheme } = useTheme();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [isVerified, setIsVerifiedState] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -114,22 +112,6 @@ export default function ProfileScreen() {
             )}
             {signingIn && <ActivityIndicator color={c.accent} />}
 
-            {/* Appearance */}
-            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <View style={styles.toggleRow}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={[styles.toggleLabel, { color: c.text }]}>Dark mode</Text>
-                  <Text style={[styles.toggleDesc, { color: c.muted }]}>Switch between light and dark appearance.</Text>
-                </View>
-                <Switch
-                  value={isDark}
-                  onValueChange={toggleTheme}
-                  trackColor={{ true: c.accent }}
-                  thumbColor="#FFFFFF"
-                />
-              </View>
-            </View>
-
             {/* Verification instructions */}
             {!isVerified && (
               <View style={[styles.instructionCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -173,13 +155,7 @@ const styles = StyleSheet.create({
   guestLabel: { fontSize: 13, fontFamily: fonts.dmSans },
   appleBtn: { width: '100%', height: 52 },
   card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
-  toggleRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: 14, gap: 12,
-  },
-  toggleLabel: { fontSize: 15, fontFamily: fonts.playfair },
-  toggleDesc: { fontSize: 13, lineHeight: 19, fontFamily: fonts.dmSans },
-  instructionCard: { borderRadius: 14, padding: SPACING.md, gap: 12, borderWidth: StyleSheet.hairlineWidth },
+instructionCard: { borderRadius: 14, padding: SPACING.md, gap: 12, borderWidth: StyleSheet.hairlineWidth },
   instructionTitle: { fontSize: 16, fontFamily: fonts.playfair },
   instructionText: { fontSize: 14, lineHeight: 22, fontFamily: fonts.dmSans },
 });

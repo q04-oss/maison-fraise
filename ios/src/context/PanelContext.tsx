@@ -3,7 +3,10 @@ import { Animated, Dimensions } from 'react-native';
 
 export type PanelId =
   | 'home'
+  | 'profile'
+  | 'location'
   | 'ask'
+  | 'gift-note'
   | 'variety'
   | 'chocolate'
   | 'finish'
@@ -30,6 +33,7 @@ export interface OrderState {
   time_slot_time: string | null;
   date: string | null;
   is_gift: boolean;
+  gift_note: string | null;
   customer_email: string;
   // post-confirm
   order_id: number | null;
@@ -79,6 +83,7 @@ const defaultOrder: OrderState = {
   time_slot_time: null,
   date: null,
   is_gift: false,
+  gift_note: null,
   customer_email: '',
   order_id: null,
   nfc_token: null,
@@ -102,6 +107,8 @@ interface PanelContextValue {
   goBack: () => void;
   goHome: () => void;
   sheetIndexRef: React.MutableRefObject<number>;
+  sheetHeight: number;
+  setSheetHeight: (h: number) => void;
 }
 
 const PanelContext = createContext<PanelContextValue | null>(null);
@@ -114,6 +121,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [varieties, setVarieties] = useState<Variety[]>([]);
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [activeLocation, setActiveLocation] = useState<Business | null>(null);
+  const [sheetHeight, setSheetHeight] = useState(0);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const sheetIndexRef = useRef(1);
 
@@ -164,6 +172,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       order, varieties, businesses, activeLocation,
       setOrder, setVarieties, setBusinesses, setActiveLocation,
       showPanel, goBack, goHome, sheetIndexRef,
+      sheetHeight, setSheetHeight,
     }}>
       {children}
     </PanelContext.Provider>

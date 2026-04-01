@@ -13,12 +13,18 @@ import ConfirmationPanel from './panels/ConfirmationPanel';
 import NFCPanel from './panels/NFCPanel';
 import VerifiedPanel from './panels/VerifiedPanel';
 import StandingOrderPanel from './panels/StandingOrderPanel';
+import ProfilePanel from './panels/ProfilePanel';
+import LocationPanel from './panels/LocationPanel';
+import GiftNotePanel from './panels/GiftNotePanel';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
+  profile: ProfilePanel,
+  location: LocationPanel,
   ask: AskPanel,
+  'gift-note': GiftNotePanel,
   variety: VarietyPanel,
   chocolate: ChocolatePanel,
   finish: FinishPanel,
@@ -50,5 +56,5 @@ export default function PanelNavigator() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
 });

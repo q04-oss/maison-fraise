@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { eq, or } from 'drizzle-orm';
 import { db } from '../db';
-import { standingOrders, users, legitimacyEvents } from '../db/schema';
+import { standingOrders, users, legitimacyEvents, varieties } from '../db/schema';
 import { stripe } from '../lib/stripe';
 
 const router = Router();
@@ -83,7 +83,20 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const rows = await db.select().from(standingOrders)
+    const rows = await db
+      .select({
+        id: standingOrders.id,
+        variety_name: varieties.name,
+        chocolate: standingOrders.chocolate,
+        finish: standingOrders.finish,
+        quantity: standingOrders.quantity,
+        frequency: standingOrders.frequency,
+        next_order_date: standingOrders.next_order_date,
+        status: standingOrders.status,
+        recipient_id: standingOrders.recipient_id,
+      })
+      .from(standingOrders)
+      .leftJoin(varieties, eq(standingOrders.variety_id, varieties.id))
       .where(or(eq(standingOrders.sender_id, user_id), eq(standingOrders.recipient_id, user_id)));
     res.json(rows);
   } catch (err) {

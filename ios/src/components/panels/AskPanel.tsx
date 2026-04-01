@@ -84,7 +84,37 @@ export default function AskPanel() {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: c.text }]}>Ask anything.</Text>
+        <Text style={[styles.headerSub, { color: c.muted }]}>I know today's varieties, the chocolates, and the farm.</Text>
       </View>
+
+      {messages.length === 0 && (
+        <View style={styles.promptRow}>
+          {["What's sweetest today?", "Something for a gift", "Tell me about the farm"].map(p => (
+            <TouchableOpacity
+              key={p}
+              style={[styles.promptChip, { backgroundColor: c.card, borderColor: c.border }]}
+              onPress={() => {
+                const p_text = p;
+                setMessages(prev => [...prev, { role: 'user', text: p_text }]);
+                setLoading(true);
+                setDisplayedResponse('');
+                setAction(null);
+                askClaude(p_text, varieties, businesses)
+                  .then(result => {
+                    typewriterReveal(result.response);
+                    if (result.action?.type === 'order' && result.action.variety_id) setAction(result.action);
+                    setMessages(prev => [...prev, { role: 'claude', text: result.response }]);
+                  })
+                  .catch(() => typewriterReveal('Something went wrong. Try again.'))
+                  .finally(() => setLoading(false));
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.promptText, { color: c.text }]}>{p}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <ScrollView style={styles.history} contentContainerStyle={{ paddingBottom: 16 }}>
         {messages.slice(0, -1).map((m, i) => (
@@ -151,6 +181,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: SPACING.md, paddingTop: 8, paddingBottom: 12 },
   title: { fontSize: 28, fontFamily: fonts.playfair },
+  headerSub: { fontSize: 13, fontFamily: fonts.dmSans, marginTop: 4 },
+  promptRow: { paddingHorizontal: SPACING.md, paddingBottom: 12, gap: 8 },
+  promptChip: { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10, borderWidth: StyleSheet.hairlineWidth },
+  promptText: { fontSize: 13, fontFamily: fonts.dmSans },
   history: { flex: 1, paddingHorizontal: SPACING.md },
   historyText: { fontSize: 14, fontFamily: fonts.dmSans, marginBottom: 12, lineHeight: 22 },
   claudeResponse: { fontSize: 15, fontFamily: fonts.dmSans, lineHeight: 24, marginBottom: 12 },

@@ -8,9 +8,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({ isDark: false, toggleTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [isDark, setIsDark] = useState(false);
   return (
-    <ThemeContext.Provider value={{ isDark, toggleTheme: () => setIsDark(d => !d) }}>
+    <ThemeContext.Provider value={{ isDark: false, toggleTheme: () => {} }}>
       {children}
     </ThemeContext.Provider>
   );

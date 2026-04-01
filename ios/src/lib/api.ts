@@ -95,6 +95,28 @@ export async function createStandingOrder(body: {
   return res.json();
 }
 
+export async function fetchStandingOrders(userId: number) {
+  const res = await fetch(`${BASE_URL}/api/standing-orders?user_id=${userId}`);
+  if (!res.ok) throw new Error('Failed to fetch standing orders');
+  return res.json();
+}
+
+export async function updateStandingOrder(id: number, status: 'active' | 'paused') {
+  const res = await fetch(`${BASE_URL}/api/standing-orders/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) throw new Error('Failed to update standing order');
+  return res.json();
+}
+
+export async function cancelStandingOrder(id: number) {
+  const res = await fetch(`${BASE_URL}/api/standing-orders/${id}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to cancel standing order');
+  return res.json();
+}
+
 export async function createOrder(body: {
   variety_id: number;
   location_id: number;
@@ -105,11 +127,12 @@ export async function createOrder(body: {
   is_gift: boolean;
   customer_email: string;
   push_token?: string | null;
+  gift_note?: string | null;
 }) {
   const res = await fetch(`${BASE_URL}/api/orders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...reviewHeaders() },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, gift_note: body.gift_note ?? null }),
   });
   if (!res.ok) {
     const errBody = await res.json();
@@ -144,7 +167,10 @@ export async function confirmOrder(orderId: number) {
     method: 'POST',
     headers: { ...reviewHeaders() },
   });
-  if (!res.ok) throw new Error('Failed to confirm order');
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail ?? body.error ?? 'Failed to confirm order');
+  }
   return res.json() as Promise<{
     id: number;
     nfc_token: string | null;

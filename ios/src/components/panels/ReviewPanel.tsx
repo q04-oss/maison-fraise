@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, TextInput, StyleSheet, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useApp } from '../../../App';
@@ -7,6 +9,13 @@ import { createOrder, confirmOrder } from '../../lib/api';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
+
+function formatDate(iso: string | null): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+}
 
 function Row({ label, value, sub, c }: { label: string; value: string; sub?: string; c: any }) {
   return (
@@ -25,6 +34,7 @@ export default function ReviewPanel() {
   const { reviewMode, pushToken } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState(order.customer_email);
   const [loading, setLoading] = useState(false);
 
@@ -62,12 +72,22 @@ export default function ReviewPanel() {
           merchantDisplayName: 'Maison Fraise',
           paymentIntentClientSecret: client_secret,
           defaultBillingDetails: { email },
-          appearance: { colors: { primary: c.accent, background: '#FFFFFF' } },
+          appearance: {
+            colors: {
+              primary: c.accent,
+              background: '#FFFFFF',
+              componentBackground: '#F7F5F2',
+              componentText: '#1C1C1E',
+              componentBorder: '#E5E1DA',
+              placeholderText: '#8E8E93',
+            },
+          },
         });
         if (initErr) throw new Error(initErr.message);
+        TrueSheet.present('main-sheet', 1);
         const { error: presentErr } = await presentPaymentSheet();
         if (presentErr) {
-          if (presentErr.code === 'Canceled') { setLoading(false); return; }
+          if (presentErr.code === 'Canceled') { TrueSheet.present('main-sheet', 2); setLoading(false); return; }
           throw new Error(presentErr.message);
         }
         confirmed = await confirmOrder(created.id);
@@ -89,19 +109,19 @@ export default function ReviewPanel() {
     }
   };
 
+  useEffect(() => { TrueSheet.present('main-sheet', 2); }, []);
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.progress}>
-          {Array.from({ length: 7 }).map((_, i) => (
-            <View key={i} style={[styles.seg, { backgroundColor: i < 6 ? c.text : c.border }]} />
-          ))}
-        </View>
-        <Text style={[styles.stepLabel, { color: c.muted }]}>STEP 6 OF 7</Text>
-        <Text style={[styles.stepTitle, { color: c.text }]}>Review</Text>
+    <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+      <View style={[styles.header, { borderBottomColor: c.border }]}>
+        <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
+          <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[styles.title, { color: c.text }]}>Review</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
           <Row label="STRAWBERRY" value={order.variety_name ?? '—'} c={c} />
           <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -113,7 +133,7 @@ export default function ReviewPanel() {
           <View style={[styles.divider, { backgroundColor: c.border }]} />
           <Row label="COLLECTION" value={order.location_name ?? '—'} c={c} />
           <View style={[styles.divider, { backgroundColor: c.border }]} />
-          <Row label="WHEN" value={order.time_slot_time ?? '—'} sub={order.date ?? ''} c={c} />
+          <Row label="WHEN" value={order.time_slot_time ?? '—'} sub={formatDate(order.date)} c={c} />
         </View>
 
         <View style={[styles.totalRow, { borderTopColor: c.border, borderBottomColor: c.border }]}>
@@ -131,12 +151,13 @@ export default function ReviewPanel() {
             placeholderTextColor={c.muted}
             keyboardType="email-address"
             autoCapitalize="none"
+            onFocus={() => TrueSheet.present('main-sheet', 2)}
           />
         </View>
         <View style={{ height: 8 }} />
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: c.border }]}>
+      <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
         <TouchableOpacity
           style={[styles.payBtn, { backgroundColor: c.accent }, loading && styles.payBtnDisabled]}
           onPress={handlePay}
@@ -145,9 +166,6 @@ export default function ReviewPanel() {
         >
           <Text style={styles.payBtnText}>{loading ? 'Processing…' : 'Place Order'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={goBack} activeOpacity={0.6} style={styles.backLink}>
-          <Text style={[styles.backLinkText, { color: c.accent }]}>Back</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -155,29 +173,35 @@ export default function ReviewPanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: SPACING.md, paddingTop: 8, paddingBottom: 12 },
-  progress: { flexDirection: 'row', gap: 3, marginBottom: 10 },
-  seg: { flex: 1, height: 3, borderRadius: 1 },
-  stepLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginBottom: 2 },
-  stepTitle: { fontSize: 32, fontFamily: fonts.playfair },
-  body: { paddingHorizontal: SPACING.md, gap: SPACING.md },
-  card: { borderRadius: 12, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: SPACING.md, paddingVertical: 11, gap: 12 },
-  rowLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.8, marginTop: 2 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingTop: 8,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  backBtn: { width: 40, paddingVertical: 4 },
+  backBtnText: { fontSize: 22, lineHeight: 28 },
+  title: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: fonts.playfair },
+  headerSpacer: { width: 40 },
+  scroll: { flex: 1 },
+  body: { paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, gap: SPACING.md },
+  card: { borderRadius: 16, overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: 16, gap: 12 },
+  rowLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5, color: '#8E8E93' },
   rowRight: { flex: 1, alignItems: 'flex-end', gap: 2 },
-  rowValue: { fontSize: 14, fontFamily: fonts.playfair, textAlign: 'right' },
-  rowSub: { fontSize: 11, fontFamily: fonts.dmSans },
+  rowValue: { fontSize: 15, fontFamily: fonts.playfair, textAlign: 'right' },
+  rowSub: { fontSize: 12, fontFamily: fonts.dmSans },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: SPACING.md },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 20, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
   totalLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
-  totalAmount: { fontSize: 22, fontFamily: fonts.playfair },
-  emailCard: { borderRadius: 12, padding: SPACING.md, gap: 8, borderWidth: StyleSheet.hairlineWidth },
+  totalAmount: { fontSize: 28, fontFamily: fonts.playfair },
+  emailCard: { borderRadius: 16, padding: SPACING.md, gap: 10, borderWidth: StyleSheet.hairlineWidth },
   emailLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
-  emailInput: { fontSize: 15, fontFamily: fonts.dmSans, paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
-  footer: { padding: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  emailInput: { fontSize: 16, fontFamily: fonts.dmSans, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  footer: { padding: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   payBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   payBtnDisabled: { opacity: 0.5 },
   payBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700', color: '#FFFFFF' },
-  backLink: { alignItems: 'center', paddingVertical: 8 },
-  backLinkText: { fontSize: 15, fontFamily: fonts.dmSans },
 });

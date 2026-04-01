@@ -335,6 +335,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_token_used boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_verified_at timestamp`);
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS push_token text`);
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS gift_note text`);
 
     // Users table
     await db.execute(sql`

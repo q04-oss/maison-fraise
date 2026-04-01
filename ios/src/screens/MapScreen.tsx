@@ -1,22 +1,22 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
 import MapView, { Marker, UserLocationChangeEvent } from 'react-native-maps';
+import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../context/PanelContext';
-import { useTheme } from '../context/ThemeContext';
 import PanelNavigator from '../components/PanelNavigator';
 import { fetchBusinesses } from '../lib/api';
 import { useColors } from '../theme';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SHEET_NAME = 'main-sheet';
-const DETENTS: [number, number, number] = [0.18, 0.5, 1];
+const COLLAPSED_HEIGHT = 80; // px — grabber + search bar row
+const DETENTS: [number, number, number] = [COLLAPSED_HEIGHT / SCREEN_HEIGHT, 0.5, 1];
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { setBusinesses, setActiveLocation, businesses, goHome } = usePanel();
-  const { isDark } = useTheme();
+  const { setBusinesses, setActiveLocation, setOrder, businesses, showPanel, goHome, sheetHeight, setSheetHeight } = usePanel();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
   const mapRef = useRef<MapView>(null);
@@ -25,6 +25,16 @@ export default function MapScreen() {
   const onSheetLayout = useCallback((e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
     if (h > 0) setContentHeight(h);
+  }, []);
+
+  const onPositionChange = useCallback((event: any) => {
+    const { position } = event.nativeEvent;
+    setSheetHeight(SCREEN_HEIGHT - position);
+  }, [setSheetHeight]);
+
+  useEffect(() => {
+    // Seed initial sheet height (medium detent = 50%) so FABs and HomePanel render correctly before first scroll
+    setSheetHeight(SCREEN_HEIGHT * 0.5);
   }, []);
 
   useEffect(() => {
@@ -41,6 +51,8 @@ export default function MapScreen() {
   const handleMarkerPress = (biz: any) => {
     setActiveLocation(biz);
     goHome();
+    setOrder({ location_id: biz.id, location_name: biz.name });
+    showPanel('location');
     TrueSheet.present(SHEET_NAME, 1);
     mapRef.current?.animateToRegion({
       latitude: biz.lat - 0.003,
@@ -50,11 +62,13 @@ export default function MapScreen() {
     }, 400);
   };
 
-  const handleLocateMe = () => {
-    if (!userCoords.current) return;
+  const handleLocateMe = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return;
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
     mapRef.current?.animateToRegion({
-      latitude: userCoords.current.latitude,
-      longitude: userCoords.current.longitude,
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     }, 400);
@@ -68,7 +82,7 @@ export default function MapScreen() {
         edgePadding: {
           top: insets.top + 60,
           right: 60,
-          bottom: SCREEN_HEIGHT * DETENTS[1] + 60,
+          bottom: SCREEN_HEIGHT * 0.5 + 60,
           left: 60,
         },
         animated: true,
@@ -79,7 +93,8 @@ export default function MapScreen() {
   const collectionPoints = businesses.filter(b => b.type === 'collection');
   const partners = businesses.filter(b => b.type !== 'collection');
 
-  const fabBottom = SCREEN_HEIGHT * DETENTS[0] + 16;
+  const fabBottom = sheetHeight + 16;
+  const fabsVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
   return (
     <View style={styles.container}>
@@ -92,7 +107,7 @@ export default function MapScreen() {
           latitudeDelta: 0.04,
           longitudeDelta: 0.04,
         }}
-        userInterfaceStyle={isDark ? 'dark' : 'light'}
+        userInterfaceStyle="light"
         showsUserLocation
         showsCompass={false}
         showsScale={false}
@@ -132,27 +147,32 @@ export default function MapScreen() {
         detents={DETENTS}
         initialDetentIndex={1}
         cornerRadius={20}
-        backgroundBlur={isDark ? 'system-ultra-thin-material-dark' : 'system-material'}
+        style={{ backgroundColor: '#FFFFFF' }}
         dismissible={false}
+        dimmed={false}
         grabber
-        grabberOptions={{ color: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)' }}
+        grabberOptions={{ color: 'rgba(0,0,0,0.2)' }}
+        onPositionChange={onPositionChange}
+        scrollable
       >
         <View style={{ height: contentHeight }} onLayout={onSheetLayout}>
           <PanelNavigator />
         </View>
       </TrueSheet>
 
-      {/* FABs rendered after TrueSheet so they sit on top */}
-      <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
-        <TouchableOpacity style={styles.fab} onPress={handleShowAll} activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>🍓</Text>
-          <Text style={styles.fabLabel}>Nearby</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.fab} onPress={handleLocateMe} activeOpacity={0.8}>
-          <Text style={styles.fabIcon}>⊕</Text>
-          <Text style={styles.fabLabel}>Locate</Text>
-        </TouchableOpacity>
-      </View>
+      {/* FABs float above the sheet, hide at full screen */}
+      {fabsVisible && (
+        <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
+          <TouchableOpacity style={styles.fab} onPress={handleShowAll} activeOpacity={0.8}>
+            <Text style={styles.fabIcon}>🍓</Text>
+            <Text style={styles.fabLabel}>Nearby</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.fab} onPress={handleLocateMe} activeOpacity={0.8}>
+            <Text style={styles.fabIcon}>⊕</Text>
+            <Text style={styles.fabLabel}>Locate</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

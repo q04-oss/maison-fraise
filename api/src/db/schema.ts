@@ -115,6 +115,7 @@ export const orders = pgTable('orders', {
   status: orderStatusEnum('status').notNull().default('pending'),
   customer_email: text('customer_email').notNull(),
   push_token: text('push_token'),
+  gift_note: text('gift_note'),
   nfc_token: text('nfc_token').unique(),
   nfc_token_used: boolean('nfc_token_used').notNull().default(false),
   nfc_verified_at: timestamp('nfc_verified_at'),
