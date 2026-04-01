@@ -104,7 +104,7 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json({ order, client_secret: clientSecret });
   } catch (err) {
     logger.error('Order creation error', err);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', detail: String(err) });
   }
 });
 
