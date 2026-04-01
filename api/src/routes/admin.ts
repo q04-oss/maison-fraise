@@ -327,13 +327,42 @@ router.patch('/users/:id/photographed', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/migrate — add missing columns to orders table
+// POST /api/admin/migrate — create missing tables and columns
 router.post('/migrate', async (_req: Request, res: Response) => {
   try {
+    // Orders columns
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_token text UNIQUE`);
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_token_used boolean NOT NULL DEFAULT false`);
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS nfc_verified_at timestamp`);
     await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS push_token text`);
+
+    // Users table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS users (
+        id serial PRIMARY KEY,
+        apple_user_id text UNIQUE,
+        email text NOT NULL UNIQUE,
+        verified boolean NOT NULL DEFAULT false,
+        verified_at timestamp,
+        verified_by text,
+        photographed boolean NOT NULL DEFAULT false,
+        campaign_interest boolean NOT NULL DEFAULT false,
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+
+    // Legitimacy events table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS legitimacy_events (
+        id serial PRIMARY KEY,
+        user_id integer NOT NULL REFERENCES users(id),
+        event_type text NOT NULL,
+        weight integer NOT NULL,
+        business_id integer REFERENCES businesses(id),
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {
     res.status(500).json({ error: String(err) });
