@@ -34,7 +34,6 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   const isReview = isReviewRequest(req);
-  const stripeClient = isReview ? stripeTest : stripe;
 
   try {
     const [variety] = await db.select().from(varieties).where(eq(varieties.id, variety_id));
