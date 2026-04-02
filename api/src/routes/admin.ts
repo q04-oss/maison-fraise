@@ -276,6 +276,23 @@ router.patch('/varieties/:id/stock', async (req: Request, res: Response) => {
       res.status(404).json({ error: 'Variety not found' });
       return;
     }
+
+    // Send low stock alert to active workers when stock drops to 3 or fewer
+    if (updated.stock_remaining <= 3) {
+      const activeWorkers = await db
+        .select({ push_token: users.push_token })
+        .from(users)
+        .where(and(eq(users.worker_status, 'active'), isNotNull(users.push_token)));
+      for (const worker of activeWorkers) {
+        if (worker.push_token) {
+          sendPushNotification(worker.push_token, {
+            title: 'Low Stock',
+            body: `${updated.name} is down to ${updated.stock_remaining} remaining`,
+          }).catch((err: unknown) => logger.error('Low stock push failed', err));
+        }
+      }
+    }
+
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

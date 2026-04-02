@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { eq, sql, and, desc } from 'drizzle-orm';
+import { eq, sql, and, desc, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 import { db } from '../db';
 import { orders, varieties, timeSlots, legitimacyEvents, users, referralCodes, locations, seasonPatronages, patronTokens } from '../db/schema';
 import { stripe } from '../lib/stripe';
 import { sendOrderConfirmation } from '../lib/resend';
+import { sendPushNotification } from '../lib/push';
 import { logger } from '../lib/logger';
 import { requireUser } from '../lib/auth';
 
@@ -186,6 +187,22 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
           slotDate: slot.date,
           slotTime: slot.time,
         }).catch((err: unknown) => logger.error('Confirmation email failed', err));
+      }
+
+      // Send low stock alert to active workers when stock drops to 3 or fewer
+      if (variety && variety.stock_remaining <= 3) {
+        const activeWorkers = await db
+          .select({ push_token: users.push_token })
+          .from(users)
+          .where(and(eq(users.worker_status, 'active'), isNotNull(users.push_token)));
+        for (const worker of activeWorkers) {
+          if (worker.push_token) {
+            sendPushNotification(worker.push_token, {
+              title: 'Low Stock',
+              body: `${variety.name} is down to ${variety.stock_remaining} remaining`,
+            }).catch((err: unknown) => logger.error('Low stock push failed', err));
+          }
+        }
       }
     }
 
