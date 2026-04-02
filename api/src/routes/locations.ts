@@ -91,6 +91,7 @@ timeSlotsPublicRouter.get('/', async (req: Request, res: Response) => {
         date: timeSlots.date,
         time: timeSlots.time,
         capacity: timeSlots.capacity,
+        booked: timeSlots.booked,
       })
       .from(timeSlots)
       .where(and(...(conditions as [SQL, ...SQL[]])))
