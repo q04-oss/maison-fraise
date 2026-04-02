@@ -20,6 +20,7 @@ import authRouter from './routes/auth';
 import popupsRouter from './routes/popups';
 import popupRequestsRouter from './routes/popup-requests';
 import campaignCommissionsRouter from './routes/campaign-commissions';
+import contractsRouter from './routes/contracts';
 import { logger } from './lib/logger';
 
 const app = express();
@@ -54,6 +55,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/popups', popupsRouter);
 app.use('/api/popup-requests', popupRequestsRouter);
 app.use('/api/campaign-commissions', campaignCommissionsRouter);
+app.use('/api/contracts', contractsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 

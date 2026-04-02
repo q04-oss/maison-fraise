@@ -3,6 +3,7 @@ import { eq, sum, and, sql } from 'drizzle-orm';
 import { db } from '../db';
 import {
   users, legitimacyEvents, businesses, popupRsvps, djOffers, popupNominations,
+  employmentContracts,
 } from '../db/schema';
 
 const router = Router();
@@ -201,6 +202,71 @@ router.get('/:id/hosted-popups', async (req: Request, res: Response) => {
     );
 
     res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/users/:id/contract-offer — pending contract offer
+router.get('/:id/contract-offer', async (req: Request, res: Response) => {
+  const user_id = parseInt(req.params.id, 10);
+  if (isNaN(user_id)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+  try {
+    const rows = await db
+      .select({
+        id: employmentContracts.id,
+        status: employmentContracts.status,
+        starts_at: employmentContracts.starts_at,
+        ends_at: employmentContracts.ends_at,
+        note: employmentContracts.note,
+        business_id: employmentContracts.business_id,
+        business_name: businesses.name,
+        business_address: businesses.address,
+        business_neighbourhood: businesses.neighbourhood,
+        business_instagram: businesses.instagram_handle,
+      })
+      .from(employmentContracts)
+      .innerJoin(businesses, eq(employmentContracts.business_id, businesses.id))
+      .where(and(eq(employmentContracts.user_id, user_id), eq(employmentContracts.status, 'pending')));
+    res.json(rows[0] ?? null);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/users/:id/active-contract
+router.get('/:id/active-contract', async (req: Request, res: Response) => {
+  const user_id = parseInt(req.params.id, 10);
+  if (isNaN(user_id)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+  try {
+    const rows = await db
+      .select({
+        id: employmentContracts.id,
+        starts_at: employmentContracts.starts_at,
+        ends_at: employmentContracts.ends_at,
+        business_id: employmentContracts.business_id,
+        business_name: businesses.name,
+        business_address: businesses.address,
+      })
+      .from(employmentContracts)
+      .innerJoin(businesses, eq(employmentContracts.business_id, businesses.id))
+      .where(and(eq(employmentContracts.user_id, user_id), eq(employmentContracts.status, 'active')));
+    res.json(rows[0] ?? null);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/users/:id/followers — users who have nominated this user
+router.get('/:id/followers', async (req: Request, res: Response) => {
+  const user_id = parseInt(req.params.id, 10);
+  if (isNaN(user_id)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+  try {
+    const rows = await db
+      .select({ total: sql<number>`cast(count(distinct ${popupNominations.nominator_id}) as int)` })
+      .from(popupNominations)
+      .where(eq(popupNominations.nominee_id, user_id));
+    res.json({ follower_count: rows[0]?.total ?? 0 });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

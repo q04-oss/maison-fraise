@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -603,6 +603,188 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {
     res.status(500).json({ error: String(err) });
+  }
+});
+
+// ─── Talent layer ─────────────────────────────────────────────────────────────
+
+// GET /api/admin/talent — relevance leaderboard
+router.get('/talent', async (_req: Request, res: Response) => {
+  try {
+    const allUsers = await db
+      .select({
+        id: users.id,
+        display_name: users.display_name,
+        email: users.email,
+        verified: users.verified,
+        is_dj: users.is_dj,
+        created_at: users.created_at,
+      })
+      .from(users)
+      .where(eq(users.verified, true));
+
+    const enriched = await Promise.all(allUsers.map(async u => {
+      const [nomRow] = await db
+        .select({ total: sql<number>`cast(count(*) as int)` })
+        .from(popupNominations)
+        .where(eq(popupNominations.nominee_id, u.id));
+
+      const [followerRow] = await db
+        .select({ total: sql<number>`cast(count(distinct ${popupNominations.nominator_id}) as int)` })
+        .from(popupNominations)
+        .where(eq(popupNominations.nominee_id, u.id));
+
+      const [contractRow] = await db
+        .select({ total: sql<number>`cast(count(*) as int)` })
+        .from(employmentContracts)
+        .where(and(eq(employmentContracts.user_id, u.id), eq(employmentContracts.status, 'completed')));
+
+      const [portraitRow] = await db
+        .select({ total: sql<number>`cast(count(*) as int)` })
+        .from(portraits)
+        .where(sql`${portraits.subject_name} is not null`);
+
+      const activeContract = await db
+        .select({ business_name: businesses.name, ends_at: employmentContracts.ends_at })
+        .from(employmentContracts)
+        .innerJoin(businesses, eq(employmentContracts.business_id, businesses.id))
+        .where(and(eq(employmentContracts.user_id, u.id), eq(employmentContracts.status, 'active')))
+        .then(r => r[0] ?? null);
+
+      const nomination_count = nomRow?.total ?? 0;
+      const follower_count   = followerRow?.total ?? 0;
+      const contracts_completed = contractRow?.total ?? 0;
+      const relevance_score = nomination_count * 3 + contracts_completed * 10 + follower_count;
+
+      return {
+        ...u,
+        display_name: u.display_name ?? u.email.split('@')[0],
+        nomination_count,
+        follower_count,
+        contracts_completed,
+        relevance_score,
+        active_contract: activeContract,
+      };
+    }));
+
+    res.json(enriched.sort((a, b) => b.relevance_score - a.relevance_score));
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/contracts — send contract offer to a user
+router.post('/contracts', async (req: Request, res: Response) => {
+  const { business_id, user_id, starts_at, ends_at, note } = req.body;
+  if (!business_id || !user_id || !starts_at || !ends_at) {
+    res.status(400).json({ error: 'business_id, user_id, starts_at, ends_at are required' });
+    return;
+  }
+  try {
+    const [business] = await db.select().from(businesses).where(eq(businesses.id, business_id));
+    if (!business) { res.status(404).json({ error: 'Business not found' }); return; }
+
+    const [contract] = await db.insert(employmentContracts).values({
+      business_id,
+      user_id,
+      starts_at: new Date(starts_at),
+      ends_at: new Date(ends_at),
+      note: note ?? null,
+      status: 'pending',
+    }).returning();
+
+    const [user] = await db.select().from(users).where(eq(users.id, user_id));
+    if (user?.push_token) {
+      sendPushNotification(user.push_token, {
+        title: 'Maison Fraise is placing you.',
+        body: `You've been offered a placement at ${business.name}. Open the app to review.`,
+        data: { screen: 'contract_offer', contract_id: contract.id },
+      }).catch(() => {});
+    }
+
+    res.status(201).json(contract);
+  } catch (err) {
+    logger.error('Contract create error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/contracts — all contracts
+router.get('/contracts', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: employmentContracts.id,
+        status: employmentContracts.status,
+        starts_at: employmentContracts.starts_at,
+        ends_at: employmentContracts.ends_at,
+        note: employmentContracts.note,
+        created_at: employmentContracts.created_at,
+        business_name: businesses.name,
+        business_id: employmentContracts.business_id,
+        user_id: employmentContracts.user_id,
+        user_display_name: users.display_name,
+        user_email: users.email,
+      })
+      .from(employmentContracts)
+      .innerJoin(businesses, eq(employmentContracts.business_id, businesses.id))
+      .innerJoin(users, eq(employmentContracts.user_id, users.id))
+      .orderBy(employmentContracts.created_at);
+
+    res.json(rows.map(r => ({
+      ...r,
+      user_display_name: r.user_display_name ?? r.user_email.split('@')[0],
+    })));
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/contracts/:id — update status (e.g. mark completed)
+router.patch('/contracts/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const [updated] = await db.update(employmentContracts).set(req.body).where(eq(employmentContracts.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/contract-requests — business placement requests
+router.get('/contract-requests', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: contractRequests.id,
+        description: contractRequests.description,
+        desired_start: contractRequests.desired_start,
+        status: contractRequests.status,
+        created_at: contractRequests.created_at,
+        business_name: businesses.name,
+        business_id: contractRequests.business_id,
+      })
+      .from(contractRequests)
+      .innerJoin(businesses, eq(contractRequests.business_id, businesses.id))
+      .orderBy(contractRequests.created_at);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/contract-requests/:id
+router.patch('/contract-requests/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const [updated] = await db.update(contractRequests).set(req.body).where(eq(contractRequests.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

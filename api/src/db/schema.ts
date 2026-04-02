@@ -304,3 +304,33 @@ export const popupRequests = pgTable('popup_requests', {
   status: text('status').notNull().default('pending'), // 'pending' | 'paid' | 'approved' | 'rejected'
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── Talent layer ─────────────────────────────────────────────────────────────
+
+export const employmentContracts = pgTable('employment_contracts', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  starts_at: timestamp('starts_at').notNull(),
+  ends_at: timestamp('ends_at').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'active' | 'completed' | 'declined'
+  note: text('note'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const contractRequests = pgTable('contract_requests', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  description: text('description'),
+  desired_start: text('desired_start'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'filled' | 'closed'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const businessVisits = pgTable('business_visits', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  contracted_user_id: integer('contracted_user_id').notNull().references(() => users.id),
+  visitor_user_id: integer('visitor_user_id').references(() => users.id),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
