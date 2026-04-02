@@ -1289,6 +1289,7 @@
       ${varieties.length === 0 ? '<div class="empty">No varieties.</div>' :
         varieties.map(v => `
           <div class="form-card" style="margin-bottom:8px;" id="variety-card-${v.id}">
+            ${v.image_url ? `<img src="${v.image_url}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;margin-bottom:8px;" />` : ''}
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <div>
                 <div style="font-family:'Playfair Display',serif;font-size:16px;">${v.name}</div>
@@ -1307,6 +1308,8 @@
               </select>
             </div>
             <textarea class="form-input" id="v-desc-${v.id}" rows="2" placeholder="Description (optional)" style="resize:vertical;">${v.description || ''}</textarea>
+            <label style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:4px;">Image URL</label>
+            <input class="form-input" id="var-image-url-${v.id}" type="text" value="${v.image_url ?? ''}" placeholder="https://..." />
             <div class="form-row">
               <input class="form-input" id="v-stock-${v.id}" type="number" min="0" value="${v.stock_remaining}" placeholder="Stock" />
             </div>
@@ -1333,12 +1336,13 @@
     const active = activeEl.value === 'true';
     const description = descEl.value.trim() || null;
     const stock_remaining = parseInt(stockEl.value);
+    const image_url = document.getElementById(`var-image-url-${id}`).value || null;
 
     const [r1, r2] = await Promise.all([
       fetch(BASE + '/api/admin/varieties/' + id, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
-        body: JSON.stringify({ location_id, active, description }),
+        body: JSON.stringify({ location_id, active, description, image_url }),
       }),
       isNaN(stock_remaining) ? Promise.resolve({ ok: true }) : fetch(BASE + '/api/admin/varieties/' + id + '/stock', {
         method: 'PATCH',

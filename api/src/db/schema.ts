@@ -74,6 +74,7 @@ export const varieties = pgTable('varieties', {
   harvest_date: date('harvest_date'),
   tag: text('tag'),
   location_id: integer('location_id').references(() => locations.id),
+  image_url: text('image_url'),
   active: boolean('active').notNull().default(true),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });

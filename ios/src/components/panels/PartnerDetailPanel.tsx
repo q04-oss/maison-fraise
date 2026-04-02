@@ -237,6 +237,20 @@ export default function PartnerDetailPanel() {
             </TouchableOpacity>
           </View>
 
+          {/* Instagram handle */}
+          {!!biz.instagram_handle && (
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`https://www.instagram.com/${biz.instagram_handle!.replace('@', '')}`)}
+              activeOpacity={0.7}
+              style={styles.instagramRow}
+            >
+              <Text style={[styles.fieldLabel, { color: c.muted }]}>INSTAGRAM</Text>
+              <Text style={[styles.instagramHandle, { color: c.accent }]}>
+                @{biz.instagram_handle.replace('@', '')}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* Links */}
           <View style={styles.linksRow}>
             {!!biz.instagram_handle && (
@@ -427,6 +441,9 @@ const styles = StyleSheet.create({
   addressRow: { gap: 3 },
   addressText: { fontSize: 12, fontFamily: fonts.dmSans },
   mapsLink: { fontSize: 12, fontFamily: fonts.dmMono },
+
+  instagramRow: { gap: 3 },
+  instagramHandle: { fontSize: 13, fontFamily: fonts.dmMono },
 
   linksRow: { flexDirection: 'row', gap: 10 },
   linkBtn: {

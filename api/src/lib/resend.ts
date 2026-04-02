@@ -247,6 +247,42 @@ export async function sendAuditionResult(params: {
   });
 }
 
+export async function sendDailySummary(to: string, params: {
+  orderCount: number;
+  rsvpCount: number;
+  lowStockVarieties: { name: string; stock_remaining: number }[];
+}) {
+  const { orderCount, rsvpCount, lowStockVarieties } = params;
+
+  const lowStockRows = lowStockVarieties.length > 0
+    ? lowStockVarieties.map(v => row(v.name, `${v.stock_remaining} remaining`)).join('')
+    : '<tr><td style="padding:14px 0;"><p style="margin:0;font-size:15px;color:#F2F2F7;font-family:Georgia,\'Times New Roman\',serif;">All varieties adequately stocked.</p></td></tr>';
+
+  const content = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      ${row('Orders today', String(orderCount))}
+      ${row('Paid RSVPs today', String(rsvpCount))}
+    </table>
+
+    <p style="margin:0 0 12px;font-size:10px;color:#8A8A8E;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Low stock (≤ 3)</p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      ${lowStockRows}
+    </table>
+
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      Generated automatically at 08:00 by Maison Fraise.
+    </p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: REPLY_TO,
+    subject: 'Maison Fraise — Daily Summary',
+    html: baseTemplate(content, 'Daily summary.'),
+  });
+}
+
 export async function sendRsvpConfirmed(params: {
   to: string;
   popupName: string;

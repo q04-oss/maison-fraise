@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { eq, sql } from 'drizzle-orm';
+import { eq, sql, and, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
+import crypto from 'crypto';
 import { db } from '../db';
 import { orders, varieties, timeSlots, legitimacyEvents, users } from '../db/schema';
 import { stripe } from '../lib/stripe';
@@ -191,6 +192,107 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
   } catch (err) {
     logger.error('Order confirm error', err);
     res.status(500).json({ error: 'Internal server error', detail: String(err) });
+  }
+});
+
+// POST /api/orders/payment-intent — create a Stripe PaymentIntent for a new order (public, no admin PIN)
+router.post('/payment-intent', async (req: Request, res: Response) => {
+  const {
+    variety_id,
+    quantity,
+    location_id,
+    time_slot_id,
+    chocolate,
+    finish,
+    is_gift,
+    gift_note,
+    customer_email,
+  } = req.body;
+
+  if (!variety_id || !quantity || !location_id || !time_slot_id || !chocolate || !finish || !customer_email) {
+    res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  try {
+    const [variety] = await db.select().from(varieties).where(eq(varieties.id, variety_id));
+    if (!variety || !variety.active) {
+      res.status(404).json({ error: 'Variety not found' });
+      return;
+    }
+
+    // Stock guard (task 2)
+    if (variety.stock_remaining < quantity) {
+      res.status(409).json({ error: 'insufficient_stock' });
+      return;
+    }
+
+    const total_cents = variety.price_cents * quantity;
+
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: total_cents,
+      currency: 'cad',
+      metadata: {
+        variety_id: String(variety_id),
+        quantity: String(quantity),
+        location_id: String(location_id),
+        time_slot_id: String(time_slot_id),
+        chocolate: String(chocolate),
+        finish: String(finish),
+        is_gift: String(is_gift ?? false),
+        gift_note: gift_note ?? '',
+        customer_email: String(customer_email),
+      },
+    });
+
+    res.status(201).json({ client_secret: paymentIntent.client_secret, total_cents });
+  } catch (err) {
+    logger.error('Payment intent creation error', err);
+    res.status(500).json({ error: 'Internal server error', detail: String(err) });
+  }
+});
+
+// GET /api/orders/by-email/:email — most recent paid order for an email (iOS polls after PaymentSheet)
+router.get('/by-email/:email', async (req: Request, res: Response) => {
+  const email = req.params.email;
+  if (!email) {
+    res.status(400).json({ error: 'email is required' });
+    return;
+  }
+
+  try {
+    const [order] = await db
+      .select({
+        id: orders.id,
+        variety_id: orders.variety_id,
+        variety_name: varieties.name,
+        location_id: orders.location_id,
+        time_slot_id: orders.time_slot_id,
+        chocolate: orders.chocolate,
+        finish: orders.finish,
+        quantity: orders.quantity,
+        is_gift: orders.is_gift,
+        total_cents: orders.total_cents,
+        status: orders.status,
+        nfc_token: orders.nfc_token,
+        gift_note: orders.gift_note,
+        created_at: orders.created_at,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .where(and(eq(orders.customer_email, email), eq(orders.status, 'paid')))
+      .orderBy(desc(orders.created_at))
+      .limit(1);
+
+    if (!order) {
+      res.status(404).json({ error: 'No paid order found for this email' });
+      return;
+    }
+
+    res.json(order);
+  } catch (err) {
+    logger.error('by-email lookup error', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -719,6 +719,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     `);
 
     await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS location_id integer REFERENCES locations(id)`);
+    await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS image_url TEXT`);
 
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {

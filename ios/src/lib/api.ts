@@ -625,3 +625,35 @@ export async function fetchUserPlacements(userId: number): Promise<any[]> {
   if (!r.ok) return [];
   return r.json();
 }
+
+export async function createOrderPaymentIntent(order: {
+  variety_id: number;
+  quantity: number;
+  location_id: number;
+  time_slot_id: number | null;
+  chocolate: string | null;
+  finish: string | null;
+  is_gift: boolean;
+  gift_note: string | null;
+  customer_email: string;
+}): Promise<{ client_secret: string; total_cents: number }> {
+  const r = await fetch(`${BASE_URL}/api/orders/payment-intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(order),
+  });
+  if (!r.ok) throw new Error('payment_intent_failed');
+  return r.json();
+}
+
+export async function fetchLatestOrderByEmail(email: string): Promise<any | null> {
+  const r = await fetch(`${BASE_URL}/api/orders/by-email/${encodeURIComponent(email)}`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function searchAll(q: string): Promise<{ users: any[]; popups: any[]; varieties: any[] }> {
+  const r = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(q)}`);
+  if (!r.ok) return { users: [], popups: [], varieties: [] };
+  return r.json();
+}

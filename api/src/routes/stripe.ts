@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
+import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, popupRsvps, popupRequests, campaignCommissions, users, businesses } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
-import { sendRsvpConfirmed } from '../lib/resend';
+import { sendRsvpConfirmed, sendOrderConfirmation } from '../lib/resend';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -37,7 +38,70 @@ router.post('/webhook', async (req: Request, res: Response) => {
       const pi = event.data.object as Stripe.PaymentIntent;
       const type = pi.metadata?.type;
 
-      if (!type || type === 'order') {
+      // New order flow — PI created by POST /api/orders/payment-intent (no pre-created order row)
+      if (!type && pi.metadata?.variety_id && pi.metadata?.customer_email) {
+        const variety_id = parseInt(pi.metadata.variety_id, 10);
+        const quantity = parseInt(pi.metadata.quantity, 10);
+        const location_id = parseInt(pi.metadata.location_id, 10);
+        const time_slot_id = parseInt(pi.metadata.time_slot_id, 10);
+        const chocolate = pi.metadata.chocolate as 'guanaja_70' | 'caraibe_66' | 'jivara_40' | 'ivoire_blanc';
+        const finish = pi.metadata.finish as 'plain' | 'fleur_de_sel' | 'or_fin';
+        const is_gift = pi.metadata.is_gift === 'true';
+        const gift_note = pi.metadata.gift_note || null;
+        const customer_email = pi.metadata.customer_email;
+
+        // Decrement stock
+        await db
+          .update(varieties)
+          .set({ stock_remaining: sql`stock_remaining - ${quantity}` })
+          .where(eq(varieties.id, variety_id));
+
+        // Generate NFC token
+        const nfc_token = crypto.randomBytes(4).toString('hex');
+
+        // Insert order
+        const [newOrder] = await db
+          .insert(orders)
+          .values({
+            variety_id,
+            location_id,
+            time_slot_id,
+            chocolate,
+            finish,
+            quantity,
+            is_gift,
+            total_cents: pi.amount,
+            stripe_payment_intent_id: pi.id,
+            status: 'paid',
+            customer_email,
+            gift_note,
+            nfc_token,
+          })
+          .returning();
+
+        logger.info(`Order ${newOrder.id} created + paid via payment_intent webhook`);
+
+        // Send confirmation email (fire-and-forget)
+        Promise.all([
+          db.select().from(varieties).where(eq(varieties.id, variety_id)),
+          db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id)),
+        ]).then(([[variety], [slot]]) => {
+          if (variety && slot) {
+            sendOrderConfirmation({
+              to: customer_email,
+              varietyName: variety.name,
+              chocolate,
+              finish,
+              quantity,
+              isGift: is_gift,
+              totalCents: pi.amount,
+              slotDate: slot.date,
+              slotTime: slot.time,
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+
+      } else if (!type || type === 'order') {
         // Legacy order flow
         const [order] = await db
           .select()
