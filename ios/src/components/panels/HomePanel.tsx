@@ -180,7 +180,7 @@ export default function HomePanel() {
           {locations.length === 0 && (
             <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
           )}
-          {locations.length > 0 && expandedId === null && !singleLocation && (
+          {locations.length > 0 && expandedId === null && (
             <Text style={[styles.emptyText, { color: c.muted, marginTop: 40 }]}>Select a location above.</Text>
           )}
           {locations.map((biz: any) => {
