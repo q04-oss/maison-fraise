@@ -107,8 +107,8 @@ router.post('/', async (req: Request, res: Response) => {
       .returning();
 
     res.status(201).json({ order, client_secret: clientSecret });
-  } catch (err) {
-    logger.error('Order creation error', err);
+  } catch (err: any) {
+    logger.error('Order creation error: ' + String(err?.message ?? err));
     res.status(500).json({ error: 'Internal server error', detail: String(err) });
   }
 });
