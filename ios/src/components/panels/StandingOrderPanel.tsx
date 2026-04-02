@@ -6,7 +6,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useApp } from '../../../App';
-import { searchVerifiedUsers, generateGiftNote, createStandingOrder, placeStandingOrderFromFund, fetchMyMembership } from '../../lib/api';
+import { searchVerifiedUsers, generateGiftNote, createStandingOrder, placeStandingOrderFromFund } from '../../lib/api';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
@@ -36,13 +36,9 @@ export default function StandingOrderPanel() {
     Promise.all([
       AsyncStorage.getItem('user_db_id'),
       AsyncStorage.getItem('verified'),
-      fetchMyMembership().catch(() => null),
-    ]).then(([dbId, verified, membership]) => {
+    ]).then(([dbId, verified]) => {
       if (dbId) setUserDbId(parseInt(dbId, 10));
       setIsVerified(verified === 'true');
-      if (membership?.fund?.balance_cents != null) {
-        setFundBalanceCents(membership.fund.balance_cents);
-      }
     });
   }, []);
   const [freq, setFreq] = useState('monthly');

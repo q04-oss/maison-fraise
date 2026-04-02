@@ -9,26 +9,21 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useApp } from '../../../App';
 import { usePanel } from '../../context/PanelContext';
 import {
-  signInWithApple, verifyAppleSignIn, setAuthToken,
-  fetchStandingOrders, updateStandingOrder,
-  cancelStandingOrder, fetchOrdersByEmail,
-  fetchUserPopupRsvps, fetchDjGigs, fetchDjAllocations, registerAsDj,
-  fetchHostedPopups, fetchActiveContract, fetchFollowerCount, logMemberVisit,
-  fetchLegitimacyBreakdown, updateDisplayName, cancelPopupRsvp, fetchAuthToken,
-  demoLogin, fetchSetupIntent, savePaymentMethod, fetchMyReferralCode, applyReferralCode,
-  fetchNotificationPrefs, updateNotificationPrefs, fetchMyMembership,
-  fetchMyTokenOffers,
+  verifyAppleSignIn, setAuthToken,
+  fetchStandingOrders, updateStandingOrder, cancelStandingOrder,
+  fetchOrdersByEmail, updateDisplayName,
+  demoLogin, fetchSetupIntent,
+  fetchMyReferralCode, applyReferralCode,
+  fetchNotificationPrefs, updateNotificationPrefs,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
-import { useTheme } from '../../context/ThemeContext';
 
 export default function ProfilePanel() {
   const { goHome, jumpToPanel, showPanel, setOrder, setActiveLocation, varieties, businesses } = usePanel();
   const { pushToken } = useApp();
   const c = useColors();
-  const { isDark } = useTheme();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userDbId, setUserDbId] = useState<number | null>(null);
@@ -38,45 +33,25 @@ export default function ProfilePanel() {
   const [signingIn, setSigningIn] = useState(false);
   const [standingOrders, setStandingOrders] = useState<any[]>([]);
   const [recentOrders, setRecentOrders] = useState<any[]>([]);
-  const [isDj, setIsDj] = useState(false);
-  const [djToggling, setDjToggling] = useState(false);
-  const [upcomingPopups, setUpcomingPopups] = useState<any[]>([]);
-  const [hostedPopups, setHostedPopups] = useState<any[]>([]);
-  const [djGigs, setDjGigs] = useState<any[]>([]);
-  const [allocations, setAllocations] = useState<any[]>([]);
-  const [activeContract, setActiveContract] = useState<any>(null);
-  const [followerCount, setFollowerCount] = useState<number>(0);
-  const [loggingVisit, setLoggingVisit] = useState(false);
-  const [legitimacy, setLegitimacy] = useState<{ total: number; breakdown: { event_type: string; total: number; count: number }[] } | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [cancellingRsvp, setCancellingRsvp] = useState<number | null>(null);
-  const [togglingOrder, setTogglingOrder] = useState<number | null>(null);
   const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
   const [addingPayment, setAddingPayment] = useState(false);
   const [paymentSaved, setPaymentSaved] = useState(false);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralUses, setReferralUses] = useState(0);
-  const [notifPrefs, setNotifPrefs] = useState<{ order_updates: boolean; social: boolean; popup_updates: boolean; marketing: boolean } | null>(null);
-  const [membershipTier, setMembershipTier] = useState<string | null>(null);
-  const [pendingOffers, setPendingOffers] = useState(0);
-  const [workerStatus, setWorkerStatus] = useState<string | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState<{ order_updates: boolean; marketing: boolean } | null>(null);
 
   useEffect(() => {
     Promise.all([
       AsyncStorage.getItem('user_email'),
       AsyncStorage.getItem('verified'),
       AsyncStorage.getItem('user_db_id'),
-      AsyncStorage.getItem('is_dj'),
       AppleAuthentication.isAvailableAsync().catch(() => false),
       AsyncStorage.getItem('display_name'),
-      AsyncStorage.getItem('worker_status'),
-    ]).then(([email, verified, dbId, djFlag, available, storedDisplayName, storedWorkerStatus]) => {
+    ]).then(([email, verified, dbId, available, storedDisplayName]) => {
       if (storedDisplayName) setDisplayName(storedDisplayName);
-      if (storedWorkerStatus) setWorkerStatus(storedWorkerStatus);
-      const verifiedBool = verified === 'true';
-      setIsVerifiedState(verifiedBool);
+      setIsVerifiedState(verified === 'true');
       setAppleAvailable(available as boolean);
-      setIsDj(djFlag === 'true');
       if (email) {
         setUserEmail(email);
         fetchOrdersByEmail(email)
@@ -92,21 +67,10 @@ export default function ProfilePanel() {
         const uid = parseInt(dbId, 10);
         setUserDbId(uid);
         fetchStandingOrders(uid).then(setStandingOrders).catch(() => {});
-        fetchActiveContract(uid).then(setActiveContract).catch(() => {});
-        fetchFollowerCount(uid).then(r => setFollowerCount(r.follower_count)).catch(() => {});
-        fetchLegitimacyBreakdown(uid).then(setLegitimacy).catch(() => {});
         fetchMyReferralCode().then(r => { setReferralCode(r.code); setReferralUses(r.uses); }).catch(() => {});
-        fetchNotificationPrefs().then(setNotifPrefs).catch(() => {});
-        fetchMyMembership().then(data => { if (data.membership?.tier) setMembershipTier(data.membership.tier); }).catch(() => {});
-        fetchMyTokenOffers().then(offers => setPendingOffers(offers.length)).catch(() => {});
-        if (verifiedBool) {
-          fetchUserPopupRsvps(uid).then(setUpcomingPopups).catch(() => {});
-          fetchHostedPopups(uid).then(setHostedPopups).catch(() => {});
-          if (djFlag === 'true') {
-            fetchDjGigs(uid).then(setDjGigs).catch(() => {});
-            fetchDjAllocations(uid).then(setAllocations).catch(() => {});
-          }
-        }
+        fetchNotificationPrefs().then(prefs => {
+          setNotifPrefs({ order_updates: prefs.order_updates, marketing: prefs.marketing });
+        }).catch(() => {});
       }
     }).finally(() => setLoading(false));
   }, []);
@@ -122,7 +86,6 @@ export default function ProfilePanel() {
       });
       if (!credential.identityToken) throw new Error('No identity token received.');
 
-      // Primary flow: verify identity token with backend
       const result = await verifyAppleSignIn({
         identityToken: credential.identityToken,
         firstName: credential.fullName?.givenName ?? undefined,
@@ -132,14 +95,10 @@ export default function ProfilePanel() {
 
       await AsyncStorage.setItem('user_db_id', String(result.user_id));
       await setAuthToken(result.token);
-
       setUserDbId(result.user_id);
 
-      // Email: Apple only sends it on first sign-in; persist if present
       const emailToUse = credential.email ?? (await AsyncStorage.getItem('user_email'));
-      if (credential.email) {
-        await AsyncStorage.setItem('user_email', credential.email);
-      }
+      if (credential.email) await AsyncStorage.setItem('user_email', credential.email);
       if (emailToUse) {
         setUserEmail(emailToUse);
         fetchOrdersByEmail(emailToUse)
@@ -154,7 +113,6 @@ export default function ProfilePanel() {
 
       fetchStandingOrders(result.user_id).then(setStandingOrders).catch(() => {});
 
-      // Update push token after sign-in
       if (pushToken) {
         const { updatePushToken } = await import('../../lib/api');
         updatePushToken(result.user_id, pushToken).catch(() => {});
@@ -180,46 +138,39 @@ export default function ProfilePanel() {
         const { updatePushToken } = await import('../../lib/api');
         updatePushToken(result.user_id, pushToken).catch(() => {});
       }
-    } catch (err: any) {
+    } catch {
       Alert.alert('Demo unavailable', 'The demo account is not available right now.');
     } finally {
       setSigningIn(false);
     }
   };
 
-  const handleDjToggle = async () => {
-    if (!userDbId || djToggling) return;
-    const next = !isDj;
-    setDjToggling(true);
-    try {
-      await registerAsDj(userDbId, next);
-      setIsDj(next);
-      await AsyncStorage.setItem('is_dj', next ? 'true' : 'false');
-      if (next) {
-        fetchDjGigs(userDbId).then(setDjGigs).catch(() => {});
-        fetchDjAllocations(userDbId).then(setAllocations).catch(() => {});
-      } else {
-        setDjGigs([]);
-        setAllocations([]);
-      }
-    } catch {
-      Alert.alert('Could not update', 'Try again.');
-    } finally {
-      setDjToggling(false);
-    }
+  const handleSignOut = () => {
+    Alert.alert('Sign out?', 'You\'ll need to sign in again to place orders.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out', style: 'destructive', onPress: async () => {
+          await AsyncStorage.multiRemove(['user_email', 'user_db_id', 'verified', 'is_dj']);
+          setUserEmail(null);
+          setUserDbId(null);
+          setIsVerifiedState(false);
+          setStandingOrders([]);
+          setRecentOrders([]);
+          setOrder({ customer_email: '' });
+        },
+      },
+    ]);
   };
 
-  const handleLogVisit = async () => {
-    if (!activeContract || !userDbId || loggingVisit) return;
-    setLoggingVisit(true);
-    try {
-      await logMemberVisit(activeContract.business_id, userDbId);
-      Alert.alert('Visit logged', 'Member visit recorded successfully.');
-    } catch (err: any) {
-      Alert.alert('Could not log', err.message ?? 'Please try again.');
-    } finally {
-      setLoggingVisit(false);
-    }
+  const handleEditName = () => {
+    Alert.prompt('Display name', 'Enter your name', async (name) => {
+      if (!name || name.trim().length < 2 || !userDbId) return;
+      try {
+        await updateDisplayName(userDbId, name.trim());
+        await AsyncStorage.setItem('display_name', name.trim());
+        setDisplayName(name.trim());
+      } catch {}
+    });
   };
 
   const handleCancelStanding = (id: number) => {
@@ -249,35 +200,6 @@ export default function ProfilePanel() {
     }
   };
 
-  const handleCancelRsvp = (popupId: number) => {
-    Alert.alert('Cancel RSVP', 'Are you sure? Paid RSVPs will be refunded.', [
-      { text: 'Keep it', style: 'cancel' },
-      { text: 'Cancel RSVP', style: 'destructive', onPress: async () => {
-        if (!userDbId) return;
-        setCancellingRsvp(popupId);
-        try {
-          await cancelPopupRsvp(popupId, userDbId);
-          setUpcomingPopups(prev => prev.filter(r => r.popup_id !== popupId));
-        } catch (e: any) {
-          Alert.alert('Error', e.message);
-        } finally {
-          setCancellingRsvp(null);
-        }
-      }},
-    ]);
-  };
-
-  const handleToggleOrder = async (id: number, currentStatus: string) => {
-    setTogglingOrder(id);
-    try {
-      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
-      await updateStandingOrder(id, newStatus);
-      setStandingOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
-    } catch {} finally {
-      setTogglingOrder(null);
-    }
-  };
-
   const handleAddPaymentMethod = async () => {
     setAddingPayment(true);
     try {
@@ -289,9 +211,7 @@ export default function ProfilePanel() {
       if (initErr) throw new Error(initErr.message);
       const { error: presentErr } = await presentPaymentSheet();
       if (presentErr) {
-        if (presentErr.code !== 'Canceled') {
-          Alert.alert('Could not save card. Please try again.');
-        }
+        if (presentErr.code !== 'Canceled') Alert.alert('Could not save card. Please try again.');
         return;
       }
       setHasPaymentMethod(true);
@@ -321,46 +241,11 @@ export default function ProfilePanel() {
     });
   };
 
-  const handleNotifToggle = (key: 'order_updates' | 'social' | 'popup_updates' | 'marketing', value: boolean) => {
+  const handleNotifToggle = (key: 'order_updates' | 'marketing', value: boolean) => {
     if (!notifPrefs) return;
     const updated = { ...notifPrefs, [key]: value };
     setNotifPrefs(updated);
     updateNotificationPrefs({ [key]: value }).catch(() => {});
-  };
-
-  const handleSignOut = () => {
-    Alert.alert('Sign out?', 'You\'ll need to sign in again to place orders.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Sign out', style: 'destructive', onPress: async () => {
-          await AsyncStorage.multiRemove(['user_email', 'user_db_id', 'verified', 'is_dj']);
-          setUserEmail(null);
-          setUserDbId(null);
-          setIsVerifiedState(false);
-          setIsDj(false);
-          setStandingOrders([]);
-          setRecentOrders([]);
-          setUpcomingPopups([]);
-          setHostedPopups([]);
-          setDjGigs([]);
-          setAllocations([]);
-          setActiveContract(null);
-          setFollowerCount(0);
-          setOrder({ customer_email: '' });
-        },
-      },
-    ]);
-  };
-
-  const handleEditName = () => {
-    Alert.prompt('Display name', 'Enter your name', async (name) => {
-      if (!name || name.trim().length < 2 || !userDbId) return;
-      try {
-        await updateDisplayName(userDbId, name.trim());
-        await AsyncStorage.setItem('display_name', name.trim());
-        setDisplayName(name.trim());
-      } catch {}
-    });
   };
 
   const lastOrder = recentOrders[0] ?? null;
@@ -391,18 +276,6 @@ export default function ProfilePanel() {
     const nextPanel = !lastOrder.chocolate ? 'chocolate' : !lastOrder.finish ? 'finish' : 'when';
     jumpToPanel(nextPanel);
   };
-
-  const upcomingDjGigs = djGigs.filter((g: any) => g.status === 'upcoming');
-  const pastDjGigs = djGigs.filter((g: any) => g.status === 'past');
-
-  // Poll RSVP counts while DJ has upcoming gigs
-  useEffect(() => {
-    if (!isDj || !userDbId || upcomingDjGigs.length === 0) return;
-    const interval = setInterval(() => {
-      fetchDjGigs(userDbId).then(setDjGigs).catch(() => {});
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [isDj, userDbId, upcomingDjGigs.length]);
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -468,99 +341,11 @@ export default function ProfilePanel() {
 
                 <TouchableOpacity
                   style={styles.actionRow}
-                  onPress={() => showPanel('membership')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Membership</Text>
-                    {membershipTier ? (
-                      <Text style={[styles.actionSub, { color: c.muted }]}>{membershipTier.charAt(0).toUpperCase() + membershipTier.slice(1)}</Text>
-                    ) : (
-                      <Text style={[styles.actionSub, { color: c.muted }]}>View tiers and status</Text>
-                    )}
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('editorial-feed')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Editorial</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Read and write pieces</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('member-directory')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Members</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Browse the directory</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('search')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Search</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Find other members</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('following-list')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Connections</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Following and followers</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('nomination-history')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Nominations</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Given and received</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
                   onPress={() => showPanel('order-history')}
                   activeOpacity={0.75}
                 >
                   <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Order History</Text>
+                    <Text style={[styles.actionTitle, { color: c.text }]}>Order history</Text>
                     <Text style={[styles.actionSub, { color: c.muted }]}>View all your past orders</Text>
                   </View>
                   <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
@@ -569,191 +354,16 @@ export default function ProfilePanel() {
                 <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
 
                 <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('activity-feed')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Activity</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>See what people you follow are up to</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('notification-inbox')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Notifications</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Your inbox from Maison Fraise</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                {/* Tap to Connect */}
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('nfc-tap')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> tap to connect_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Exchange contact via NFC code</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('contacts')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Contacts</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Your NFC connections</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('portal-owner')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>My Portal</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Manage your exclusive content</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('my-tokens')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> tokens_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Your minted strawberry tokens</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('token-offers')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>
-                      {'> trade offers_'}
-                      {pendingOffers > 0 ? `  [${pendingOffers}]` : ''}
-                    </Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Incoming token trade requests</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('patronages')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> patronages_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Season farm patronages</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('greenhouses')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> greenhouses_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Greenhouse founding & provenance</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
                   style={[styles.actionRow, styles.actionRowLast]}
-                  onPress={() => showPanel('chocolate-locations')}
+                  onPress={() => showPanel('search')}
                   activeOpacity={0.75}
                 >
                   <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> chocolate shops_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Chocolate locations & collaborations</Text>
+                    <Text style={[styles.actionTitle, { color: c.text }]}>Search</Text>
+                    <Text style={[styles.actionSub, { color: c.muted }]}>Find varieties and locations</Text>
                   </View>
                   <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
                 </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Active contract / placement */}
-            {activeContract && (
-              <View style={[styles.contractCard, { backgroundColor: c.card, borderColor: c.border }]}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>CURRENT PLACEMENT</Text>
-                <Text style={[styles.contractBiz, { color: c.text }]}>{activeContract.business_name}</Text>
-                <Text style={[styles.contractMeta, { color: c.muted }]}>{activeContract.business_address}</Text>
-                <View style={[styles.contractDivider, { backgroundColor: c.border }]} />
-                <TouchableOpacity
-                  style={[styles.logVisitBtn, { backgroundColor: c.accent }, loggingVisit && { opacity: 0.6 }]}
-                  onPress={handleLogVisit}
-                  activeOpacity={0.8}
-                  disabled={loggingVisit}
-                >
-                  <Text style={styles.logVisitText}>+ Log member visit</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Follower count */}
-            {userDbId && followerCount > 0 && (
-              <View style={[styles.followerRow, { borderColor: c.border }]}>
-                <Text style={[styles.followerCount, { color: c.text }]}>{followerCount}</Text>
-                <Text style={[styles.followerLabel, { color: c.muted }]}>
-                  {followerCount === 1 ? 'follower' : 'followers'}
-                </Text>
-              </View>
-            )}
-
-            {/* Legitimacy score */}
-            {legitimacy && legitimacy.total > 0 && (
-              <View style={[styles.legitimacyCard, { borderColor: c.border }]}>
-                <View style={styles.legitimacyHeader}>
-                  <Text style={[styles.sectionLabel, { color: c.muted }]}>RELEVANCE SCORE</Text>
-                  <Text style={[styles.legitimacyTotal, { color: c.text }]}>{legitimacy.total}</Text>
-                </View>
-                {legitimacy.breakdown.map(e => (
-                  <View key={e.event_type} style={[styles.legitimacyRow, { borderTopColor: c.border }]}>
-                    <Text style={[styles.legitimacyType, { color: c.muted }]}>
-                      {e.event_type.replace(/_/g, ' ')}
-                    </Text>
-                    <Text style={[styles.legitimacyScore, { color: c.text }]}>+{e.total}</Text>
-                  </View>
-                ))}
               </View>
             )}
 
@@ -788,115 +398,6 @@ export default function ProfilePanel() {
                     <Text style={[styles.rowMeta, { color: c.muted }]}>#{o.id}</Text>
                   </View>
                 ))}
-              </View>
-            )}
-
-            {/* Upcoming popup RSVPs */}
-            {isVerified && upcomingPopups.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>UPCOMING POPUPS</Text>
-                {upcomingPopups.map((p: any) => (
-                  <View key={p.id} style={[styles.popupRsvpRow, { backgroundColor: c.card, borderColor: c.border }]}>
-                    <View style={styles.popupRsvpInfo}>
-                      <Text style={[styles.popupRsvpVenue, { color: c.text }]}>{p.venue_name}</Text>
-                      <Text style={[styles.popupRsvpMeta, { color: c.muted }]}>
-                        {p.date} · {p.time}{p.dj_name ? ` · ${p.dj_name}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={[styles.popupRsvpCount, { color: c.muted }]}>{p.rsvp_count} going</Text>
-                    {(p.status === 'paid' || p.status === 'pending') && (
-                      <TouchableOpacity
-                        onPress={() => handleCancelRsvp(p.popup_id)}
-                        disabled={cancellingRsvp === p.popup_id}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.rowMeta, { color: '#C0392B', opacity: cancellingRsvp === p.popup_id ? 0.5 : 1 }]}>Cancel</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Hosted popups / audition status */}
-            {isVerified && hostedPopups.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>MY POPUPS</Text>
-                {hostedPopups.map((p: any) => {
-                  const statusColor = p.audition_status === 'passed'
-                    ? c.accent
-                    : p.audition_status === 'failed'
-                      ? '#C0392B'
-                      : c.muted;
-                  const statusLabel = p.audition_status === 'passed'
-                    ? 'Threshold reached'
-                    : p.audition_status === 'failed'
-                      ? 'Did not pass'
-                      : p.is_audition
-                        ? `${p.nomination_count} nomination${p.nomination_count !== 1 ? 's' : ''}`
-                        : null;
-                  return (
-                    <View key={p.id} style={[styles.hostedRow, { backgroundColor: c.card, borderColor: c.border }]}>
-                      <View style={styles.hostedInfo}>
-                        {p.is_audition && (
-                          <Text style={[styles.hostedBadge, { color: '#B8860B' }]}>AUDITION</Text>
-                        )}
-                        <Text style={[styles.rowName, { color: c.text }]}>{p.venue_name}</Text>
-                        <Text style={[styles.rowMeta, { color: c.muted }]}>{p.date}</Text>
-                      </View>
-                      {statusLabel && (
-                        <Text style={[styles.rowMeta, { color: statusColor }]}>{statusLabel}</Text>
-                      )}
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Verified actions */}
-            {isVerified && (
-              <View style={[styles.verifiedActions, { borderColor: c.border }]}>
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('contract-offer')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Placement offer</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Review your contract from Maison Fraise</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <TouchableOpacity
-                  style={styles.actionRow}
-                  onPress={() => showPanel('popup-request')}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>Host a popup</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Propose a date, venue, and vibe</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-
-                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
-
-                <View style={[styles.actionRow, styles.actionRowLast]}>
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.text }]}>I'm a DJ</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Receive popup gig requests</Text>
-                  </View>
-                  <Switch
-                    value={isDj}
-                    onValueChange={handleDjToggle}
-                    disabled={djToggling}
-                    trackColor={{ false: c.border, true: c.accent }}
-                    thumbColor="#fff"
-                  />
-                </View>
               </View>
             )}
 
@@ -952,55 +453,6 @@ export default function ProfilePanel() {
               </View>
             )}
 
-            {/* DJ gigs */}
-            {isDj && upcomingDjGigs.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>UPCOMING GIGS</Text>
-                {upcomingDjGigs.map((g: any) => {
-                  const isToday = g.date === new Date().toISOString().split('T')[0];
-                  return (
-                    <View key={g.id} style={[styles.row, { borderBottomColor: c.border }]}>
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={[styles.rowName, { color: c.text }]}>{g.venue_name}</Text>
-                        <Text style={[styles.rowMeta, { color: c.muted }]}>{g.date} · {g.time}</Text>
-                      </View>
-                      <View style={styles.gigRight}>
-                        {isToday && <View style={[styles.liveDot, { backgroundColor: '#C0392B' }]} />}
-                        <Text style={[styles.rowMeta, { color: isToday ? c.text : c.muted }]}>{g.rsvp_count} going</Text>
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
-
-            {isDj && pastDjGigs.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>PAST GIGS</Text>
-                {pastDjGigs.map((g: any) => (
-                  <View key={g.id} style={[styles.row, { borderBottomColor: c.border }]}>
-                    <Text style={[styles.rowName, { color: c.text }]}>{g.venue_name}</Text>
-                    <Text style={[styles.rowMeta, { color: c.muted }]}>{g.date}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Allocations */}
-            {allocations.length > 0 && (
-              <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>ALLOCATIONS</Text>
-                {allocations.map((a: any) => (
-                  <View key={a.id} style={[styles.row, { borderBottomColor: c.border }]}>
-                    <Text style={[styles.rowName, { color: c.text }]}>Complimentary box</Text>
-                    <Text style={[styles.rowMeta, { color: a.claimed ? c.muted : c.accent }]}>
-                      {a.claimed ? 'Claimed' : a.description}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
             {/* Refer a Friend */}
             {userDbId && referralCode && (
               <View style={[styles.referralCard, { backgroundColor: c.card, borderColor: c.border }]}>
@@ -1027,8 +479,6 @@ export default function ProfilePanel() {
                 {(
                   [
                     { key: 'order_updates' as const, label: 'Order updates' },
-                    { key: 'social' as const, label: 'Social' },
-                    { key: 'popup_updates' as const, label: 'Popup updates' },
                     { key: 'marketing' as const, label: 'Marketing' },
                   ] as const
                 ).map(({ key, label }, index, arr) => (
@@ -1050,39 +500,12 @@ export default function ProfilePanel() {
               </View>
             )}
 
-            {/* Operator panel — visible to workers */}
-            {workerStatus && (
-              <View style={[styles.verifiedActions, { borderColor: c.border }]}>
-                <TouchableOpacity
-                  style={[styles.actionRow, styles.actionRowLast]}
-                  onPress={() => {
-                    Alert.prompt(
-                      'Operator PIN',
-                      'Enter your admin PIN to manage variety order.',
-                      (pin) => {
-                        if (!pin || !pin.trim()) return;
-                        showPanel('operator-varieties', { adminPin: pin.trim() });
-                      },
-                      'secure-text',
-                    );
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.actionInfo}>
-                    <Text style={[styles.actionTitle, { color: c.accent, fontFamily: fonts.dmMono }]}>{'> variety order_'}</Text>
-                    <Text style={[styles.actionSub, { color: c.muted }]}>Reorder varieties for the storefront</Text>
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             {/* Verification hint for unverified */}
-            {!isVerified && (
+            {!isVerified && userDbId && (
               <View style={styles.verifyHint}>
                 <Text style={[styles.sectionLabel, { color: c.muted }]}>VERIFICATION</Text>
                 <Text style={[styles.verifyHintText, { color: c.muted }]}>
-                  Sign in with Apple, collect your first order in person, then tap your phone to the NFC chip inside the box lid. Unlocks popups, standing orders, and early access.
+                  Sign in with Apple and collect your first order in person to become a verified member.
                 </Text>
               </View>
             )}
@@ -1143,19 +566,6 @@ const styles = StyleSheet.create({
   orderAgainName: { fontSize: 15, fontFamily: fonts.playfair },
   orderAgainSub: { fontSize: 12, fontFamily: fonts.dmSans },
 
-  popupRsvpRow: {
-    borderRadius: 12,
-    padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 6,
-  },
-  popupRsvpInfo: { flex: 1, gap: 3 },
-  popupRsvpVenue: { fontSize: 14, fontFamily: fonts.playfair },
-  popupRsvpMeta: { fontSize: 11, fontFamily: fonts.dmMono },
-  popupRsvpCount: { fontSize: 11, fontFamily: fonts.dmMono },
-
   verifiedActions: {
     borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
@@ -1186,65 +596,6 @@ const styles = StyleSheet.create({
   standingActions: { flexDirection: 'row', gap: 16 },
   standingActionText: { fontSize: 13, fontFamily: fonts.dmSans },
 
-  hostedRow: {
-    borderRadius: 12,
-    padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    marginBottom: 6,
-    gap: 12,
-  },
-  hostedInfo: { flex: 1, gap: 2 },
-  hostedBadge: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
-  gigRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: { width: 6, height: 6, borderRadius: 3 },
-  verifyHint: { gap: 5 },
-  verifyHintText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
-
-  contractCard: {
-    borderRadius: 14,
-    padding: SPACING.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 4,
-  },
-  contractBiz: { fontSize: 17, fontFamily: fonts.playfair, marginTop: 4 },
-  contractMeta: { fontSize: 12, fontFamily: fonts.dmSans },
-  contractDivider: { height: StyleSheet.hairlineWidth, marginVertical: 10 },
-  logVisitBtn: {
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  logVisitText: { fontSize: 14, fontFamily: fonts.dmSans, color: '#fff' },
-
-  followerRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  followerCount: { fontSize: 22, fontFamily: fonts.playfair },
-  followerLabel: { fontSize: 12, fontFamily: fonts.dmMono },
-
-  legitimacyCard: {
-    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden',
-  },
-  legitimacyHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: 12,
-  },
-  legitimacyTotal: { fontSize: 22, fontFamily: fonts.playfair },
-  legitimacyRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  legitimacyType: { fontSize: 12, fontFamily: fonts.dmSans, textTransform: 'capitalize' },
-  legitimacyScore: { fontSize: 14, fontFamily: fonts.dmMono },
-
   standingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   cardSavedBadge: { fontSize: 12, fontFamily: fonts.dmMono },
   addPaymentBtn: {
@@ -1272,4 +623,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   notifLabel: { fontSize: 14, fontFamily: fonts.dmSans },
+
+  verifyHint: { gap: 5 },
+  verifyHintText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
 });

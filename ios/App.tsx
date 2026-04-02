@@ -71,42 +71,8 @@ export default function App() {
 
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       const screen = response.notification.request.content.data?.screen;
-      if (screen === 'NFCVerify') setPendingScreen('nfc');
-      if (screen === 'popup') setPendingScreen('popup');
-      if (screen === 'dj_offer') {
-        const popupId = response.notification.request.content.data?.popup_id;
-        if (popupId) { setPendingData({ popup_id: popupId }); setPendingScreen('dj-offer'); }
-      }
-      if (screen === 'nominate') {
-        const popupId = response.notification.request.content.data?.popup_id;
-        if (popupId) { setPendingData({ popup_id: popupId }); setPendingScreen('nomination'); }
-      }
-      if (screen === 'audition_result') {
-        const popupId = response.notification.request.content.data?.popup_id;
-        if (popupId) { setPendingData({ popup_id: popupId }); setPendingScreen('audition-result'); }
-      }
-      if (screen === 'campaign_commission') {
-        const popupId = response.notification.request.content.data?.popup_id;
-        if (popupId) { setPendingData({ popup_id: popupId }); setPendingScreen('campaign-commission'); }
-      }
-      if (screen === 'contract_offer') {
-        setPendingScreen('contract-offer');
-      }
-      if (screen === 'nomination-history') {
-        setPendingScreen('nomination-history');
-      }
-      if (screen === 'notification-inbox') {
-        setPendingScreen('notification-inbox');
-      }
-      if (screen === 'activity-feed') {
-        setPendingScreen('activity-feed');
-      }
       if (screen === 'order-history') {
         setPendingScreen('order-history');
-      }
-      if (screen === 'popup-detail') {
-        const popupId = response.notification.request.content.data?.popupId;
-        if (popupId) { setPendingData({ popup_id: popupId }); setPendingScreen('popup-detail'); }
       }
       if (screen === 'profile') {
         setPendingScreen('profile');

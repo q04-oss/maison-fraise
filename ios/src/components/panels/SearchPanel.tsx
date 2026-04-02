@@ -9,11 +9,9 @@ import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
 export default function SearchPanel() {
-  const { goBack, showPanel, setPanelData, setActiveLocation } = usePanel();
+  const { goBack } = usePanel();
   const c = useColors();
   const [query, setQuery] = useState('');
-  const [users, setUsers] = useState<any[]>([]);
-  const [popups, setPopups] = useState<any[]>([]);
   const [varieties, setVarieties] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -21,7 +19,7 @@ export default function SearchPanel() {
   const handleSearch = useCallback(async (q: string) => {
     setQuery(q);
     if (q.trim().length < 2) {
-      setUsers([]); setPopups([]); setVarieties([]);
+      setVarieties([]);
       setSearched(false);
       return;
     }
@@ -29,25 +27,13 @@ export default function SearchPanel() {
     setSearched(true);
     searchAll(q.trim())
       .then(res => {
-        setUsers(res.users ?? []);
-        setPopups(res.popups ?? []);
         setVarieties(res.varieties ?? []);
       })
-      .catch(() => { setUsers([]); setPopups([]); setVarieties([]); })
+      .catch(() => { setVarieties([]); })
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSelectUser = (user: any) => {
-    setPanelData({ userId: user.id });
-    showPanel('user-profile');
-  };
-
-  const handleSelectPopup = (popup: any) => {
-    setActiveLocation({ ...popup, type: 'popup' });
-    showPanel('popup-detail');
-  };
-
-  const hasResults = users.length > 0 || popups.length > 0 || varieties.length > 0;
+  const hasResults = varieties.length > 0;
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -62,7 +48,7 @@ export default function SearchPanel() {
       <View style={[styles.searchRow, { borderBottomColor: c.border }]}>
         <TextInput
           style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.card }]}
-          placeholder="Search people, popups, varieties…"
+          placeholder="Search varieties…"
           placeholderTextColor={c.muted}
           value={query}
           onChangeText={handleSearch}
@@ -78,50 +64,6 @@ export default function SearchPanel() {
         <Text style={[styles.empty, { color: c.muted }]}>No results.</Text>
       ) : (
         <ScrollView showsVerticalScrollIndicator={false}>
-          {users.length > 0 && (
-            <View>
-              <Text style={[styles.sectionHeader, { color: c.muted }]}>PEOPLE</Text>
-              {users.map(item => (
-                <TouchableOpacity
-                  key={String(item.id)}
-                  style={[styles.row, { borderBottomColor: c.border }]}
-                  onPress={() => handleSelectUser(item)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.rowMain}>
-                    <Text style={[styles.name, { color: c.text }]}>{item.display_name}</Text>
-                    {item.is_dj && (
-                      <Text style={[styles.tag, { color: c.muted }]}>DJ</Text>
-                    )}
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          {popups.length > 0 && (
-            <View>
-              <Text style={[styles.sectionHeader, { color: c.muted }]}>POPUPS</Text>
-              {popups.map(item => (
-                <TouchableOpacity
-                  key={String(item.id)}
-                  style={[styles.row, { borderBottomColor: c.border }]}
-                  onPress={() => handleSelectPopup(item)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.rowMain}>
-                    <Text style={[styles.popupName, { color: c.text }]}>{item.name}</Text>
-                    {!!item.neighbourhood && (
-                      <Text style={[styles.popupNeighbourhood, { color: c.muted }]}>{item.neighbourhood}</Text>
-                    )}
-                  </View>
-                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
           {varieties.length > 0 && (
             <View>
               <Text style={[styles.sectionHeader, { color: c.muted }]}>VARIETIES</Text>

@@ -118,12 +118,10 @@ export default function MapScreen() {
   const [bizLoading, setBizLoading] = useState(true);
   const [mapFilter, setMapFilter] = useState<'all' | 'collection' | 'partner' | 'popup'>('all');
   const [filterOpen, setFilterOpen] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
   const mapRef = useRef<MapView>(null);
   const userCoords = useRef<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('verified').then(v => setIsVerified(v === 'true')).catch(() => {});
     AsyncStorage.getItem('user_db_id').then(id => {
       if (id) fetchAuthToken(parseInt(id, 10)).catch(() => {});
     }).catch(() => {});
@@ -151,76 +149,10 @@ export default function MapScreen() {
   }, []);
 
   useEffect(() => {
-    if (pendingScreen === 'nfc') {
-      clearPendingScreen();
-      jumpToPanel('nfc');
-      TrueSheet.present(SHEET_NAME, 2);
-    }
-    if (pendingScreen === 'popup') {
-      clearPendingScreen();
-      goHome();
-      TrueSheet.present(SHEET_NAME, 1);
-    }
-    if (pendingScreen === 'dj-offer' && pendingData?.popup_id) {
-      const popupBiz = businesses.find(b => b.id === pendingData.popup_id);
-      clearPendingScreen();
-      if (popupBiz) {
-        setActiveLocation(popupBiz);
-        jumpToPanel('dj-offer');
-        TrueSheet.present(SHEET_NAME, 2);
-      }
-    }
-    if (pendingScreen === 'nomination' && pendingData?.popup_id) {
-      const popupBiz = businesses.find(b => b.id === pendingData.popup_id);
-      clearPendingScreen();
-      if (popupBiz) {
-        setActiveLocation(popupBiz);
-        jumpToPanel('nomination');
-        TrueSheet.present(SHEET_NAME, 2);
-      }
-    }
-    if ((pendingScreen === 'audition-result' || pendingScreen === 'campaign-commission') && pendingData?.popup_id) {
-      const popupBiz = businesses.find(b => b.id === pendingData.popup_id);
-      clearPendingScreen();
-      if (popupBiz) {
-        setActiveLocation(popupBiz);
-        jumpToPanel('campaign-commission');
-        TrueSheet.present(SHEET_NAME, 2);
-      }
-    }
-    if (pendingScreen === 'contract-offer') {
-      clearPendingScreen();
-      jumpToPanel('contract-offer');
-      TrueSheet.present(SHEET_NAME, 2);
-    }
-    if (pendingScreen === 'nomination-history') {
-      clearPendingScreen();
-      jumpToPanel('nomination-history');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-    }
-    if (pendingScreen === 'notification-inbox') {
-      clearPendingScreen();
-      jumpToPanel('notification-inbox');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-    }
-    if (pendingScreen === 'activity-feed') {
-      clearPendingScreen();
-      jumpToPanel('activity-feed');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-    }
     if (pendingScreen === 'order-history') {
       clearPendingScreen();
       showPanel('order-history');
       setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-    }
-    if (pendingScreen === 'popup-detail' && pendingData?.popup_id) {
-      const popupBiz = businesses.find(b => b.id === pendingData.popup_id);
-      clearPendingScreen();
-      if (popupBiz) {
-        setActiveLocation(popupBiz);
-        showPanel('popup-detail');
-        setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-      }
     }
     if (pendingScreen === 'profile') {
       clearPendingScreen();
@@ -288,24 +220,6 @@ export default function MapScreen() {
     }, 400);
   };
 
-  const handlePopupMarkerPress = (biz: any) => {
-    setActiveLocation(biz);
-    showPanel('popup-detail');
-    setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
-    mapRef.current?.animateToRegion({
-      latitude: biz.lat - 0.003,
-      longitude: biz.lng,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 400);
-  };
-
-  const handleUnverifiedPopupPress = () => {
-    Alert.alert(
-      'Verified members only',
-      'Collect your first order in person, then tap the NFC chip inside your box lid to verify.'
-    );
-  };
 
   const handleLocateMe = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -425,37 +339,21 @@ export default function MapScreen() {
         {popups.map(b => {
           if (!isVisible(b)) return null;
           const live = isLive(b);
-          if (isVerified) {
-            return (
-              <Marker
-                key={`popup-${b.id}`}
-                coordinate={{ latitude: b.lat, longitude: b.lng }}
-                onPress={() => handlePopupMarkerPress(b)}
-                tracksViewChanges={live}
-              >
-                {live
-                  ? <LivePopupPin color="#C0392B" />
-                  : (
-                    <View style={styles.pinPopup}>
-                      <View style={[styles.pinPopupRing, { borderColor: '#C0392B' }]} />
-                      <View style={[styles.pinPopupDot, { backgroundColor: '#C0392B' }]} />
-                    </View>
-                  )
-                }
-              </Marker>
-            );
-          }
-          // Unverified — greyed out
           return (
             <Marker
-              key={`popup-grey-${b.id}`}
+              key={`popup-${b.id}`}
               coordinate={{ latitude: b.lat, longitude: b.lng }}
-              onPress={handleUnverifiedPopupPress}
+              tracksViewChanges={live}
             >
-              <View style={styles.pinPopup}>
-                <View style={[styles.pinPopupRing, { borderColor: c.border }]} />
-                <View style={[styles.pinPopupDot, { backgroundColor: c.border }]} />
-              </View>
+              {live
+                ? <LivePopupPin color="#C0392B" />
+                : (
+                  <View style={styles.pinPopup}>
+                    <View style={[styles.pinPopupRing, { borderColor: '#C0392B' }]} />
+                    <View style={[styles.pinPopupDot, { backgroundColor: '#C0392B' }]} />
+                  </View>
+                )
+              }
             </Marker>
           );
         })}
@@ -463,28 +361,13 @@ export default function MapScreen() {
         {auditionPopups.map(b => {
           if (!isVisible(b)) return null;
           const live = isLive(b);
-          if (isVerified) {
-            return (
-              <Marker
-                key={`audition-${b.id}`}
-                coordinate={{ latitude: b.lat, longitude: b.lng }}
-                onPress={() => handlePopupMarkerPress(b)}
-                tracksViewChanges={live}
-              >
-                <AuditionPopupPin live={live} />
-              </Marker>
-            );
-          }
           return (
             <Marker
-              key={`audition-grey-${b.id}`}
+              key={`audition-${b.id}`}
               coordinate={{ latitude: b.lat, longitude: b.lng }}
-              onPress={handleUnverifiedPopupPress}
+              tracksViewChanges={live}
             >
-              <View style={styles.pinPopup}>
-                <View style={[styles.pinAuditionRing, { borderColor: '#ccc' }]} />
-                <View style={[styles.pinAuditionDot, { backgroundColor: '#ccc' }]} />
-              </View>
+              <AuditionPopupPin live={live} />
             </Marker>
           );
         })}

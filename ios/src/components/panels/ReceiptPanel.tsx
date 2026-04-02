@@ -124,15 +124,6 @@ export default function ReceiptPanel() {
                   </View>
                 </View>
 
-                {worker.portal_opted_in && (
-                  <TouchableOpacity
-                    style={styles.actionLine}
-                    onPress={() => showPanel('portal-subscriber')}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.actionText, { color: c.accent }]}>{'> request portal access_'}</Text>
-                  </TouchableOpacity>
-                )}
               </>
             )}
           </>

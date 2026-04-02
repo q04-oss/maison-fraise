@@ -59,19 +59,6 @@ export default function ConfirmationPanel() {
           </View>
         </View>
 
-        {order.nfc_token && (
-          <View style={[styles.nfcCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.nfcTitle, { color: c.text }]}>Open your box when you arrive.</Text>
-            <Text style={[styles.nfcBody, { color: c.muted }]}>Tap your phone to the NFC chip inside the lid to verify your membership.</Text>
-            <TouchableOpacity
-              style={[styles.nfcBtn, { backgroundColor: c.accent }]}
-              onPress={() => showPanel('nfc')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.nfcBtnText}>Verify now</Text>
-            </TouchableOpacity>
-          </View>
-        )}
 
         {isVerified && (
           <TouchableOpacity

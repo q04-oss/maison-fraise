@@ -3,19 +3,11 @@ import {
   View, Text, TouchableOpacity, ScrollView, Image, RefreshControl,
   StyleSheet, ActivityIndicator, Linking, Platform, Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchBusinessPortraits, fetchBusinessVisitCount, fetchBusinessPopupStats, fetchPlacedHistory, createTip } from '../../lib/api';
+import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip } from '../../lib/api';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatPopupDate(iso: string): string {
-  const d = new Date(iso);
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-}
 
 function formatContact(contact: string): { label: string; url: string } {
   const trimmed = contact.trim();
@@ -31,39 +23,25 @@ function formatContact(contact: string): { label: string; url: string } {
 }
 
 export default function PartnerDetailPanel() {
-  const { goBack, showPanel, setActiveLocation, activeLocation, setPanelData, panelData } = usePanel();
+  const { goBack, activeLocation } = usePanel();
   const c = useColors();
   const [portraits, setPortraits] = useState<{ id: number; url: string; season: string; subject_name?: string }[]>([]);
   const [visitCount, setVisitCount] = useState<number | null>(null);
-  const [popupStats, setPopupStats] = useState<{
-    next_popup: any | null;
-    past_popup_count: number;
-  } | null>(null);
-  const [isVerified, setIsVerified] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [placedHistory, setPlacedHistory] = useState<any[]>([]);
   const [tipping, setTipping] = useState(false);
   const [tipAmount, setTipAmount] = useState<number | null>(null);
 
   const biz = activeLocation;
-
-  useEffect(() => {
-    AsyncStorage.getItem('verified').then(v => setIsVerified(v === 'true')).catch(() => {});
-  }, []);
 
   const loadData = (isRefresh = false) => {
     if (!biz) { setLoading(false); return; }
     Promise.all([
       fetchBusinessPortraits(biz.id).catch(() => []),
       fetchBusinessVisitCount(biz.id).catch(() => null),
-      fetchBusinessPopupStats(biz.id).catch(() => null),
-      fetchPlacedHistory(biz.id).catch(() => []),
-    ]).then(([p, v, s, h]) => {
+    ]).then(([p, v]) => {
       setPortraits(p as any[]);
       setVisitCount(v ? (v as any).visit_count : null);
-      setPopupStats(s as any);
-      setPlacedHistory(h as any[]);
     }).finally(() => { setLoading(false); if (isRefresh) setRefreshing(false); });
   };
 
@@ -91,16 +69,7 @@ export default function PartnerDetailPanel() {
     Linking.openURL(url);
   };
 
-  const handleViewPopup = (popup: any) => {
-    setActiveLocation({ ...popup, type: 'popup' });
-    showPanel('popup-detail');
-  };
-
   const handleCommission = () => {
-    if (!isVerified) {
-      Alert.alert('Verified members only', 'Collect your first order in person to unlock campaign commissions.');
-      return;
-    }
     if (biz?.instagram_handle) {
       Alert.alert(
         'Commission a campaign here',
@@ -147,11 +116,6 @@ export default function PartnerDetailPanel() {
     }
   };
 
-  const handleOpenLookbook = (initialIndex = 0) => {
-    setPanelData({ initialIndex });
-    showPanel('lookbook');
-  };
-
   if (!biz) return null;
 
   const campaigns = portraits.reduce<Record<string, typeof portraits>>((acc, p) => {
@@ -162,8 +126,6 @@ export default function PartnerDetailPanel() {
   }, {});
   const campaignKeys = Object.keys(campaigns);
 
-  const nextPopup = popupStats?.next_popup ?? null;
-  const pastPopupCount = popupStats?.past_popup_count ?? 0;
   const contactInfo = biz.contact ? formatContact(biz.contact) : null;
 
   return (
@@ -202,11 +164,6 @@ export default function PartnerDetailPanel() {
             {visitCount !== null && visitCount > 0 && (
               <Text style={[styles.chip, { color: c.muted, borderColor: c.border }]}>
                 {visitCount} member {visitCount === 1 ? 'visit' : 'visits'}
-              </Text>
-            )}
-            {pastPopupCount > 0 && (
-              <Text style={[styles.chip, { color: c.muted, borderColor: c.border }]}>
-                {pastPopupCount} {pastPopupCount === 1 ? 'popup' : 'popups'} hosted
               </Text>
             )}
           </View>
@@ -267,32 +224,6 @@ export default function PartnerDetailPanel() {
           </View>
         </View>
 
-        {/* Upcoming popup at this venue */}
-        {nextPopup && (
-          <View style={[styles.popupCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.sectionLabel, { color: c.muted }]}>UPCOMING POPUP HERE</Text>
-            <Text style={[styles.popupName, { color: c.text }]}>{nextPopup.name}</Text>
-            <View style={styles.popupMeta}>
-              <Text style={[styles.popupDate, { color: c.muted }]}>
-                {formatPopupDate(nextPopup.starts_at)}
-                {nextPopup.neighbourhood ? ` · ${nextPopup.neighbourhood}` : ''}
-              </Text>
-              {nextPopup.entrance_fee_cents && (
-                <Text style={[styles.popupFee, { color: c.muted }]}>
-                  CA${(nextPopup.entrance_fee_cents / 100).toFixed(0)} entry
-                </Text>
-              )}
-            </View>
-            <TouchableOpacity
-              style={[styles.viewPopupBtn, { borderColor: c.border }]}
-              onPress={() => handleViewPopup(nextPopup)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.viewPopupText, { color: c.text }]}>View popup →</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
         {/* Commission a campaign CTA */}
         <TouchableOpacity
           style={[styles.commissionCard, { borderColor: c.border }]}
@@ -302,7 +233,7 @@ export default function PartnerDetailPanel() {
           <View style={styles.commissionInfo}>
             <Text style={[styles.commissionTitle, { color: c.text }]}>Commission a campaign here</Text>
             <Text style={[styles.commissionSub, { color: c.muted }]}>
-              Portrait shoot · Verified members only
+              Portrait shoot · Book via Instagram
             </Text>
           </View>
           <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
@@ -328,37 +259,12 @@ export default function PartnerDetailPanel() {
           </View>
         )}
 
-        {/* Placed history section */}
-        {placedHistory.length > 0 && (
-          <View style={styles.historySection}>
-            <Text style={[styles.sectionLabel, { color: c.muted, paddingHorizontal: SPACING.md }]}>WHO'S BEEN HERE</Text>
-            {placedHistory.map(h => (
-              <TouchableOpacity
-                key={h.user_id}
-                style={[styles.historyRow, { borderBottomColor: c.border }]}
-                onPress={() => { setPanelData({ userId: h.user_id }); showPanel('user-profile'); }}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.historyName, { color: c.text }]}>{h.display_name}</Text>
-                <Text style={[styles.historyDates, { color: c.muted }]}>
-                  {new Date(h.starts_at).getFullYear()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
         {/* Campaign portrait rails */}
         {loading ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : campaignKeys.length > 0 && (
           <View style={styles.portraitsSection}>
-            <View style={styles.campaignsHeader}>
-              <Text style={[styles.sectionLabel, { color: c.muted }]}>CAMPAIGNS</Text>
-              <TouchableOpacity onPress={() => handleOpenLookbook(0)} activeOpacity={0.7}>
-                <Text style={[styles.viewAll, { color: c.accent }]}>View all →</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={[styles.sectionLabel, { color: c.muted, paddingHorizontal: SPACING.md }]}>CAMPAIGNS</Text>
             {campaignKeys.map(season => (
               <View key={season} style={styles.campaign}>
                 <Text style={[styles.campaignSeason, { color: c.muted }]}>{season}</Text>
@@ -455,27 +361,6 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
 
-  popupCard: {
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.md,
-    borderRadius: 14,
-    padding: SPACING.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  popupName: { fontSize: 17, fontFamily: fonts.playfair },
-  popupMeta: { flexDirection: 'row', gap: 12, alignItems: 'center' },
-  popupDate: { fontSize: 12, fontFamily: fonts.dmMono },
-  popupFee: { fontSize: 12, fontFamily: fonts.dmMono },
-  viewPopupBtn: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  viewPopupText: { fontSize: 14, fontFamily: fonts.dmSans },
-
   commissionCard: {
     marginHorizontal: SPACING.md,
     marginTop: SPACING.md,
@@ -513,19 +398,4 @@ const styles = StyleSheet.create({
     paddingVertical: 12, alignItems: 'center',
   },
   tipBtnText: { fontSize: 15, fontFamily: fonts.dmMono },
-
-  historySection: { paddingTop: SPACING.md, gap: 0 },
-  historyRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  historyName: { fontSize: 15, fontFamily: fonts.playfair },
-  historyDates: { fontSize: 11, fontFamily: fonts.dmMono },
-
-  campaignsHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-  },
-  viewAll: { fontSize: 12, fontFamily: fonts.dmMono },
 });
