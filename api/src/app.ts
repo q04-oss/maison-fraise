@@ -41,6 +41,7 @@ import { requireUser } from './lib/auth';
 import { uploadMedia } from './lib/upload';
 
 const app = express();
+app.set('trust proxy', 1);
 
 const limiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false });
 app.use('/api', limiter);
