@@ -20,16 +20,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
     return;
   }
 
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body as Buffer,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    if (!webhookSecret) {
+      logger.warn('STRIPE_WEBHOOK_SECRET is not set — skipping signature verification (dev mode)');
+      event = JSON.parse(req.body.toString()) as Stripe.Event;
+    } else {
+      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    }
   } catch (err) {
-    logger.warn('Stripe webhook signature verification failed', err);
-    res.status(400).json({ error: 'Webhook signature verification failed' });
+    console.error('Webhook signature verification failed:', err);
+    res.status(400).json({ error: 'Invalid signature' });
     return;
   }
 

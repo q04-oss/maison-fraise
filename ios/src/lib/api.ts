@@ -748,3 +748,40 @@ export async function createCampaignCommissionIntent(params: {
   if (!r.ok) throw new Error('commission_intent_failed');
   return r.json();
 }
+
+export async function fetchSetupIntent(): Promise<{ client_secret: string; customer_id: string }> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/users/me/setup-intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+  if (!r.ok) throw new Error('setup_intent_failed');
+  return r.json();
+}
+
+export async function savePaymentMethod(paymentMethodId: string): Promise<void> {
+  const headers = await authHeader();
+  await fetch(`${BASE_URL}/api/users/me/payment-method`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ payment_method_id: paymentMethodId }),
+  });
+}
+
+export async function fetchMyReferralCode(): Promise<{ code: string; uses: number }> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/users/me/referral-code`, { headers });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function applyReferralCode(code: string): Promise<{ discount_percent: number }> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/users/me/apply-referral`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ code }),
+  });
+  if (!r.ok) throw new Error('invalid_code');
+  return r.json();
+}

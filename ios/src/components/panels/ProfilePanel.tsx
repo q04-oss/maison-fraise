@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Switch,
-  StyleSheet, ActivityIndicator, Alert,
+  StyleSheet, ActivityIndicator, Alert, Share,
 } from 'react-native';
+import { useStripe } from '@stripe/stripe-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useApp } from '../../../App';
@@ -14,7 +15,7 @@ import {
   fetchUserPopupRsvps, fetchDjGigs, fetchDjAllocations, registerAsDj,
   fetchHostedPopups, fetchActiveContract, fetchFollowerCount, logMemberVisit,
   fetchLegitimacyBreakdown, updateDisplayName, cancelPopupRsvp, fetchAuthToken,
-  demoLogin,
+  demoLogin, fetchSetupIntent, savePaymentMethod, fetchMyReferralCode, applyReferralCode,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts } from '../../theme';
@@ -26,6 +27,7 @@ export default function ProfilePanel() {
   const { pushToken } = useApp();
   const c = useColors();
   const { isDark } = useTheme();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userDbId, setUserDbId] = useState<number | null>(null);
   const [isVerified, setIsVerifiedState] = useState(false);
@@ -47,6 +49,11 @@ export default function ProfilePanel() {
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [cancellingRsvp, setCancellingRsvp] = useState<number | null>(null);
   const [togglingOrder, setTogglingOrder] = useState<number | null>(null);
+  const [hasPaymentMethod, setHasPaymentMethod] = useState(false);
+  const [addingPayment, setAddingPayment] = useState(false);
+  const [paymentSaved, setPaymentSaved] = useState(false);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralUses, setReferralUses] = useState(0);
 
   useEffect(() => {
     Promise.all([
@@ -80,6 +87,7 @@ export default function ProfilePanel() {
         fetchActiveContract(uid).then(setActiveContract).catch(() => {});
         fetchFollowerCount(uid).then(r => setFollowerCount(r.follower_count)).catch(() => {});
         fetchLegitimacyBreakdown(uid).then(setLegitimacy).catch(() => {});
+        fetchMyReferralCode().then(r => { setReferralCode(r.code); setReferralUses(r.uses); }).catch(() => {});
         if (verifiedBool) {
           fetchUserPopupRsvps(uid).then(setUpcomingPopups).catch(() => {});
           fetchHostedPopups(uid).then(setHostedPopups).catch(() => {});
@@ -257,6 +265,49 @@ export default function ProfilePanel() {
     } catch {} finally {
       setTogglingOrder(null);
     }
+  };
+
+  const handleAddPaymentMethod = async () => {
+    setAddingPayment(true);
+    try {
+      const { client_secret } = await fetchSetupIntent();
+      const { error: initErr } = await initPaymentSheet({
+        setupIntentClientSecret: client_secret,
+        merchantDisplayName: 'Maison Fraise',
+      });
+      if (initErr) throw new Error(initErr.message);
+      const { error: presentErr } = await presentPaymentSheet();
+      if (presentErr) {
+        if (presentErr.code !== 'Canceled') {
+          Alert.alert('Could not save card. Please try again.');
+        }
+        return;
+      }
+      setHasPaymentMethod(true);
+      setPaymentSaved(true);
+      setTimeout(() => setPaymentSaved(false), 3000);
+    } catch {
+      Alert.alert('Could not save card. Please try again.');
+    } finally {
+      setAddingPayment(false);
+    }
+  };
+
+  const handleShareReferral = () => {
+    if (!referralCode) return;
+    Share.share({ message: `Use my code ${referralCode} for 10% off your first Maison Fraise order 🍓` });
+  };
+
+  const handleApplyReferral = () => {
+    Alert.prompt('Have a referral code?', 'Enter the code below', async (code) => {
+      if (!code || !code.trim()) return;
+      try {
+        await applyReferralCode(code.trim().toUpperCase());
+        Alert.alert('10% discount applied to your first order!');
+      } catch {
+        Alert.alert('Invalid code', 'That code could not be applied. Please check and try again.');
+      }
+    });
   };
 
   const handleSignOut = () => {
@@ -671,7 +722,28 @@ export default function ProfilePanel() {
             {/* Standing orders */}
             {standingOrders.length > 0 && (
               <View style={styles.section}>
-                <Text style={[styles.sectionLabel, { color: c.muted }]}>STANDING ORDERS</Text>
+                <View style={styles.standingHeader}>
+                  <Text style={[styles.sectionLabel, { color: c.muted }]}>STANDING ORDERS</Text>
+                  {hasPaymentMethod && (
+                    <Text style={[styles.cardSavedBadge, { color: c.accent }]}>✓ Card saved</Text>
+                  )}
+                </View>
+                {!hasPaymentMethod && (
+                  <TouchableOpacity
+                    style={[styles.addPaymentBtn, { backgroundColor: c.card, borderColor: c.border }]}
+                    onPress={handleAddPaymentMethod}
+                    disabled={addingPayment}
+                    activeOpacity={0.8}
+                  >
+                    {addingPayment
+                      ? <ActivityIndicator size="small" color={c.accent} />
+                      : <Text style={[styles.addPaymentText, { color: c.accent }]}>+ Add Payment Method</Text>
+                    }
+                  </TouchableOpacity>
+                )}
+                {paymentSaved && (
+                  <Text style={[styles.paymentSavedText, { color: c.accent }]}>Payment method saved</Text>
+                )}
                 {standingOrders.map((so: any) => (
                   <View key={so.id} style={[styles.standingRow, { backgroundColor: c.card, borderColor: c.border }]}>
                     <View style={styles.standingInfo}>
@@ -745,6 +817,25 @@ export default function ProfilePanel() {
                     </Text>
                   </View>
                 ))}
+              </View>
+            )}
+
+            {/* Refer a Friend */}
+            {userDbId && referralCode && (
+              <View style={[styles.referralCard, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.sectionLabel, { color: c.muted }]}>REFER A FRIEND</Text>
+                <Text style={[styles.referralCode, { color: c.text }]}>{referralCode}</Text>
+                <Text style={[styles.referralUses, { color: c.muted }]}>{referralUses} {referralUses === 1 ? 'friend' : 'friends'} referred</Text>
+                <TouchableOpacity
+                  style={[styles.shareBtn, { backgroundColor: c.text }]}
+                  onPress={handleShareReferral}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.shareBtnText, { color: c.ctaText }]}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleApplyReferral} activeOpacity={0.7} style={styles.haveCodeLink}>
+                  <Text style={[styles.haveCodeText, { color: c.muted }]}>Have a code?</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -915,4 +1006,23 @@ const styles = StyleSheet.create({
   },
   legitimacyType: { fontSize: 12, fontFamily: fonts.dmSans, textTransform: 'capitalize' },
   legitimacyScore: { fontSize: 14, fontFamily: fonts.dmMono },
+
+  standingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  cardSavedBadge: { fontSize: 12, fontFamily: fonts.dmMono },
+  addPaymentBtn: {
+    borderRadius: 12, paddingVertical: 12, alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth, marginBottom: 8,
+  },
+  addPaymentText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '600' },
+  paymentSavedText: { fontSize: 12, fontFamily: fonts.dmSans, textAlign: 'center', marginBottom: 4 },
+
+  referralCard: {
+    borderRadius: 14, padding: SPACING.md, borderWidth: StyleSheet.hairlineWidth, gap: 8,
+  },
+  referralCode: { fontSize: 28, fontFamily: fonts.dmMono, letterSpacing: 2 },
+  referralUses: { fontSize: 13, fontFamily: fonts.dmSans },
+  shareBtn: { borderRadius: 12, paddingVertical: 12, alignItems: 'center' },
+  shareBtnText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '700' },
+  haveCodeLink: { alignItems: 'center', paddingVertical: 4 },
+  haveCodeText: { fontSize: 11, fontFamily: fonts.dmMono },
 });

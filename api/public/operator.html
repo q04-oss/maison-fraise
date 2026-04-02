@@ -1097,9 +1097,14 @@
         <div class="action-row" style="margin-top:16px;">
           <button class="action-btn" onclick="exportCustomers()">Export Customers CSV</button>
         </div>
+        <div class="order-card" style="margin-top:16px;">
+          <div style="font-family:DM Mono,monospace;font-size:11px;color:#888;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Top Referrers</div>
+          <div id="referral-list"></div>
+        </div>
       `;
 
       renderRevenueChart();
+      loadReferrals();
     } catch (e) {
       body.innerHTML = '<div class="empty">Could not load revenue.</div>';
     }
@@ -1140,6 +1145,22 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = 'customers.csv'; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function loadReferrals() {
+    const el = document.getElementById('referral-list');
+    if (!el) return;
+    const res = await fetch('/api/admin/referrals', { headers: { 'X-Admin-PIN': currentPin } });
+    if (!res.ok) { el.innerHTML = '<p style="color:#666;font-style:italic">Could not load.</p>'; return; }
+    const rows = await res.json();
+    if (rows.length === 0) { el.innerHTML = '<p style="color:#666;font-style:italic">No referrals yet.</p>'; return; }
+    el.innerHTML = rows.map(r => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e1e1e;">
+        <span style="font-family:DM Mono,monospace;color:#c5705d;font-size:13px">${r.code}</span>
+        <span style="font-family:DM Mono,monospace;color:#888;font-size:12px">${r.display_name || r.user_email}</span>
+        <span style="font-family:DM Mono,monospace;color:#f5f5f5;font-size:13px">${r.uses} use${r.uses !== 1 ? 's' : ''}</span>
+      </div>
+    `).join('');
   }
 
   // ── CHOCOLATIER ───────────────────────────────────────
@@ -1416,6 +1437,11 @@
               <div>
                 <div style="font-family:'Playfair Display',serif;font-size:16px;">${v.name}</div>
                 <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);">CA$${(v.price_cents/100).toFixed(2)} · stock: ${v.stock_remaining}</div>
+                <div style="font-family:'DM Mono',monospace;font-size:11px;margin-top:3px;">
+                  ${v.avg_rating != null && v.rating_count > 0
+                    ? `<span style="color:#FFD700;">★ ${v.avg_rating.toFixed ? v.avg_rating.toFixed(1) : v.avg_rating}</span><span style="color:#FFD700;font-size:11px;"> (${v.rating_count} ${v.rating_count === 1 ? 'rating' : 'ratings'})</span>`
+                    : `<span style="color:var(--muted);">No ratings yet</span>`}
+                </div>
                 <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);">
                   ${v.location_id ? `@ ${locations.find(l => l.id === v.location_id)?.name ?? 'Unknown'}` : 'All locations'}
                 </div>

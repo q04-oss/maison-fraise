@@ -25,6 +25,7 @@ router.get('/', async (_req: Request, res: Response) => {
       c.display_name ?? c.email.split('@')[0],
     ]));
 
+    res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
     res.json(rows.map(b => ({
       ...b,
       lat: b.latitude ? parseFloat(String(b.latitude)) : null,

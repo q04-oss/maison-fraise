@@ -70,6 +70,8 @@ export interface Variety {
   harvestDate?: string;
   tag?: string;
   image_url?: string;
+  avg_rating?: number | null;
+  rating_count?: number;
 }
 
 export interface Business {

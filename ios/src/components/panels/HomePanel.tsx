@@ -142,6 +142,12 @@ export default function HomePanel() {
               {v.farm && <Text style={[styles.farm, { color: c.muted }]}>{v.farm}</Text>}
               <View style={[styles.freshDot, { backgroundColor: freshColor }]} />
               <Text style={[styles.freshLabel, { color: freshColor }]}>{label}</Text>
+              {v.avg_rating != null && (v.rating_count ?? 0) > 0 && (
+                <>
+                  <Text style={[styles.freshLabel, { color: c.muted }]}>·</Text>
+                  <Text style={styles.ratingText}>★ {v.avg_rating.toFixed(1)}</Text>
+                </>
+              )}
             </View>
             {!!v.harvestDate && (
               <Text style={[styles.harvestDate, { color: c.muted }]}>
@@ -290,4 +296,5 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, fontFamily: fonts.dmSans, textAlign: 'center', fontStyle: 'italic' },
   varietyDesc: { fontSize: 11, fontFamily: fonts.dmSans, lineHeight: 16, fontStyle: 'italic' },
   harvestDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, fontStyle: 'italic' },
+  ratingText: { fontSize: 10, fontFamily: fonts.dmMono, color: '#FFD700' },
 });

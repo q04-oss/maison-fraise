@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and, lte, sum, gte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -260,11 +260,25 @@ router.patch('/varieties/:id/stock', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/varieties — all varieties with location info
+// GET /api/admin/varieties — all varieties with location info and ratings
 router.get('/varieties', async (_req: Request, res: Response) => {
   try {
-    const rows = await db.select().from(varieties);
-    res.json(rows);
+    const vars = await db.select().from(varieties);
+
+    const ratings = await db.execute<{ variety_id: number; avg_rating: number; rating_count: number }>(sql`
+      SELECT variety_id,
+        ROUND(AVG(rating)::numeric, 1)::float as avg_rating,
+        COUNT(*)::int as rating_count
+      FROM orders
+      WHERE rating IS NOT NULL AND variety_id IS NOT NULL
+      GROUP BY variety_id
+    `);
+    const ratingMap = Object.fromEntries(
+      Array.from(ratings).map(r => [r.variety_id, { avg_rating: r.avg_rating, rating_count: r.rating_count }])
+    );
+    const result = vars.map(v => ({ ...v, ...(ratingMap[v.id] ?? { avg_rating: null, rating_count: 0 }) }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -1326,6 +1340,26 @@ router.post('/broadcast', async (req: Request, res: Response) => {
     );
 
     res.json({ sent: tokens.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/referrals — referral leaderboard (top 20 by uses)
+router.get('/referrals', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        code: referralCodes.code,
+        uses: referralCodes.uses,
+        user_email: users.email,
+        display_name: users.display_name,
+      })
+      .from(referralCodes)
+      .innerJoin(users, eq(referralCodes.user_id, users.id))
+      .orderBy(desc(referralCodes.uses))
+      .limit(20);
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
