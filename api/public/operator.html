@@ -20,399 +20,160 @@
       --border:  rgba(255,255,255,0.08);
       --border2: rgba(255,255,255,0.13);
       --red:     rgba(220,80,80,0.9);
+      --green:   rgba(80,200,120,0.9);
       --radius:  14px;
     }
 
-    body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
+    body { font-family: 'DM Sans', -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-    /* ── PIN SCREEN ─────────────────────────────────── */
+    /* ── PIN ── */
     #pin-screen {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 24px;
-      gap: 32px;
-      background: var(--bg2);
-      position: relative;
-      overflow: hidden;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 40px 24px; gap: 32px; background: var(--bg2);
+      position: relative; overflow: hidden;
     }
-
-    /* Subtle grid behind PIN */
     #pin-screen::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
+      content: ''; position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px),
         linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px);
       background-size: 60px 60px;
       mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
       -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
       pointer-events: none;
     }
-
-    /* Amber glow */
     #pin-screen::after {
-      content: '';
-      position: absolute;
-      top: 30%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 400px;
-      height: 400px;
-      border-radius: 50%;
+      content: ''; position: absolute; top: 30%; left: 50%; transform: translate(-50%,-50%);
+      width: 400px; height: 400px; border-radius: 50%;
       background: radial-gradient(circle, rgba(201,151,58,0.08) 0%, transparent 70%);
       pointer-events: none;
     }
-
-    .logo-block {
-      text-align: center;
-      position: relative;
-      z-index: 1;
-    }
-
-    .logo-title {
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-      font-size: 32px;
-      color: var(--text);
-      letter-spacing: 0.3px;
-    }
-
-    .logo-sub {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--amber);
-      margin-top: 8px;
-    }
-
-    .pin-card {
-      background: var(--card);
-      border: 1px solid var(--border2);
-      border-radius: var(--radius);
-      padding: 28px 24px;
-      width: 100%;
-      max-width: 360px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .pin-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-
-    .pin-input {
-      width: 100%;
-      padding: 14px 16px;
-      font-size: 22px;
-      letter-spacing: 8px;
-      border: 1px solid var(--border2);
-      border-radius: 10px;
-      background: rgba(255,255,255,0.04);
-      color: var(--text);
-      outline: none;
-      text-align: center;
-      font-family: 'DM Mono', monospace;
-      transition: border-color 0.2s;
-    }
+    .logo-block { text-align: center; position: relative; z-index: 1; }
+    .logo-title { font-family: 'Playfair Display', serif; font-style: italic; font-size: 32px; color: var(--text); }
+    .logo-sub { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--amber); margin-top: 8px; }
+    .pin-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px 24px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+    .pin-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .pin-input { width: 100%; padding: 14px 16px; font-size: 22px; letter-spacing: 8px; border: 1px solid var(--border2); border-radius: 10px; background: rgba(255,255,255,0.04); color: var(--text); outline: none; text-align: center; font-family: 'DM Mono', monospace; transition: border-color 0.2s; }
     .pin-input:focus { border-color: var(--amber); }
     .pin-input::placeholder { opacity: 0.3; }
-
-    .pin-btn {
-      width: 100%;
-      padding: 16px;
-      background: var(--amber);
-      color: #0C0C0E;
-      border: none;
-      border-radius: 30px;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
+    .pin-btn { width: 100%; padding: 16px; background: var(--amber); color: #0C0C0E; border: none; border-radius: 30px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
     .pin-btn:active { opacity: 0.8; }
+    .pin-error { font-family: 'DM Mono', monospace; font-size: 12px; color: #E05A5A; text-align: center; min-height: 18px; }
 
-    .pin-error {
-      font-family: 'DM Mono', monospace;
-      font-size: 12px;
-      color: #E05A5A;
-      text-align: center;
-      min-height: 18px;
-      letter-spacing: 0.5px;
-    }
-
-    /* ── DASHBOARD SHELL ────────────────────────────── */
+    /* ── DASHBOARD ── */
     #dashboard { display: none; flex-direction: column; min-height: 100vh; }
-
-    .dash-header {
-      background: var(--bg2);
-      border-bottom: 1px solid var(--border);
-      padding: 52px 20px 20px;
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
+    .dash-header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 52px 20px 0; }
+    .dash-header-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-bottom: 16px; }
     .dash-header-left { display: flex; flex-direction: column; gap: 4px; }
-
-    .dash-role {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--amber);
-    }
-
-    .dash-title {
-      font-family: 'Playfair Display', serif;
-      font-size: 30px;
-      color: var(--text);
-    }
-
-    .dash-date {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 2px;
-      letter-spacing: 0.3px;
-    }
-
-    .logout-btn {
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 9px 16px;
-      border-radius: 20px;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: color 0.2s, border-color 0.2s;
-    }
+    .dash-role { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--amber); }
+    .dash-title { font-family: 'Playfair Display', serif; font-size: 30px; color: var(--text); }
+    .dash-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .logout-btn { background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 9px 16px; border-radius: 20px; cursor: pointer; white-space: nowrap; transition: color 0.2s, border-color 0.2s; }
     .logout-btn:hover { color: var(--text); border-color: var(--border2); }
+
+    /* ── TABS ── */
+    .tab-row { display: flex; gap: 0; border-top: 1px solid var(--border); }
+    .tab { padding: 12px 20px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
 
     .dash-body { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; }
 
-    /* ── FILTER PILLS ───────────────────────────────── */
-    .filter-row {
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-      scrollbar-width: none;
-    }
+    /* ── FILTERS ── */
+    .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
     .filter-row::-webkit-scrollbar { display: none; }
+    .pill { flex-shrink: 0; padding: 7px 16px; border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.5px; cursor: pointer; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--muted); transition: all 0.15s; }
+    .pill.active { background: var(--amber); color: #0C0C0E; border-color: var(--amber); }
 
-    .pill {
-      flex-shrink: 0;
-      padding: 7px 16px;
-      border-radius: 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 0.5px;
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.04);
-      color: var(--muted);
-      transition: all 0.15s;
+    /* ── CARDS ── */
+    .order-card, .popup-card, .request-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
     }
-    .pill.active {
-      background: var(--amber);
-      color: #0C0C0E;
-      border-color: var(--amber);
-    }
-
-    /* ── ORDER CARD ─────────────────────────────────── */
-    .order-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
     .order-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-
-    .order-id {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.5px;
-    }
-
-    .order-email {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 500;
-      margin-top: 2px;
-    }
-
-    .status-badge {
-      flex-shrink: 0;
-      padding: 4px 11px;
-      border-radius: 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-    }
-
-    .order-items { display: flex; flex-direction: column; gap: 4px; }
-
-    .order-variety {
-      font-family: 'Playfair Display', serif;
-      font-size: 17px;
-      color: var(--text);
-    }
-
-    .order-details {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      color: var(--muted);
-    }
-
-    .order-meta {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.3px;
-    }
-
-    .gift-badge {
-      display: inline-block;
-      background: rgba(201,151,58,0.15);
-      color: var(--amber);
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      padding: 3px 9px;
-      border-radius: 10px;
-      text-transform: uppercase;
-    }
-
+    .order-id { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+    .order-email { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text); font-weight: 500; margin-top: 2px; }
+    .status-badge { flex-shrink: 0; padding: 4px 11px; border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; }
+    .order-variety { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--text); }
+    .order-details { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--muted); }
+    .order-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+    .gift-badge { display: inline-block; background: rgba(201,151,58,0.15); color: var(--amber); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; padding: 3px 9px; border-radius: 10px; text-transform: uppercase; }
     .action-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-
-    .action-btn {
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      cursor: pointer;
-      border: 1px solid var(--border2);
-      background: rgba(255,255,255,0.05);
-      color: var(--text);
-      transition: all 0.15s;
-    }
+    .action-btn { padding: 8px 16px; border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; cursor: pointer; border: 1px solid var(--border2); background: rgba(255,255,255,0.05); color: var(--text); transition: all 0.15s; }
     .action-btn:active { opacity: 0.7; }
+    .action-btn.primary { background: var(--amber); color: #0C0C0E; border-color: var(--amber); }
+    .action-btn.danger { background: transparent; color: rgba(220,100,100,0.85); border-color: rgba(220,80,80,0.3); }
+    .action-btn.success { background: transparent; color: rgba(80,200,120,0.9); border-color: rgba(80,200,120,0.3); }
 
-    .action-btn.primary {
-      background: var(--amber);
-      color: #0C0C0E;
-      border-color: var(--amber);
-    }
-
-    .action-btn.danger {
-      background: transparent;
-      color: rgba(220,100,100,0.85);
-      border-color: rgba(220,80,80,0.3);
-    }
-    .action-btn.danger:active { background: rgba(220,80,80,0.1); }
-
-    /* ── ALERT CARD ─────────────────────────────────── */
-    .alert-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .alert-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 17px;
-      color: var(--text);
-    }
-
-    .alert-farm {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 3px;
-    }
-
-    .stock-num {
-      font-family: 'Playfair Display', serif;
-      font-size: 28px;
-      color: #E05A5A;
-    }
-
-    .stock-label {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: var(--muted);
-      text-align: center;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-    }
-
-    /* ── SLOT GROUP ─────────────────────────────────── */
+    /* ── ALERTS ── */
+    .alert-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+    .alert-name { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--text); }
+    .alert-farm { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .stock-num { font-family: 'Playfair Display', serif; font-size: 28px; color: #E05A5A; }
+    .stock-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); text-align: center; letter-spacing: 0.8px; text-transform: uppercase; }
     .slot-group { display: flex; flex-direction: column; gap: 8px; }
+    .slot-heading { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); padding: 0 4px; }
 
-    .slot-heading {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--amber);
-      padding: 0 4px;
-    }
+    /* ── EMPTY / LOADING ── */
+    .empty { text-align: center; color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 14px; font-style: italic; padding: 40px 0; }
 
-    /* ── EMPTY / LOADING ────────────────────────────── */
-    .empty {
-      text-align: center;
-      color: var(--muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      font-style: italic;
-      padding: 40px 0;
-    }
-
-    /* ── STATUS COLORS ──────────────────────────────── */
+    /* ── STATUS COLORS ── */
     .s-pending   { background: rgba(255,255,255,0.06); color: rgba(242,242,247,0.4); }
     .s-paid      { background: rgba(201,151,58,0.18); color: #D4A843; }
     .s-preparing { background: rgba(255,160,50,0.14); color: rgba(255,185,100,0.9); }
     .s-ready     { background: rgba(100,180,255,0.12); color: rgba(130,200,255,0.85); }
     .s-collected { background: rgba(100,200,120,0.1); color: rgba(130,210,140,0.75); }
     .s-cancelled { background: rgba(220,80,80,0.12); color: rgba(220,110,110,0.85); }
+    .s-approved  { background: rgba(80,200,120,0.12); color: rgba(100,210,140,0.9); }
+    .s-rejected  { background: rgba(220,80,80,0.12); color: rgba(220,110,110,0.85); }
+    .s-passed    { background: rgba(255,255,255,0.06); color: rgba(242,242,247,0.4); }
+    .s-accepted  { background: rgba(80,200,120,0.12); color: rgba(100,210,140,0.9); }
+
+    /* ── FORM ── */
+    .form-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .form-title { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--text); }
+    .form-row { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+    .form-input, .form-select, .form-textarea {
+      padding: 11px 14px; border: 1px solid var(--border2); border-radius: 10px;
+      background: rgba(255,255,255,0.04); color: var(--text); font-family: 'DM Sans', sans-serif;
+      font-size: 14px; outline: none; transition: border-color 0.2s; width: 100%;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--amber); }
+    .form-select option { background: #1a1a1c; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-check { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    .form-check input { width: 18px; height: 18px; cursor: pointer; accent-color: var(--amber); }
+    .form-check span { font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); }
+
+    /* ── SECTION HEADING ── */
+    .section-heading { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); padding: 4px 0; margin-top: 4px; }
+
+    /* ── POPUP CARD ── */
+    .popup-name { font-family: 'Playfair Display', serif; font-size: 19px; color: var(--text); }
+    .popup-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+    .popup-stats { display: flex; gap: 16px; }
+    .stat-block { display: flex; flex-direction: column; gap: 2px; }
+    .stat-num { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--text); }
+    .stat-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+
+    /* ── NOMINATION ROW ── */
+    .nom-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .nom-row:last-child { border-bottom: none; }
+    .nom-name { font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--text); }
+    .nom-count { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--amber); }
+
+    /* ── COLLAPSIBLE ── */
+    .collapse-toggle { display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+    .collapse-body { display: none; margin-top: 12px; }
+    .collapse-body.open { display: block; }
+    .chevron { font-size: 12px; color: var(--muted); transition: transform 0.2s; }
+    .chevron.open { transform: rotate(180deg); }
+
+    /* ── PORTRAIT LIST ── */
+    .portrait-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); gap: 12px; }
+    .portrait-row:last-child { border-bottom: none; }
+    .portrait-url { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .portrait-meta { font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--text); }
   </style>
 </head>
 <body>
@@ -434,12 +195,15 @@
 <!-- DASHBOARD -->
 <div id="dashboard">
   <div class="dash-header">
-    <div class="dash-header-left">
-      <div class="dash-role" id="dash-role"></div>
-      <div class="dash-title" id="dash-title"></div>
-      <div class="dash-date" id="dash-date"></div>
+    <div class="dash-header-top">
+      <div class="dash-header-left">
+        <div class="dash-role" id="dash-role"></div>
+        <div class="dash-title" id="dash-title"></div>
+        <div class="dash-date" id="dash-date"></div>
+      </div>
+      <button class="logout-btn" onclick="logout()">Sign out</button>
     </div>
-    <button class="logout-btn" onclick="logout()">Sign out</button>
+    <div class="tab-row" id="tab-row"></div>
   </div>
   <div class="dash-body" id="dash-body"></div>
 </div>
@@ -450,52 +214,37 @@
   let currentPin = null;
   let currentFilter = 'all';
   let allOrders = [];
-  let varieties = {};
+  let currentTab = 'orders';
+  let allBusinesses = [];
 
-  const CHOCOLATE_NAMES = {
-    guanaja_70: 'Guanaja 70%',
-    caraibe_66: 'Caraïbe 66%',
-    jivara_40: 'Jivara 40%',
-    ivoire_blanc: 'Ivoire Blanc',
-  };
-  const FINISH_NAMES = {
-    plain: 'Plain',
-    fleur_de_sel: 'Fleur de Sel',
-    or_fin: 'Or Fin',
-  };
-  const STATUS_NEXT = {
-    pending: null,
-    paid: 'preparing',
-    preparing: 'ready',
-    ready: 'collected',
-    collected: null,
-    cancelled: null,
-  };
-  const STATUS_LABEL = {
-    pending: 'Pending',
-    paid: 'Paid',
-    preparing: 'Preparing',
-    ready: 'Ready',
-    collected: 'Collected',
-    cancelled: 'Cancelled',
-  };
+  const CHOC = { guanaja_70:'Guanaja 70%', caraibe_66:'Caraïbe 66%', jivara_40:'Jivara 40%', ivoire_blanc:'Ivoire Blanc' };
+  const FIN  = { plain:'Plain', fleur_de_sel:'Fleur de Sel', or_fin:'Or Fin' };
+  const STATUS_NEXT  = { pending:null, paid:'preparing', preparing:'ready', ready:'collected', collected:null, cancelled:null };
+  const STATUS_LABEL = { pending:'Pending', paid:'Paid', preparing:'Preparing', ready:'Ready', collected:'Collected', cancelled:'Cancelled' };
 
   function today() {
-    const d = new Date();
-    return d.toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return new Date().toLocaleDateString('en-CA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+  }
+  function fmt(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric' });
   }
 
+  // ── PIN ──────────────────────────────────────────────
   async function submitPin() {
     const pin = document.getElementById('pin-input').value.trim();
     const err = document.getElementById('pin-error');
     err.textContent = '';
     if (!pin) return;
 
-    // Try each role in order
     const roles = [
-      { role: 'admin',       header: 'X-Admin-PIN',       url: '/api/admin/orders' },
-      { role: 'chocolatier', header: 'X-Chocolatier-PIN', url: '/api/chocolatier/orders' },
-      { role: 'supplier',    header: 'X-Supplier-PIN',    url: '/api/supplier/alerts' },
+      { role:'admin',       header:'X-Admin-PIN',       url:'/api/admin/orders' },
+      { role:'chocolatier', header:'X-Chocolatier-PIN', url:'/api/chocolatier/orders' },
+      { role:'supplier',    header:'X-Supplier-PIN',    url:'/api/supplier/alerts' },
     ];
 
     for (const { role, header, url } of roles) {
@@ -509,106 +258,112 @@
         return;
       }
     }
-
     err.textContent = 'Invalid PIN.';
     document.getElementById('pin-input').value = '';
   }
 
   function logout() {
-    currentRole = null;
-    currentPin = null;
+    currentRole = currentPin = null;
     document.getElementById('dashboard').style.display = 'none';
     document.getElementById('pin-screen').style.display = 'flex';
     document.getElementById('pin-input').value = '';
     document.getElementById('pin-error').textContent = '';
   }
 
+  // ── DASHBOARD ────────────────────────────────────────
   async function loadDashboard(role, data) {
-    const roleLabel = { admin: 'Admin', chocolatier: 'Chocolatier', supplier: 'Supplier' };
-    const titleLabel = { admin: 'Orders', chocolatier: 'Today', supplier: 'Stock Alerts' };
-
-    document.getElementById('dash-role').textContent = roleLabel[role];
+    const roleLabel  = { admin:'Admin', chocolatier:'Chocolatier', supplier:'Supplier' };
+    const titleLabel = { admin:'Orders', chocolatier:'Today', supplier:'Stock Alerts' };
+    document.getElementById('dash-role').textContent  = roleLabel[role];
     document.getElementById('dash-title').textContent = titleLabel[role];
-    document.getElementById('dash-date').textContent = today();
+    document.getElementById('dash-date').textContent  = today();
 
     if (role === 'admin') {
       allOrders = data;
+      // Load all businesses for popup + portrait forms
+      const bRes = await fetch(BASE + '/api/businesses', { headers: { 'X-Admin-PIN': currentPin } });
+      if (bRes.ok) allBusinesses = await bRes.json();
+      buildAdminTabs();
       renderAdmin();
     } else if (role === 'chocolatier') {
+      document.getElementById('tab-row').innerHTML = '';
       renderChocolatier(data);
     } else if (role === 'supplier') {
+      document.getElementById('tab-row').innerHTML = '';
       renderSupplier(data);
     }
   }
 
-  // ── ADMIN ──────────────────────────────────────────
+  // ── ADMIN TABS ────────────────────────────────────────
+  function buildAdminTabs() {
+    const tabs = [
+      { id:'orders',   label:'Orders' },
+      { id:'popups',   label:'Popups' },
+      { id:'requests', label:'Requests' },
+      { id:'portraits',label:'Portraits' },
+    ];
+    document.getElementById('tab-row').innerHTML = tabs.map(t =>
+      `<div class="tab ${t.id === currentTab ? 'active' : ''}" onclick="switchTab('${t.id}')">${t.label}</div>`
+    ).join('');
+  }
 
+  function switchTab(tab) {
+    currentTab = tab;
+    buildAdminTabs();
+    if (tab === 'orders')    renderAdmin();
+    else if (tab === 'popups')    renderPopupsTab();
+    else if (tab === 'requests')  renderRequestsTab();
+    else if (tab === 'portraits') renderPortraitsTab();
+  }
+
+  // ── ORDERS TAB ────────────────────────────────────────
   function renderAdmin() {
     const body = document.getElementById('dash-body');
-    const statuses = ['all', 'pending', 'paid', 'preparing', 'ready', 'collected', 'cancelled'];
+    const statuses = ['all','pending','paid','preparing','ready','collected','cancelled'];
     const filtered = currentFilter === 'all' ? allOrders : allOrders.filter(o => o.status === currentFilter);
 
-    const filterHtml = `
-      <div class="filter-row">
-        ${statuses.map(s => `
-          <div class="pill ${currentFilter === s ? 'active' : ''}" onclick="setFilter('${s}')">
-            ${s === 'all' ? `All (${allOrders.length})` : STATUS_LABEL[s]}
-          </div>
-        `).join('')}
-      </div>
-    `;
+    const filterHtml = `<div class="filter-row">${statuses.map(s =>
+      `<div class="pill ${currentFilter===s?'active':''}" onclick="setFilter('${s}')">
+        ${s==='all'?`All (${allOrders.length})`:STATUS_LABEL[s]}</div>`
+    ).join('')}</div>`;
 
-    const ordersHtml = filtered.length === 0
+    body.innerHTML = filterHtml + (filtered.length === 0
       ? '<div class="empty">No orders.</div>'
-      : filtered.map(o => orderCardHtml(o)).join('');
-
-    body.innerHTML = filterHtml + ordersHtml;
+      : filtered.map(orderCardHtml).join(''));
   }
 
-  function setFilter(f) {
-    currentFilter = f;
-    renderAdmin();
-  }
+  function setFilter(f) { currentFilter = f; renderAdmin(); }
 
   function orderCardHtml(o) {
-    const choc = CHOCOLATE_NAMES[o.chocolate] || o.chocolate;
-    const fin = FINISH_NAMES[o.finish] || o.finish;
+    const choc = CHOC[o.chocolate] || o.chocolate;
+    const fin  = FIN[o.finish] || o.finish;
     const total = (o.total_cents / 100).toFixed(2);
-    const next = STATUS_NEXT[o.status];
+    const next  = STATUS_NEXT[o.status];
     const slotMeta = o.slot_date && o.slot_time ? `${o.slot_date} · ${o.slot_time}` : `Slot #${o.time_slot_id}`;
-
     const actions = [];
-    if (next) {
-      actions.push(`<button class="action-btn primary" onclick="updateStatus(${o.id}, '${next}')">Mark ${STATUS_LABEL[next]}</button>`);
-    }
-    if (o.status !== 'cancelled' && o.status !== 'collected') {
-      actions.push(`<button class="action-btn danger" onclick="updateStatus(${o.id}, 'cancelled')">Cancel</button>`);
-    }
-
-    return `
-      <div class="order-card" id="order-${o.id}">
-        <div class="order-top">
-          <div>
-            <div class="order-id">#${o.id} · CA$${total}</div>
-            <div class="order-email">${o.customer_email}</div>
-          </div>
-          <div class="status-badge s-${o.status}">${STATUS_LABEL[o.status]}</div>
+    if (next) actions.push(`<button class="action-btn primary" onclick="updateStatus(${o.id},'${next}')">Mark ${STATUS_LABEL[next]}</button>`);
+    if (o.status !== 'cancelled' && o.status !== 'collected')
+      actions.push(`<button class="action-btn danger" onclick="updateStatus(${o.id},'cancelled')">Cancel</button>`);
+    return `<div class="order-card" id="order-${o.id}">
+      <div class="order-top">
+        <div>
+          <div class="order-id">#${o.id} · CA$${total}</div>
+          <div class="order-email">${o.customer_email}</div>
         </div>
-        <div class="order-items">
-          <div class="order-variety">${o.variety_name || `Variety #${o.variety_id}`}</div>
-          <div class="order-details">${choc} · ${fin} · ×${o.quantity}</div>
-          ${o.is_gift ? '<span class="gift-badge">Gift</span>' : ''}
-        </div>
-        <div class="order-meta">${slotMeta}</div>
-        ${actions.length ? `<div class="action-row">${actions.join('')}</div>` : ''}
+        <div class="status-badge s-${o.status}">${STATUS_LABEL[o.status]}</div>
       </div>
-    `;
+      <div><div class="order-variety">${o.variety_name||`Variety #${o.variety_id}`}</div>
+        <div class="order-details">${choc} · ${fin} · ×${o.quantity}</div>
+        ${o.is_gift?'<span class="gift-badge">Gift</span>':''}
+      </div>
+      <div class="order-meta">${slotMeta}</div>
+      ${actions.length?`<div class="action-row">${actions.join('')}</div>`:''}
+    </div>`;
   }
 
   async function updateStatus(id, status) {
     const res = await fetch(`${BASE}/api/admin/orders/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      method:'PATCH', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
       body: JSON.stringify({ status }),
     });
     if (res.ok) {
@@ -618,78 +373,352 @@
     }
   }
 
-  // ── CHOCOLATIER ────────────────────────────────────
-
-  function renderChocolatier(rows) {
+  // ── POPUPS TAB ────────────────────────────────────────
+  async function renderPopupsTab() {
     const body = document.getElementById('dash-body');
-    if (!rows.length) {
-      body.innerHTML = '<div class="empty">No paid orders for today.</div>';
-      return;
-    }
+    body.innerHTML = '<div class="empty">Loading…</div>';
+    const res = await fetch(BASE + '/api/admin/popups', { headers: { 'X-Admin-PIN': currentPin } });
+    const popups = res.ok ? await res.json() : [];
 
-    // Group by slot time
-    const groups = {};
-    rows.forEach(({ order: o, slot: s }) => {
-      const key = s.time;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push({ o, s });
-    });
+    const partnerOptions = allBusinesses.filter(b => b.type === 'partner')
+      .map(b => `<option value="${b.id}">${b.name}</option>`).join('');
 
-    const html = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([time, items]) => `
-      <div class="slot-group">
-        <div class="slot-heading">${time}</div>
-        ${items.map(({ o }) => {
-          const choc = CHOCOLATE_NAMES[o.chocolate] || o.chocolate;
-          const fin = FINISH_NAMES[o.finish] || o.finish;
-          return `
-            <div class="order-card">
-              <div class="order-top">
-                <div>
-                  <div class="order-id">#${o.id}</div>
-                  <div class="order-email">${o.customer_email}</div>
-                </div>
-                <div class="order-details" style="text-align:right;font-size:13px;">×${o.quantity}</div>
-              </div>
-              <div class="order-items">
-                <div class="order-details">${choc} · ${fin}</div>
-                ${o.is_gift ? '<span class="gift-badge">Gift</span>' : ''}
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    `).join('');
+    const createForm = `
+      <div class="form-card">
+        <div class="form-title">New Popup</div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Name</div><input class="form-input" id="pf-name" placeholder="Le Cabinet × Studio Loft" /></div>
+          <div class="form-row"><div class="form-label">City</div><input class="form-input" id="pf-city" value="Montreal" /></div>
+        </div>
+        <div class="form-row"><div class="form-label">Address</div><input class="form-input" id="pf-address" placeholder="123 Rue Saint-Denis" /></div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Neighbourhood</div><input class="form-input" id="pf-neighbourhood" placeholder="Le Plateau" /></div>
+          <div class="form-row"><div class="form-label">Instagram Handle</div><input class="form-input" id="pf-instagram" placeholder="@venue" /></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Starts At</div><input class="form-input" id="pf-starts" type="datetime-local" /></div>
+          <div class="form-row"><div class="form-label">Ends At</div><input class="form-input" id="pf-ends" type="datetime-local" /></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Capacity</div><input class="form-input" id="pf-capacity" type="number" placeholder="60" /></div>
+          <div class="form-row"><div class="form-label">Entrance Fee ($)</div><input class="form-input" id="pf-fee" type="number" step="0.01" placeholder="15.00" /></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Latitude</div><input class="form-input" id="pf-lat" type="number" step="any" placeholder="45.5231" /></div>
+          <div class="form-row"><div class="form-label">Longitude</div><input class="form-input" id="pf-lng" type="number" step="any" placeholder="-73.5889" /></div>
+        </div>
+        <div class="form-row"><div class="form-label">Partner Venue</div>
+          <select class="form-select" id="pf-partner">
+            <option value="">None</option>
+            ${partnerOptions}
+          </select>
+        </div>
+        <div class="form-row"><div class="form-label">Host User ID</div><input class="form-input" id="pf-host" type="number" placeholder="User DB ID" /></div>
+        <div class="form-row"><div class="form-label">DJ Name (optional)</div><input class="form-input" id="pf-dj" placeholder="Leave blank if using DJ offer" /></div>
+        <div class="form-row"><div class="form-label">Organizer Note</div><textarea class="form-textarea" id="pf-note" placeholder="Visible to invited DJ and guests"></textarea></div>
+        <div class="form-row"><div class="form-label">Description</div><textarea class="form-textarea" id="pf-desc" placeholder="Partner venue description (shown in partner panel)"></textarea></div>
+        <label class="form-check"><input type="checkbox" id="pf-audition" /><span>Mark as audition popup</span></label>
+        <button class="action-btn primary" onclick="createPopup()" style="align-self:flex-start;padding:12px 28px;">Create Popup</button>
+        <div id="pf-error" style="font-family:'DM Mono',monospace;font-size:12px;color:#E05A5A;min-height:16px;"></div>
+      </div>`;
 
-    body.innerHTML = html;
+    const popupCards = popups.length === 0
+      ? '<div class="empty">No popups yet.</div>'
+      : popups.map(popupCardHtml).join('');
+
+    body.innerHTML = `<div class="section-heading">Active & Upcoming</div>${popupCards}<div class="section-heading" style="margin-top:8px;">Create</div>${createForm}`;
   }
 
-  // ── SUPPLIER ───────────────────────────────────────
+  function popupCardHtml(p) {
+    const auditionBadge = p.is_audition
+      ? `<div class="status-badge s-${p.audition_status||'pending'}">${p.audition_status||'audition'}</div>`
+      : '';
+    const djOfferHtml = p.dj_offers && p.dj_offers.length > 0
+      ? p.dj_offers.map(o => `<span class="status-badge s-${o.status}" style="margin-right:4px;">DJ #${o.dj_user_id} — ${o.status}</span>`).join('')
+      : '<span style="color:var(--muted);font-size:12px;font-family:\'DM Mono\',monospace;">No DJ offer sent</span>';
 
+    const auditionActions = p.is_audition ? `
+      <button class="action-btn success" onclick="setAuditionStatus(${p.id},'passed')">Pass Audition</button>
+      <button class="action-btn danger" onclick="setAuditionStatus(${p.id},'failed')">Fail Audition</button>` : '';
+
+    return `<div class="popup-card" id="popup-${p.id}">
+      <div class="order-top">
+        <div>
+          <div class="order-id">#${p.id} · ${p.type}</div>
+          <div class="popup-name">${p.name}</div>
+          <div class="popup-meta">${fmt(p.starts_at)} → ${fmt(p.ends_at)}</div>
+          <div class="popup-meta">${p.address}${p.neighbourhood ? ' · ' + p.neighbourhood : ''}</div>
+        </div>
+        ${auditionBadge}
+      </div>
+      <div class="popup-stats">
+        <div class="stat-block"><div class="stat-num">${p.rsvp_count}</div><div class="stat-label">RSVPs</div></div>
+        <div class="stat-block"><div class="stat-num">${p.nomination_count}</div><div class="stat-label">Nominations</div></div>
+        <div class="stat-block"><div class="stat-num">${p.capacity || '—'}</div><div class="stat-label">Capacity</div></div>
+        <div class="stat-block"><div class="stat-num">${p.entrance_fee_cents ? '$'+(p.entrance_fee_cents/100).toFixed(0) : '—'}</div><div class="stat-label">Fee</div></div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:0.5px;">Check-in token: ${p.checkin_token || '—'}</div>
+      <div style="margin-top:4px;">${djOfferHtml}</div>
+      <div class="action-row">
+        <button class="action-btn" onclick="toggleNominations(${p.id})">Nominations</button>
+        <button class="action-btn" onclick="showDjForm(${p.id})">Send DJ Offer</button>
+        ${auditionActions}
+      </div>
+      <div id="nom-${p.id}" style="display:none;margin-top:4px;"></div>
+      <div id="djform-${p.id}" style="display:none;margin-top:8px;"></div>
+    </div>`;
+  }
+
+  async function toggleNominations(id) {
+    const el = document.getElementById(`nom-${id}`);
+    if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+    el.innerHTML = '<div class="empty" style="padding:16px 0;">Loading…</div>';
+    el.style.display = 'block';
+    const res = await fetch(`${BASE}/api/admin/popups/${id}/nominations`, { headers: { 'X-Admin-PIN': currentPin } });
+    const noms = res.ok ? await res.json() : [];
+    el.innerHTML = noms.length === 0
+      ? '<div class="empty" style="padding:12px 0;">No nominations yet.</div>'
+      : noms.map(n => `<div class="nom-row"><div class="nom-name">${n.display_name}</div><div class="nom-count">${n.nomination_count}</div></div>`).join('');
+  }
+
+  function showDjForm(popupId) {
+    const el = document.getElementById(`djform-${popupId}`);
+    if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:10px;padding:12px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid var(--border);">
+        <div class="form-label">Send DJ Offer</div>
+        <input class="form-input" id="dj-uid-${popupId}" type="number" placeholder="DJ User ID" />
+        <input class="form-input" id="dj-boxes-${popupId}" type="number" placeholder="Allocation boxes (e.g. 6)" />
+        <textarea class="form-textarea" id="dj-note-${popupId}" placeholder="Note to the DJ" style="min-height:60px;"></textarea>
+        <button class="action-btn primary" onclick="sendDjOffer(${popupId})" style="align-self:flex-start;">Send Offer</button>
+        <div id="dj-err-${popupId}" style="font-size:12px;color:#E05A5A;font-family:'DM Mono',monospace;"></div>
+      </div>`;
+    el.style.display = 'block';
+  }
+
+  async function sendDjOffer(popupId) {
+    const dj_user_id = parseInt(document.getElementById(`dj-uid-${popupId}`).value);
+    const allocation_boxes = parseInt(document.getElementById(`dj-boxes-${popupId}`).value) || 0;
+    const organizer_note = document.getElementById(`dj-note-${popupId}`).value;
+    const errEl = document.getElementById(`dj-err-${popupId}`);
+    if (!dj_user_id) { errEl.textContent = 'User ID required.'; return; }
+    const res = await fetch(`${BASE}/api/admin/popups/${popupId}/dj-offer`, {
+      method:'POST', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
+      body: JSON.stringify({ dj_user_id, allocation_boxes, organizer_note }),
+    });
+    if (res.ok) {
+      document.getElementById(`djform-${popupId}`).style.display = 'none';
+      renderPopupsTab();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      errEl.textContent = err.error || 'Failed.';
+    }
+  }
+
+  async function setAuditionStatus(id, status) {
+    await fetch(`${BASE}/api/admin/businesses/${id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
+      body: JSON.stringify({ audition_status: status }),
+    });
+    renderPopupsTab();
+  }
+
+  async function createPopup() {
+    const errEl = document.getElementById('pf-error');
+    errEl.textContent = '';
+    const feeVal = parseFloat(document.getElementById('pf-fee').value);
+    const body = {
+      type: 'popup',
+      name: document.getElementById('pf-name').value.trim(),
+      address: document.getElementById('pf-address').value.trim(),
+      city: document.getElementById('pf-city').value.trim(),
+      neighbourhood: document.getElementById('pf-neighbourhood').value.trim() || null,
+      instagram_handle: document.getElementById('pf-instagram').value.trim() || null,
+      starts_at: document.getElementById('pf-starts').value || null,
+      ends_at: document.getElementById('pf-ends').value || null,
+      launched_at: document.getElementById('pf-starts').value || new Date().toISOString(),
+      capacity: parseInt(document.getElementById('pf-capacity').value) || null,
+      entrance_fee_cents: feeVal > 0 ? Math.round(feeVal * 100) : null,
+      latitude: parseFloat(document.getElementById('pf-lat').value) || null,
+      longitude: parseFloat(document.getElementById('pf-lng').value) || null,
+      partner_business_id: parseInt(document.getElementById('pf-partner').value) || null,
+      host_user_id: parseInt(document.getElementById('pf-host').value) || null,
+      dj_name: document.getElementById('pf-dj').value.trim() || null,
+      organizer_note: document.getElementById('pf-note').value.trim() || null,
+      description: document.getElementById('pf-desc').value.trim() || null,
+      is_audition: document.getElementById('pf-audition').checked,
+      audition_status: document.getElementById('pf-audition').checked ? 'pending' : null,
+    };
+    if (!body.name || !body.address || !body.city) { errEl.textContent = 'Name, address, and city are required.'; return; }
+    const res = await fetch(`${BASE}/api/admin/businesses`, {
+      method:'POST', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
+      body: JSON.stringify(body),
+    });
+    if (res.ok) { renderPopupsTab(); }
+    else {
+      const err = await res.json().catch(() => ({}));
+      errEl.textContent = err.error || 'Failed to create popup.';
+    }
+  }
+
+  // ── REQUESTS TAB ──────────────────────────────────────
+  async function renderRequestsTab() {
+    const body = document.getElementById('dash-body');
+    body.innerHTML = '<div class="empty">Loading…</div>';
+    const res = await fetch(BASE + '/api/admin/popup-requests', { headers: { 'X-Admin-PIN': currentPin } });
+    const requests = res.ok ? await res.json() : [];
+    if (!requests.length) { body.innerHTML = '<div class="empty">No popup requests.</div>'; return; }
+    body.innerHTML = requests.map(r => `
+      <div class="request-card" id="req-${r.id}">
+        <div class="order-top">
+          <div>
+            <div class="order-id">#${r.id} · ${fmtDate(r.created_at)}</div>
+            <div class="popup-name">${r.venue_name}</div>
+            <div class="popup-meta">${r.requested_date} at ${r.requested_time}</div>
+            <div class="order-email">${r.user_display_name || r.user_email}</div>
+          </div>
+          <div class="status-badge s-${r.status}">${r.status}</div>
+        </div>
+        ${r.notes ? `<div class="order-details" style="font-style:italic;">"${r.notes}"</div>` : ''}
+        ${r.status === 'pending' || r.status === 'paid' ? `
+          <div class="action-row">
+            <button class="action-btn success" onclick="updateRequest(${r.id},'approved')">Approve</button>
+            <button class="action-btn danger" onclick="updateRequest(${r.id},'rejected')">Reject</button>
+          </div>` : ''}
+      </div>`).join('');
+  }
+
+  async function updateRequest(id, status) {
+    await fetch(`${BASE}/api/admin/popup-requests/${id}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
+      body: JSON.stringify({ status }),
+    });
+    renderRequestsTab();
+  }
+
+  // ── PORTRAITS TAB ─────────────────────────────────────
+  async function renderPortraitsTab() {
+    const body = document.getElementById('dash-body');
+    const businessOptions = allBusinesses
+      .map(b => `<option value="${b.id}">${b.name} (${b.type})</option>`).join('');
+
+    body.innerHTML = `
+      <div class="form-card">
+        <div class="form-title">Add Portrait</div>
+        <div class="form-row"><div class="form-label">Business</div>
+          <select class="form-select" id="port-biz">${businessOptions}</select>
+        </div>
+        <div class="form-row"><div class="form-label">Image URL</div><input class="form-input" id="port-url" placeholder="https://..." /></div>
+        <div class="form-grid">
+          <div class="form-row"><div class="form-label">Subject Name</div><input class="form-input" id="port-subject" placeholder="Optional" /></div>
+          <div class="form-row"><div class="form-label">Season</div><input class="form-input" id="port-season" placeholder="Spring 2025" /></div>
+        </div>
+        <div class="form-row"><div class="form-label">Campaign Title</div><input class="form-input" id="port-campaign" placeholder="Optional" /></div>
+        <div class="form-row"><div class="form-label">Sort Order</div><input class="form-input" id="port-sort" type="number" value="0" /></div>
+        <button class="action-btn primary" onclick="addPortrait()" style="align-self:flex-start;padding:12px 28px;">Add Portrait</button>
+        <div id="port-error" style="font-family:'DM Mono',monospace;font-size:12px;color:#E05A5A;min-height:16px;"></div>
+      </div>
+      <div class="section-heading" style="margin-top:4px;">View by Business</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select class="form-select" id="port-view-biz" style="flex:1;">${businessOptions}</select>
+        <button class="action-btn" onclick="loadPortraits()">Load</button>
+      </div>
+      <div id="portrait-list"></div>`;
+  }
+
+  async function addPortrait() {
+    const errEl = document.getElementById('port-error');
+    errEl.textContent = '';
+    const business_id = parseInt(document.getElementById('port-biz').value);
+    const image_url   = document.getElementById('port-url').value.trim();
+    if (!business_id || !image_url) { errEl.textContent = 'Business and image URL are required.'; return; }
+    const res = await fetch(`${BASE}/api/admin/portraits`, {
+      method:'POST', headers:{'Content-Type':'application/json','X-Admin-PIN':currentPin},
+      body: JSON.stringify({
+        business_id,
+        image_url,
+        subject_name:   document.getElementById('port-subject').value.trim() || null,
+        season:         document.getElementById('port-season').value.trim() || null,
+        campaign_title: document.getElementById('port-campaign').value.trim() || null,
+        sort_order:     parseInt(document.getElementById('port-sort').value) || 0,
+      }),
+    });
+    if (res.ok) {
+      document.getElementById('port-url').value = '';
+      document.getElementById('port-subject').value = '';
+      errEl.textContent = '';
+      errEl.style.color = 'rgba(80,200,120,0.9)';
+      errEl.textContent = 'Portrait added.';
+      setTimeout(() => { errEl.textContent = ''; errEl.style.color = '#E05A5A'; }, 2000);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      errEl.textContent = err.error || 'Failed.';
+    }
+  }
+
+  async function loadPortraits() {
+    const el = document.getElementById('portrait-list');
+    const business_id = parseInt(document.getElementById('port-view-biz').value);
+    el.innerHTML = '<div class="empty">Loading…</div>';
+    const res = await fetch(`${BASE}/api/admin/portraits?business_id=${business_id}`, { headers: { 'X-Admin-PIN': currentPin } });
+    const portraits = res.ok ? await res.json() : [];
+    if (!portraits.length) { el.innerHTML = '<div class="empty">No portraits for this business.</div>'; return; }
+    el.innerHTML = `<div class="form-card">${portraits.map(p => `
+      <div class="portrait-row">
+        <div style="flex:1;min-width:0;">
+          <div class="portrait-meta">${p.subject_name || '—'} · ${p.season || '—'}</div>
+          <div class="portrait-url">${p.image_url}</div>
+        </div>
+        <button class="action-btn danger" onclick="deletePortrait(${p.id})">Remove</button>
+      </div>`).join('')}</div>`;
+  }
+
+  async function deletePortrait(id) {
+    await fetch(`${BASE}/api/admin/portraits/${id}`, { method:'DELETE', headers:{'X-Admin-PIN':currentPin} });
+    loadPortraits();
+  }
+
+  // ── CHOCOLATIER ───────────────────────────────────────
+  function renderChocolatier(rows) {
+    const body = document.getElementById('dash-body');
+    if (!rows.length) { body.innerHTML = '<div class="empty">No paid orders for today.</div>'; return; }
+    const groups = {};
+    rows.forEach(({ order: o, slot: s }) => {
+      if (!groups[s.time]) groups[s.time] = [];
+      groups[s.time].push({ o, s });
+    });
+    body.innerHTML = Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([time, items]) => `
+      <div class="slot-group">
+        <div class="slot-heading">${time}</div>
+        ${items.map(({ o }) => `
+          <div class="order-card">
+            <div class="order-top">
+              <div><div class="order-id">#${o.id}</div><div class="order-email">${o.customer_email}</div></div>
+              <div class="order-details" style="text-align:right;">×${o.quantity}</div>
+            </div>
+            <div class="order-details">${CHOC[o.chocolate]||o.chocolate} · ${FIN[o.finish]||o.finish}</div>
+            ${o.is_gift?'<span class="gift-badge">Gift</span>':''}
+          </div>`).join('')}
+      </div>`).join('');
+  }
+
+  // ── SUPPLIER ──────────────────────────────────────────
   function renderSupplier(items) {
     const body = document.getElementById('dash-body');
-    if (!items.length) {
-      body.innerHTML = '<div class="empty">All varieties are well stocked.</div>';
-      return;
-    }
-
+    if (!items.length) { body.innerHTML = '<div class="empty">All varieties are well stocked.</div>'; return; }
     body.innerHTML = items.map(v => `
       <div class="alert-card">
-        <div>
-          <div class="alert-name">${v.name}</div>
-          <div class="alert-farm">${[v.source_farm, v.source_location].filter(Boolean).join(', ') || '—'}</div>
+        <div><div class="alert-name">${v.name}</div>
+          <div class="alert-farm">${[v.source_farm,v.source_location].filter(Boolean).join(', ')||'—'}</div>
         </div>
         <div style="text-align:center;">
           <div class="stock-num">${v.stock_remaining}</div>
           <div class="stock-label">remaining</div>
         </div>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
-  // Enter key on PIN input
-  document.getElementById('pin-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitPin();
-  });
+  document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key==='Enter') submitPin(); });
 </script>
 </body>
 </html>

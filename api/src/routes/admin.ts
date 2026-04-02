@@ -1,9 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { eq, isNull, sql } from 'drizzle-orm';
+import { eq, isNull, sql, and } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady } from '../lib/resend';
+import { sendPushNotification } from '../lib/push';
+import { randomUUID } from 'crypto';
 
 const router = Router();
 
@@ -277,24 +279,258 @@ router.get('/locations', async (_req: Request, res: Response) => {
 
 // POST /api/admin/businesses
 router.post('/businesses', async (req: Request, res: Response) => {
-  const { name, type, address, city, hours, contact, latitude, longitude, launched_at } = req.body;
+  const { name, type, address, city, hours, contact, latitude, longitude, launched_at,
+          description, instagram_handle, neighbourhood, starts_at, ends_at, dj_name,
+          organizer_note, capacity, entrance_fee_cents, is_audition, partner_business_id,
+          host_user_id, checkin_token } = req.body;
   if (!name || !type || !address || !city || !launched_at) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
   try {
     const [business] = await db.insert(businesses).values({
-      name,
-      type,
-      address,
-      city,
+      name, type, address, city,
       hours: hours ?? null,
       contact: contact ?? null,
       latitude: latitude ?? null,
       longitude: longitude ?? null,
       launched_at: new Date(launched_at),
+      description: description ?? null,
+      instagram_handle: instagram_handle ?? null,
+      neighbourhood: neighbourhood ?? null,
+      starts_at: starts_at ? new Date(starts_at) : null,
+      ends_at: ends_at ? new Date(ends_at) : null,
+      dj_name: dj_name ?? null,
+      organizer_note: organizer_note ?? null,
+      capacity: capacity ?? null,
+      entrance_fee_cents: entrance_fee_cents ?? null,
+      is_audition: is_audition ?? false,
+      partner_business_id: partner_business_id ?? null,
+      host_user_id: host_user_id ?? null,
+      checkin_token: checkin_token ?? randomUUID(),
     }).returning();
     res.status(201).json(business);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/businesses/:id
+router.patch('/businesses/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const body = { ...req.body };
+    if (body.starts_at) body.starts_at = new Date(body.starts_at);
+    if (body.ends_at) body.ends_at = new Date(body.ends_at);
+    const [updated] = await db.update(businesses).set(body).where(eq(businesses.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/popups — all popups with RSVP + nomination counts
+router.get('/popups', async (_req: Request, res: Response) => {
+  try {
+    const popups = await db.select().from(businesses).where(eq(businesses.type, 'popup'));
+
+    const enriched = await Promise.all(popups.map(async p => {
+      const [rsvpRow] = await db
+        .select({ total: sql<number>`cast(count(*) as int)` })
+        .from(popupRsvps)
+        .where(and(eq(popupRsvps.popup_id, p.id), eq(popupRsvps.status, 'paid')));
+
+      const [nomRow] = await db
+        .select({ total: sql<number>`cast(count(*) as int)` })
+        .from(popupNominations)
+        .where(eq(popupNominations.popup_id, p.id));
+
+      const offers = await db.select().from(djOffers).where(eq(djOffers.popup_id, p.id));
+
+      return {
+        ...p,
+        lat: p.latitude ? parseFloat(String(p.latitude)) : null,
+        lng: p.longitude ? parseFloat(String(p.longitude)) : null,
+        rsvp_count: rsvpRow?.total ?? 0,
+        nomination_count: nomRow?.total ?? 0,
+        dj_offers: offers,
+      };
+    }));
+
+    res.json(enriched.sort((a, b) =>
+      (b.starts_at?.getTime() ?? 0) - (a.starts_at?.getTime() ?? 0)
+    ));
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/popups/:id/nominations
+router.get('/popups/:id/nominations', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const rows = await db
+      .select({
+        nominee_id: popupNominations.nominee_id,
+        display_name: users.display_name,
+        email: users.email,
+        nomination_count: sql<number>`cast(count(*) as int)`,
+      })
+      .from(popupNominations)
+      .innerJoin(users, eq(popupNominations.nominee_id, users.id))
+      .where(eq(popupNominations.popup_id, id))
+      .groupBy(popupNominations.nominee_id, users.display_name, users.email)
+      .orderBy(sql`count(*) desc`);
+
+    res.json(rows.map(r => ({
+      user_id: r.nominee_id,
+      display_name: r.display_name ?? r.email.split('@')[0],
+      nomination_count: r.nomination_count,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/popups/:id/dj-offer — send DJ offer + push notification
+router.post('/popups/:id/dj-offer', async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  const { dj_user_id, allocation_boxes, organizer_note } = req.body;
+  if (isNaN(popup_id) || !dj_user_id) {
+    res.status(400).json({ error: 'dj_user_id is required' });
+    return;
+  }
+  try {
+    const [popup] = await db.select().from(businesses).where(eq(businesses.id, popup_id));
+    if (!popup) { res.status(404).json({ error: 'Popup not found' }); return; }
+
+    const [offer] = await db.insert(djOffers).values({
+      popup_id,
+      dj_user_id,
+      allocation_boxes: allocation_boxes ?? 0,
+      organizer_note: organizer_note ?? null,
+      status: 'pending',
+    }).returning();
+
+    // Push notification to DJ
+    const [djUser] = await db.select().from(users).where(eq(users.id, dj_user_id));
+    if (djUser?.push_token) {
+      sendPushNotification(djUser.push_token, {
+        title: 'You\'ve been invited.',
+        body: `${popup.name} wants you for their popup. Open the app to accept or pass.`,
+        data: { screen: 'dj-offer', popup_id },
+      }).catch(() => {});
+    }
+
+    res.status(201).json(offer);
+  } catch (err) {
+    logger.error('DJ offer error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/popup-requests
+router.get('/popup-requests', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: popupRequests.id,
+        user_id: popupRequests.user_id,
+        venue_id: popupRequests.venue_id,
+        venue_name: businesses.name,
+        requested_date: popupRequests.requested_date,
+        requested_time: popupRequests.requested_time,
+        notes: popupRequests.notes,
+        status: popupRequests.status,
+        created_at: popupRequests.created_at,
+        user_email: users.email,
+        user_display_name: users.display_name,
+      })
+      .from(popupRequests)
+      .innerJoin(businesses, eq(popupRequests.venue_id, businesses.id))
+      .innerJoin(users, eq(popupRequests.user_id, users.id))
+      .orderBy(popupRequests.created_at);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/popup-requests/:id — approve or reject
+router.patch('/popup-requests/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  const { status } = req.body; // 'approved' | 'rejected'
+  if (isNaN(id) || !['approved', 'rejected'].includes(status)) {
+    res.status(400).json({ error: 'status must be approved or rejected' });
+    return;
+  }
+  try {
+    const [updated] = await db.update(popupRequests).set({ status }).where(eq(popupRequests.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
+
+    // Notify requester
+    const [requester] = await db.select().from(users).where(eq(users.id, updated.user_id));
+    if (requester?.push_token) {
+      const msg = status === 'approved'
+        ? 'Your popup request has been approved. We\'ll be in touch.'
+        : 'Your popup request was not approved this time.';
+      sendPushNotification(requester.push_token, {
+        title: 'Maison Fraise',
+        body: msg,
+        data: { screen: 'home' },
+      }).catch(() => {});
+    }
+
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/portraits — add a portrait
+router.post('/portraits', async (req: Request, res: Response) => {
+  const { business_id, image_url, subject_name, season, campaign_title, sort_order } = req.body;
+  if (!business_id || !image_url) {
+    res.status(400).json({ error: 'business_id and image_url are required' });
+    return;
+  }
+  try {
+    const [portrait] = await db.insert(portraits).values({
+      business_id,
+      image_url,
+      subject_name: subject_name ?? null,
+      season: season ?? null,
+      campaign_title: campaign_title ?? null,
+      sort_order: sort_order ?? 0,
+    }).returning();
+    res.status(201).json(portrait);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/admin/portraits/:id
+router.delete('/portraits/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    await db.delete(portraits).where(eq(portraits.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/portraits?business_id=
+router.get('/portraits', async (req: Request, res: Response) => {
+  const business_id = parseInt(String(req.query.business_id), 10);
+  if (isNaN(business_id)) { res.status(400).json({ error: 'business_id required' }); return; }
+  try {
+    const rows = await db.select().from(portraits).where(eq(portraits.business_id, business_id));
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
