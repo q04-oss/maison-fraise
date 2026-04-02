@@ -144,11 +144,11 @@ export async function confirmOrder(orderId: number) {
   }>;
 }
 
-export async function signInWithApple(identity_token: string, push_token?: string | null): Promise<{ user_db_id: number; email: string }> {
+export async function signInWithApple(identity_token: string, push_token?: string | null, display_name?: string | null): Promise<{ user_db_id: number; email: string }> {
   const res = await fetch(`${BASE_URL}/api/auth/apple`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identity_token, push_token: push_token ?? undefined }),
+    body: JSON.stringify({ identity_token, push_token: push_token ?? undefined, display_name: display_name ?? undefined }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

@@ -53,7 +53,7 @@ async function verifyAppleToken(identityToken: string): Promise<{ sub: string; e
 // Body: { identity_token: string, push_token?: string }
 // Returns: { user_db_id: number, email: string }
 router.post('/apple', async (req: Request, res: Response) => {
-  const { identity_token, push_token } = req.body;
+  const { identity_token, push_token, display_name } = req.body;
   if (!identity_token) {
     res.status(400).json({ error: 'identity_token is required' });
     return;
@@ -63,13 +63,15 @@ router.post('/apple', async (req: Request, res: Response) => {
     const { sub: appleUserId, email } = await verifyAppleToken(identity_token);
 
     const pushUpdate = push_token ? { push_token } : {};
+    const nameUpdate = display_name ? { display_name } : {};
 
     // 1. Look up by apple_user_id first
     const [byApple] = await db.select().from(users).where(eq(users.apple_user_id, appleUserId));
     if (byApple) {
-      if (push_token && byApple.push_token !== push_token) {
-        await db.update(users).set({ push_token }).where(eq(users.id, byApple.id));
-      }
+      const updates: Record<string, any> = {};
+      if (push_token && byApple.push_token !== push_token) updates.push_token = push_token;
+      if (display_name && !byApple.display_name) updates.display_name = display_name;
+      if (Object.keys(updates).length) await db.update(users).set(updates).where(eq(users.id, byApple.id));
       res.json({ user_db_id: byApple.id, email: byApple.email });
       return;
     }
@@ -80,7 +82,7 @@ router.post('/apple', async (req: Request, res: Response) => {
       if (byEmail) {
         const [linked] = await db
           .update(users)
-          .set({ apple_user_id: appleUserId, ...pushUpdate })
+          .set({ apple_user_id: appleUserId, ...pushUpdate, ...nameUpdate })
           .where(eq(users.id, byEmail.id))
           .returning();
         res.json({ user_db_id: linked.id, email: linked.email });
@@ -90,7 +92,7 @@ router.post('/apple', async (req: Request, res: Response) => {
       // 3. Brand new user — create account
       const [created] = await db
         .insert(users)
-        .values({ email, apple_user_id: appleUserId, ...pushUpdate })
+        .values({ email, apple_user_id: appleUserId, ...pushUpdate, ...nameUpdate })
         .returning();
       res.json({ user_db_id: created.id, email: created.email });
       return;

@@ -87,7 +87,9 @@ export default function ProfilePanel() {
         ],
       });
       if (!credential.identityToken) throw new Error('No identity token received.');
-      const result = await signInWithApple(credential.identityToken, pushToken);
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean).join(' ') || null;
+      const result = await signInWithApple(credential.identityToken, pushToken, fullName);
       await AsyncStorage.setItem('user_db_id', String(result.user_db_id));
       await AsyncStorage.setItem('user_email', result.email);
       setUserEmail(result.email);
