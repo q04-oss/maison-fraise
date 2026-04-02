@@ -5,6 +5,7 @@ import {
   users, legitimacyEvents, businesses, popupRsvps, djOffers, popupNominations,
   employmentContracts, orders, varieties, timeSlots, userFollows, notifications,
 } from '../db/schema';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -62,10 +63,8 @@ router.get('/search', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/users/me/display-name — update logged-in user's display name
-router.patch('/me/display-name', async (req: Request, res: Response) => {
-  const rawId = req.headers['x-user-id'];
-  const user_id = parseInt(String(rawId), 10);
-  if (isNaN(user_id)) { res.status(400).json({ error: 'X-User-ID header required' }); return; }
+router.patch('/me/display-name', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
   const { display_name } = req.body;
   if (!display_name || typeof display_name !== 'string' || display_name.trim().length < 2) {
     res.status(400).json({ error: 'display_name must be at least 2 characters' });
@@ -80,7 +79,7 @@ router.patch('/me/display-name', async (req: Request, res: Response) => {
 });
 
 // POST /api/users/:id/follow — body: { follower_id: number }
-router.post('/:id/follow', async (req: Request, res: Response) => {
+router.post('/:id/follow', requireUser, async (req: Request, res: Response) => {
   const followee_id = parseInt(req.params.id, 10);
   const { follower_id } = req.body;
   if (isNaN(followee_id) || !follower_id) {
@@ -111,7 +110,7 @@ router.post('/:id/follow', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/users/:id/follow — body: { follower_id: number }
-router.delete('/:id/follow', async (req: Request, res: Response) => {
+router.delete('/:id/follow', requireUser, async (req: Request, res: Response) => {
   const followee_id = parseInt(req.params.id, 10);
   const { follower_id } = req.body;
   if (isNaN(followee_id) || !follower_id) {
@@ -406,14 +405,9 @@ router.get('/:id/public-profile', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/users/me/orders — order history identified by X-User-ID header
-router.get('/me/orders', async (req: Request, res: Response) => {
-  const rawId = req.headers['x-user-id'];
-  const user_id = parseInt(String(rawId), 10);
-  if (isNaN(user_id)) {
-    res.status(400).json({ error: 'X-User-ID header is required' });
-    return;
-  }
+// GET /api/users/me/orders — order history identified by JWT or X-User-ID header
+router.get('/me/orders', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
   try {
     const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, user_id));
     if (!user) { res.status(404).json({ error: 'User not found' }); return; }
@@ -436,7 +430,8 @@ router.get('/me/orders', async (req: Request, res: Response) => {
       .leftJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
       .where(eq(orders.customer_email, user.email))
       .orderBy(desc(orders.created_at))
-      .limit(50);
+      .limit(parseInt(req.query.limit as string) || 20)
+      .offset(parseInt(req.query.offset as string) || 0);
 
     res.json(rows);
   } catch (err) {
@@ -444,10 +439,9 @@ router.get('/me/orders', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/notifications?user_id=
-router.get('/notifications', async (req: Request, res: Response) => {
-  const user_id = parseInt(String(req.query.user_id), 10);
-  if (isNaN(user_id)) { res.status(400).json({ error: 'user_id is required' }); return; }
+// GET /api/notifications
+router.get('/notifications', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
   try {
     const rows = await db
       .select()
@@ -462,7 +456,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/notifications/:id/read
-router.patch('/notifications/:id/read', async (req: Request, res: Response) => {
+router.patch('/notifications/:id/read', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
@@ -473,10 +467,9 @@ router.patch('/notifications/:id/read', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/feed?user_id= — activity feed from followed users
-router.get('/feed', async (req: Request, res: Response) => {
-  const user_id = parseInt(String(req.query.user_id), 10);
-  if (isNaN(user_id)) { res.status(400).json({ error: 'user_id is required' }); return; }
+// GET /api/feed — activity feed from followed users
+router.get('/feed', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
   try {
     const followRows = await db
       .select({ followee_id: userFollows.followee_id })

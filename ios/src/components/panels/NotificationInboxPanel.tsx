@@ -56,7 +56,12 @@ export default function NotificationInboxPanel() {
         {loading ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : notes.length === 0 ? (
-          <Text style={[styles.empty, { color: c.muted }]}>Nothing yet.</Text>
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+            <Text style={{ fontSize: 32, color: c.border }}>知</Text>
+            <Text style={{ fontFamily: fonts.dmSans, color: c.muted, fontSize: 15, fontStyle: 'italic' }}>
+              You're all caught up.
+            </Text>
+          </View>
         ) : (
           notes.map(n => (
             <TouchableOpacity

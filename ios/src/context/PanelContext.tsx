@@ -69,6 +69,7 @@ export interface Variety {
   freshnessColor?: string;
   harvestDate?: string;
   tag?: string;
+  image_url?: string;
 }
 
 export interface Business {

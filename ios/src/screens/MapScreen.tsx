@@ -9,7 +9,7 @@ import { usePanel } from '../context/PanelContext';
 import PanelNavigator from '../components/PanelNavigator';
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
-import { fetchBusinesses, updatePushToken } from '../lib/api';
+import { fetchBusinesses, updatePushToken, fetchAuthToken } from '../lib/api';
 import { useColors, fonts, SPACING } from '../theme';
 import { useApp } from '../../App';
 
@@ -123,6 +123,9 @@ export default function MapScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem('verified').then(v => setIsVerified(v === 'true')).catch(() => {});
+    AsyncStorage.getItem('user_db_id').then(id => {
+      if (id) fetchAuthToken(parseInt(id, 10)).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {

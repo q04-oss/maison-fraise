@@ -55,7 +55,12 @@ export default function ActivityFeedPanel() {
         {loading ? (
           <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : feed.length === 0 ? (
-          <Text style={[styles.empty, { color: c.muted }]}>Follow people to see their activity.</Text>
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 12 }}>
+            <Text style={{ fontSize: 32, color: c.border }}>活</Text>
+            <Text style={{ fontFamily: fonts.dmSans, color: c.muted, fontSize: 15, fontStyle: 'italic' }}>
+              Nothing yet. Follow people to see their activity.
+            </Text>
+          </View>
         ) : (
           feed.map((item, i) => (
             <View key={i} style={[styles.row, { borderBottomColor: c.border }]}>

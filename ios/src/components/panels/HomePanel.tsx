@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, LayoutAnimation, Platform, UIManager, Image } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { usePanel, Variety } from '../../context/PanelContext';
 import { fetchVarieties } from '../../lib/api';
@@ -149,6 +149,9 @@ export default function HomePanel() {
               </Text>
             )}
           </View>
+          {!!v.image_url && (
+            <Image source={{ uri: v.image_url }} style={[styles.varietyThumb, { backgroundColor: c.border }]} />
+          )}
           <View style={styles.rowRight}>
             <Text style={[styles.price, { color: c.text }]}>CA${(v.price_cents / 100).toFixed(2)}</Text>
             <Text style={[styles.stock, { color: stockLow ? '#FF3B30' : c.muted }]}>
@@ -280,6 +283,7 @@ const styles = StyleSheet.create({
   farm: { fontSize: 11, fontFamily: fonts.dmMono },
   freshDot: { width: 6, height: 6, borderRadius: 3 },
   freshLabel: { fontSize: 11, fontFamily: fonts.dmMono },
+  varietyThumb: { width: 48, height: 48, borderRadius: 6 },
   rowRight: { alignItems: 'flex-end', gap: 4 },
   price: { fontSize: 15, fontFamily: fonts.dmMono },
   stock: { fontSize: 11, fontFamily: fonts.dmSans },

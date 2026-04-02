@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { logger } from '../lib/logger';
+import { signToken } from '../lib/auth';
 
 const router = Router();
 const APPLE_BUNDLE_ID = 'com.maisonfraise.app';
@@ -102,6 +103,27 @@ router.post('/apple', async (req: Request, res: Response) => {
   } catch (err: unknown) {
     logger.error('Apple auth error', err);
     res.status(401).json({ error: err instanceof Error ? err.message : 'Authentication failed' });
+  }
+});
+
+// POST /api/auth/token — issue a JWT for a given user_id (verifies user exists)
+router.post('/token', async (req: Request, res: Response) => {
+  const { user_id } = req.body;
+  if (!user_id || typeof user_id !== 'number') {
+    res.status(400).json({ error: 'user_id (number) is required' });
+    return;
+  }
+  try {
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, user_id));
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    const token = signToken(user.id);
+    res.json({ token });
+  } catch (err) {
+    logger.error('Token generation error', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

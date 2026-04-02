@@ -1,5 +1,35 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isReviewMode } from './reviewMode';
 import { API_BASE_URL as BASE_URL } from '../config/api';
+
+export async function getAuthToken(): Promise<string | null> {
+  return AsyncStorage.getItem('auth_token');
+}
+
+export async function setAuthToken(token: string): Promise<void> {
+  return AsyncStorage.setItem('auth_token', token);
+}
+
+export async function fetchAuthToken(userId: number): Promise<string | null> {
+  try {
+    const r = await fetch(`${BASE_URL}/api/auth/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!r.ok) return null;
+    const { token } = await r.json();
+    await setAuthToken(token);
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+async function authHeader(): Promise<Record<string, string>> {
+  const token = await getAuthToken();
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
 
 function reviewHeaders(): Record<string, string> {
   if (!isReviewMode()) return {};
@@ -60,9 +90,10 @@ export async function createStandingOrder(body: {
   next_order_date: string;
   gift_tone?: string;
 }) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/standing-orders`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -486,9 +517,10 @@ export async function fetchLegitimacyBreakdown(userId: number) {
 }
 
 export async function followUser(userId: number, followerId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ follower_id: followerId }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Failed to follow'); }
@@ -496,9 +528,10 @@ export async function followUser(userId: number, followerId: number) {
 }
 
 export async function unfollowUser(userId: number, followerId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ follower_id: followerId }),
   });
   if (!res.ok) throw new Error('Failed to unfollow');
@@ -506,14 +539,16 @@ export async function unfollowUser(userId: number, followerId: number) {
 }
 
 export async function fetchFollowStatus(userId: number, followerId: number) {
-  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow-status?follower_id=${followerId}`);
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow-status?follower_id=${followerId}`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch follow status');
   return res.json() as Promise<{ is_following: boolean }>;
 }
 
-export async function fetchOrderHistory(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/users/me/orders`, {
-    headers: { 'X-User-ID': String(userId) },
+export async function fetchOrderHistory(userId: number, offset = 0, limit = 20) {
+  const headers = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/users/me/orders?offset=${offset}&limit=${limit}`, {
+    headers: { 'X-User-ID': String(userId), ...headers },
   });
   if (!res.ok) throw new Error('Failed to fetch orders');
   return res.json() as Promise<{
@@ -531,7 +566,8 @@ export async function fetchOrderHistory(userId: number) {
 }
 
 export async function fetchActivityFeed(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/feed?user_id=${userId}`);
+  const headers = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/feed?user_id=${userId}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch feed');
   return res.json() as Promise<{
     type: string;
@@ -543,7 +579,8 @@ export async function fetchActivityFeed(userId: number) {
 }
 
 export async function fetchNotifications(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/notifications?user_id=${userId}`);
+  const headers = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/notifications?user_id=${userId}`, { headers });
   if (!res.ok) throw new Error('Failed to fetch notifications');
   return res.json() as Promise<{
     id: number;
@@ -556,15 +593,17 @@ export async function fetchNotifications(userId: number) {
 }
 
 export async function markNotificationRead(notificationId: number) {
-  const res = await fetch(`${BASE_URL}/api/notifications/${notificationId}/read`, { method: 'PATCH' });
+  const headers = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/notifications/${notificationId}/read`, { method: 'PATCH', headers });
   if (!res.ok) throw new Error('Failed to mark read');
   return res.json();
 }
 
 export async function updateDisplayName(userId: number, display_name: string) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/me/display-name`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'X-User-ID': String(userId) },
+    headers: { 'Content-Type': 'application/json', 'X-User-ID': String(userId), ...auth },
     body: JSON.stringify({ display_name }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Failed to update name'); }
@@ -602,9 +641,10 @@ export async function fetchNominationsReceived(userId: number) {
 }
 
 export async function cancelPopupRsvp(popupId: number, userId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/rsvp`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ user_id: userId }),
   });
   if (!res.ok) {

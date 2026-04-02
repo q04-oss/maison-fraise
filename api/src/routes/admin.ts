@@ -135,6 +135,61 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/verify-nfc — look up an order by its NFC token
+router.post('/verify-nfc', async (req: Request, res: Response) => {
+  const { token } = req.body;
+  if (!token || typeof token !== 'string') {
+    res.status(400).json({ error: 'token is required' });
+    return;
+  }
+  try {
+    const [row] = await db
+      .select({
+        order_id: orders.id,
+        status: orders.status,
+        variety_name: varieties.name,
+        quantity: orders.quantity,
+        customer_email: orders.customer_email,
+        created_at: orders.created_at,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .where(eq(orders.nfc_token, token));
+
+    if (!row) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/orders/:id/collect — mark order as collected
+router.patch('/orders/:id/collect', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid order id' });
+    return;
+  }
+  try {
+    const [updated] = await db
+      .update(orders)
+      .set({ status: 'collected' })
+      .where(eq(orders.id, id))
+      .returning();
+    if (!updated) {
+      res.status(404).json({ error: 'Order not found' });
+      return;
+    }
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/admin/varieties — create a variety
 router.post('/varieties', async (req: Request, res: Response) => {
   const { name, description, source_farm, source_location, price_cents, stock_remaining, tag } = req.body;

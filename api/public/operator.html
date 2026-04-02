@@ -374,9 +374,12 @@
   // ── ORDERS TAB ────────────────────────────────────────
   let ordersLocationFilter = '';
   let ordersStatusFilter = 'all';
+  let orderOffset = 0;
+  const ORDER_LIMIT = 20;
 
   async function renderAdmin() {
     const body = document.getElementById('dash-body');
+    orderOffset = 0;
 
     const collectionLocations = allBusinesses.filter(b => b.type === 'collection');
     const locationOpts = `<option value="">All Locations</option>` +
@@ -389,6 +392,17 @@
     ).join('');
 
     body.innerHTML = `
+      <div class="order-card" style="gap:12px;">
+        <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);">Verify NFC Token</div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="nfc-token-input" placeholder="8-char token"
+            style="font-family:'DM Mono',monospace;font-size:13px;padding:9px 12px;border:1px solid var(--border2);border-radius:10px;background:rgba(255,255,255,0.04);color:var(--text);outline:none;flex:1;transition:border-color 0.2s;"
+            onkeydown="if(event.key==='Enter')verifyNfc()"
+          />
+          <button class="action-btn primary" onclick="verifyNfc()" style="flex-shrink:0;">Verify</button>
+        </div>
+        <div id="nfc-result"></div>
+      </div>
       <div class="orders-filter-bar">
         <select class="form-select" id="orders-loc-sel" onchange="setOrdersLocation(this.value)">${locationOpts}</select>
         <div class="orders-status-pills">${statusPills}</div>
@@ -403,22 +417,83 @@
     const el = document.getElementById('orders-list');
     if (!el) return;
     el.innerHTML = '<div class="empty">Loading…</div>';
+    orderOffset = 0;
     let url = BASE + '/api/admin/orders?';
     if (ordersStatusFilter && ordersStatusFilter !== 'all') url += `status=${ordersStatusFilter}&`;
     if (ordersLocationFilter) url += `location_id=${ordersLocationFilter}&`;
+    url += `limit=${ORDER_LIMIT}&offset=0`;
     const res = await fetch(url, { headers: { 'X-Admin-PIN': currentPin } });
     if (!res.ok) { el.innerHTML = '<div class="empty">Failed to load orders.</div>'; return; }
     const orders = await res.json();
     allOrders = orders;
-    el.innerHTML = orders.length === 0
-      ? '<div class="empty">No orders.</div>'
-      : orders.map(orderCardHtml).join('');
+    if (orders.length === 0) {
+      el.innerHTML = '<div class="empty">No orders.</div>';
+      return;
+    }
+    el.innerHTML = orders.map(orderCardHtml).join('');
+    if (orders.length === ORDER_LIMIT) {
+      orderOffset = ORDER_LIMIT;
+      el.insertAdjacentHTML('beforeend', `<button class="action-btn" id="load-more-btn" onclick="loadMoreOrders()" style="width:100%;margin-top:4px;">Load more</button>`);
+    }
+  }
+
+  async function loadMoreOrders() {
+    const el = document.getElementById('orders-list');
+    if (!el) return;
+    const btn = document.getElementById('load-more-btn');
+    if (btn) btn.textContent = 'Loading…';
+    let url = BASE + '/api/admin/orders?';
+    if (ordersStatusFilter && ordersStatusFilter !== 'all') url += `status=${ordersStatusFilter}&`;
+    if (ordersLocationFilter) url += `location_id=${ordersLocationFilter}&`;
+    url += `limit=${ORDER_LIMIT}&offset=${orderOffset}`;
+    const res = await fetch(url, { headers: { 'X-Admin-PIN': currentPin } });
+    if (!res.ok) { if (btn) btn.textContent = 'Load more'; return; }
+    const orders = await res.json();
+    allOrders = allOrders.concat(orders);
+    if (btn) btn.remove();
+    orders.forEach(o => { el.insertAdjacentHTML('beforeend', orderCardHtml(o)); });
+    if (orders.length === ORDER_LIMIT) {
+      orderOffset += ORDER_LIMIT;
+      el.insertAdjacentHTML('beforeend', `<button class="action-btn" id="load-more-btn" onclick="loadMoreOrders()" style="width:100%;margin-top:4px;">Load more</button>`);
+    }
   }
 
   function setOrdersLocation(val) { ordersLocationFilter = val; loadOrdersList(); }
   function setOrdersStatus(s) { ordersStatusFilter = s; renderAdmin(); }
   function refreshOrders() { loadOrdersList(); }
   function setFilter(f) { ordersStatusFilter = f; renderAdmin(); }
+
+  // ── NFC VERIFICATION ─────────────────────────────────
+  async function verifyNfc() {
+    const token = document.getElementById('nfc-token-input').value.trim();
+    if (!token) return;
+    const res = await fetch('/api/admin/verify-nfc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ token })
+    });
+    const el = document.getElementById('nfc-result');
+    if (!el) return;
+    if (res.status === 404) { el.innerHTML = '<span style="color:#FF3B30">Token not found.</span>'; return; }
+    const order = await res.json();
+    const statusColor = order.status === 'collected' ? '#8E8E93' : '#34C759';
+    el.innerHTML = `
+      <div style="margin-top:12px;padding:12px;border:1px solid #2a2a2a;border-radius:8px;">
+        <div style="font-family:'DM Mono',monospace;font-size:13px;color:#f5f5f5;">${order.variety_name} × ${order.quantity}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:#666;margin-top:4px;">${order.customer_email}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:${statusColor};margin-top:4px;">${order.status.toUpperCase()}</div>
+        ${order.status !== 'collected' ? `<button class="action-btn" style="margin-top:10px;" onclick="collectOrder(${order.order_id})">Mark Collected</button>` : ''}
+      </div>
+    `;
+  }
+
+  async function collectOrder(id) {
+    await fetch(`/api/admin/orders/${id}/collect`, {
+      method: 'PATCH',
+      headers: { 'X-Admin-PIN': currentPin }
+    });
+    verifyNfc(); // re-verify to refresh status
+  }
 
   function orderCardHtml(o) {
     const choc = CHOC[o.chocolate] || o.chocolate || '—';
@@ -427,6 +502,9 @@
     const next  = STATUS_NEXT[o.status];
     const slotMeta = o.slot_date && o.slot_time ? `${o.slot_date} · ${o.slot_time}` : (o.time_slot_id ? `Slot #${o.time_slot_id}` : '');
     const statusLabel = STATUS_LABEL[o.status] || o.status || '—';
+    const collectedStyle = o.status === 'collected'
+      ? ' style="background:rgba(142,142,147,0.14);color:#8E8E93;"'
+      : '';
     const actions = [];
     // New admin-orders status actions
     if (o.status === 'pending')
@@ -444,7 +522,7 @@
           <div class="order-id">#${o.id}${total !== '—' ? ' · CA$' + total : ''}</div>
           <div class="order-email">${o.customer_email || '—'}</div>
         </div>
-        <div class="status-badge s-${o.status}">${statusLabel}</div>
+        <div class="status-badge s-${o.status}"${collectedStyle}>${statusLabel}</div>
       </div>
       <div><div class="order-variety">${o.variety_name||`Variety #${o.variety_id||'?'}`}</div>
         <div class="order-details">${choc} · ${fin} · ×${o.quantity||1}</div>

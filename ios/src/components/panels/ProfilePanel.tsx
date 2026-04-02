@@ -12,7 +12,7 @@ import {
   cancelStandingOrder, fetchOrdersByEmail,
   fetchUserPopupRsvps, fetchDjGigs, fetchDjAllocations, registerAsDj,
   fetchHostedPopups, fetchActiveContract, fetchFollowerCount, logMemberVisit,
-  fetchLegitimacyBreakdown, updateDisplayName, cancelPopupRsvp,
+  fetchLegitimacyBreakdown, updateDisplayName, cancelPopupRsvp, fetchAuthToken,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts } from '../../theme';
@@ -107,6 +107,7 @@ export default function ProfilePanel() {
       await AsyncStorage.setItem('user_email', result.email);
       setUserEmail(result.email);
       setUserDbId(result.user_db_id);
+      fetchAuthToken(result.user_db_id).catch(() => {});
       fetchStandingOrders(result.user_db_id).then(setStandingOrders).catch(() => {});
       fetchOrdersByEmail(result.email)
         .then((orders: any[]) => {

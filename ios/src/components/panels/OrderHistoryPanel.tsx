@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
@@ -24,16 +24,38 @@ export default function OrderHistoryPanel() {
   const c = useColors();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const userDbIdRef = useRef<number | null>(null);
+
+  const loadPage = (userId: number, pageOffset: number, append: boolean) => {
+    const setL = append ? setLoadingMore : setLoading;
+    setL(true);
+    fetchOrderHistory(userId, pageOffset, 20)
+      .then(results => {
+        if (results.length < 20) setHasMore(false);
+        setOrders(prev => append ? [...prev, ...results] : results);
+      })
+      .catch(() => {})
+      .finally(() => setL(false));
+  };
 
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => {
       if (!id) { setLoading(false); return; }
-      fetchOrderHistory(parseInt(id))
-        .then(setOrders)
-        .catch(() => {})
-        .finally(() => setLoading(false));
+      const uid = parseInt(id);
+      userDbIdRef.current = uid;
+      loadPage(uid, 0, false);
     });
   }, []);
+
+  const handleLoadMore = () => {
+    if (!userDbIdRef.current || loadingMore || !hasMore) return;
+    const nextOffset = offset + 20;
+    setOffset(nextOffset);
+    loadPage(userDbIdRef.current, nextOffset, true);
+  };
 
   const readyOrders = orders.filter(o => o.status === 'ready');
 
@@ -86,6 +108,19 @@ export default function OrderHistoryPanel() {
               );
             })}
           </>
+        )}
+        {hasMore && orders.length > 0 && (
+          <TouchableOpacity
+            style={{ alignItems: 'center', paddingVertical: 20 }}
+            onPress={handleLoadMore}
+            disabled={loadingMore}
+            activeOpacity={0.7}
+          >
+            {loadingMore
+              ? <ActivityIndicator color={c.accent} />
+              : <Text style={{ fontFamily: fonts.dmMono, color: c.muted, fontSize: 12, letterSpacing: 1 }}>Load more</Text>
+            }
+          </TouchableOpacity>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
