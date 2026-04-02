@@ -117,7 +117,7 @@ export default function HomePanel() {
     if (bizVarieties.length === 0) return (
       <Text style={[styles.emptyText, { color: c.muted, paddingVertical: 20 }]}>Nothing ready today.</Text>
     );
-    return bizVarieties.map(v => {
+    return bizVarieties.map((v, idx) => {
       const freshColor = v.freshnessColor ?? c.accent;
       const label = freshnessLabel(v.freshnessLevel);
       const isSoldOut = v.stock_remaining <= 0;
@@ -125,7 +125,7 @@ export default function HomePanel() {
       return (
         <TouchableOpacity
           key={v.id}
-          style={[styles.varietyRow, { borderTopColor: c.border, opacity: isSoldOut ? 0.5 : 1 }]}
+          style={[styles.varietyRow, { borderTopColor: c.border, borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth, opacity: isSoldOut ? 0.5 : 1 }]}
           onPress={isSoldOut ? undefined : () => handleVarietyPress(v, biz)}
           activeOpacity={isSoldOut ? 1 : 0.75}
         >
@@ -180,9 +180,6 @@ export default function HomePanel() {
           {locations.length === 0 && (
             <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
           )}
-          {locations.length > 0 && expandedId === null && (
-            <Text style={[styles.emptyText, { color: c.muted, marginTop: 40 }]}>Select a location above.</Text>
-          )}
           {locations.map((biz: any) => {
             const isExpanded = expandedId === biz.id;
             const isPopup = biz.type === 'popup';
@@ -191,9 +188,9 @@ export default function HomePanel() {
               : null;
 
             return (
-              <View key={biz.id}>
+              <View key={biz.id} style={styles.locationSection}>
                 <TouchableOpacity
-                  style={[styles.locationRow, { borderBottomColor: c.border }, isExpanded && styles.locationRowExpanded]}
+                  style={[styles.locationRow, { borderBottomColor: c.border }]}
                   onPress={() => handleLocationToggle(biz)}
                   activeOpacity={0.75}
                 >
@@ -207,11 +204,10 @@ export default function HomePanel() {
                       </Text>
                     )}
                   </View>
-                  <Text style={[styles.locationChevron, { color: c.muted }, isExpanded && styles.locationChevronOpen]}>›</Text>
                 </TouchableOpacity>
 
                 {isExpanded && (
-                  <View style={[styles.varietyBlock, { borderBottomColor: c.border }]}>
+                  <View style={[styles.varietyBlock, { backgroundColor: c.card }]}>
                     {renderVarieties(biz)}
                   </View>
                 )}
@@ -244,32 +240,30 @@ const styles = StyleSheet.create({
   brandDate: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 3 },
   seasonKanji: { fontSize: 28, position: 'absolute', right: SPACING.md },
   list: { flex: 1 },
+  locationSection: {
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.md,
+  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 4,
     gap: 12,
-  },
-  locationRowExpanded: {
-    borderBottomWidth: 0,
   },
   locationMain: { flex: 1, gap: 3 },
   popupBadge: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
-  locationName: { fontSize: 18, fontFamily: fonts.playfair },
+  locationName: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 1, textTransform: 'uppercase' },
   locationDate: { fontSize: 12, fontFamily: fonts.dmSans },
-  locationChevron: { fontSize: 22 },
-  locationChevronOpen: { transform: [{ rotate: '90deg' }] },
   varietyBlock: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 10,
   },
   varietyRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
-    paddingVertical: 18,
-    paddingLeft: SPACING.md + 12,
+    paddingVertical: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: 12,
   },
