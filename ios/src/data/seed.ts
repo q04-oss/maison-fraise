@@ -119,15 +119,6 @@ export const CHOCOLATES: Chocolate[] = [
     tagline: 'For those who know.',
     swatchColor: '#A67C52',
   },
-  {
-    id: 'ivoire_blanc',
-    name: 'Ivoire Blanc',
-    source: 'Valrhona, Rhône Valley',
-    description: 'White. Vanilla-forward.',
-    tagline: 'Not on the menu. You found it.',
-    swatchColor: '#D4B896',
-    tag: 'HIDDEN',
-  },
 ];
 
 export const FINISHES: Finish[] = [

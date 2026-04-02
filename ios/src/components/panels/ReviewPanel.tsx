@@ -10,8 +10,6 @@ import { useStripe } from '@stripe/stripe-react-native';
 import * as Haptics from 'expo-haptics';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
-import { TokenVisual } from '../TokenVisual';
-import { computeTokenVisuals } from '../../lib/tokenAlgorithm';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -30,11 +28,6 @@ export default function ReviewPanel() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState(order.customer_email);
   const [loading, setLoading] = useState(false);
-  const [excessInput, setExcessInput] = useState('');
-
-  const excessCents = Math.max(0, Math.round(parseFloat(excessInput || '0') * 100));
-  const tokenPreview = excessCents > 0 ? computeTokenVisuals(excessCents) : null;
-
   // Refresh email from storage whenever this panel becomes active (e.g. returning from profile sign-in)
   useEffect(() => {
     if (currentPanel === 'review' && !email) {
@@ -44,8 +37,7 @@ export default function ReviewPanel() {
     }
   }, [currentPanel]);
 
-  const baseCents = (order.price_cents ?? 0) * order.quantity;
-  const totalCents = baseCents + excessCents;
+  const totalCents = (order.price_cents ?? 0) * order.quantity;
 
   const activeBiz = businesses.find(b => b.id === order.location_id);
   const isPopupLive = (() => {
@@ -109,7 +101,7 @@ export default function ReviewPanel() {
         push_token: pushToken,
         gift_note: order.gift_note ?? null,
         ordered_at_popup: isPopupLive,
-        excess_amount_cents: excessCents > 0 ? excessCents : undefined,
+        excess_amount_cents: undefined,
       });
 
       let confirmed;
@@ -220,45 +212,15 @@ export default function ReviewPanel() {
           </TouchableOpacity>
         )}
 
-        {/* Excess payment */}
         <View style={[styles.divider, { backgroundColor: c.border }]} />
-        <Text style={[styles.detailLabel, { color: c.muted }]}>EXCESS PAYMENT  (optional)</Text>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { color: c.muted }]}>{'> CA$'}</Text>
-          <TextInput
-            style={[styles.excessInput, { color: c.text, borderBottomColor: c.border }]}
-            value={excessInput}
-            onChangeText={setExcessInput}
-            placeholder="0.00"
-            placeholderTextColor={c.muted}
-            keyboardType="decimal-pad"
-            onFocus={() => TrueSheet.present('main-sheet', 2)}
-          />
+        <View style={styles.totalRow}>
+          <Text style={[styles.totalLabel, { color: c.muted }]}>TOTAL</Text>
+          <Text style={[styles.totalAmount, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
         </View>
-        <Text style={[styles.excessHint, { color: c.muted }]}>
-          Pay above the order cost. Excess mints a unique token.
-        </Text>
-        {tokenPreview && (
-          <View style={styles.tokenPreviewWrapper}>
-            <Text style={[styles.detailLabel, { color: c.muted }]}>Token preview:</Text>
-            <TokenVisual
-              tokenId={0}
-              size={tokenPreview.size}
-              color={tokenPreview.color}
-              seeds={tokenPreview.seeds}
-              irregularity={tokenPreview.irregularity}
-              width={80}
-            />
-          </View>
-        )}
+
       </ScrollView>
 
-      <View style={[styles.totalRow, { borderTopColor: c.border }]}>
-        <Text style={[styles.totalLabel, { color: c.muted }]}>TOTAL</Text>
-        <Text style={[styles.totalAmount, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
-      </View>
-
-      <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom || SPACING.md }]}>
         <TouchableOpacity
           style={[styles.payBtn, { backgroundColor: c.accent }, loading && styles.payBtnDisabled]}
           onPress={handlePay}
@@ -298,27 +260,10 @@ const styles = StyleSheet.create({
   stockAlert: { fontSize: 12, fontFamily: fonts.dmSans, color: '#FF3B30', marginTop: -4 },
   signInNudge: { marginTop: -8 },
   signInNudgeText: { fontSize: 12, fontFamily: fonts.dmSans, fontStyle: 'italic', textAlign: 'right' },
-  excessInput: {
-    fontSize: 15,
-    fontFamily: fonts.dmSans,
-    textAlign: 'right',
-    flex: 1,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 2,
-  },
-  excessHint: {
-    fontSize: 11,
-    fontFamily: fonts.dmSans,
-    marginTop: -8,
-  },
-  tokenPreviewWrapper: {
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm },
   totalLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
   totalAmount: { fontSize: 28, fontFamily: fonts.playfair },
-  footer: { paddingHorizontal: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: SPACING.md, paddingTop: 12 },
   payBtn: { borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
   payBtnDisabled: { opacity: 0.5 },
   payBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700', color: '#FFFFFF' },

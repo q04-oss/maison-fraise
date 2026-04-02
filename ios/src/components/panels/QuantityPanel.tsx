@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts } from '../../theme';
@@ -11,7 +11,6 @@ export default function QuantityPanel() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState<number>(order.quantity);
-  const [isGift, setIsGift] = useState(order.is_gift);
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -46,30 +45,15 @@ export default function QuantityPanel() {
           })}
         </View>
 
-        <TouchableOpacity
-          style={[styles.giftRow, { backgroundColor: c.card, borderColor: c.border }]}
-          onPress={() => setIsGift(v => !v)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.giftLeft}>
-            <Text style={[styles.giftLabel, { color: c.text }]}>This is a gift</Text>
-            <Text style={[styles.giftSub, { color: c.muted }]}>We'll add a note card</Text>
-          </View>
-          <Switch
-            value={isGift}
-            onValueChange={setIsGift}
-            trackColor={{ true: c.accent }}
-            thumbColor="#FFFFFF"
-          />
-        </TouchableOpacity>
+
       </View>
 
       <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
         <TouchableOpacity
           style={[styles.cta, { backgroundColor: c.accent }]}
           onPress={() => {
-            setOrder({ quantity: selected, is_gift: isGift, ...(!isGift && { gift_note: null }) });
-            showPanel(isGift ? 'gift-note' : 'when');
+            setOrder({ quantity: selected, is_gift: false, gift_note: null });
+            showPanel('when');
           }}
           activeOpacity={0.8}
         >
@@ -102,17 +86,6 @@ const styles = StyleSheet.create({
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   radioDot: { width: 10, height: 10, borderRadius: 5 },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: SPACING.md },
-  giftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  giftLeft: { flex: 1, gap: 2 },
-  giftLabel: { fontSize: 15, fontFamily: fonts.playfair },
-  giftSub: { fontSize: 12, fontFamily: fonts.dmSans },
   footer: { padding: SPACING.md, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
   cta: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   ctaText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700', color: '#FFFFFF' },

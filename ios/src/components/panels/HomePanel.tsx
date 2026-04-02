@@ -46,7 +46,6 @@ export default function HomePanel() {
     }
     return false;
   });
-  const singleLocation = locations.length === 1;
 
   const todayLabel = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
   const month = now.getMonth() + 1;
@@ -58,11 +57,8 @@ export default function HomePanel() {
   useEffect(() => {
     if (activeLocation) {
       setExpandedId(activeLocation.id);
-    } else {
-      const first = locations.find((b: any) => b.type === 'collection');
-      if (first) setExpandedId(first.id);
     }
-  }, [activeLocation?.id, businesses.length]);
+  }, [activeLocation?.id]);
 
   const loadVarieties = () => {
     if (hasFetched.current || varieties.length > 0) { setLoading(false); return; }
@@ -188,7 +184,7 @@ export default function HomePanel() {
             <Text style={[styles.emptyText, { color: c.muted, marginTop: 40 }]}>Select a location above.</Text>
           )}
           {locations.map((biz: any) => {
-            const isExpanded = singleLocation || expandedId === biz.id;
+            const isExpanded = expandedId === biz.id;
             const isPopup = biz.type === 'popup';
             const popupDate = isPopup && biz.launched_at
               ? (biz.hours ?? new Date(biz.launched_at).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }))
@@ -196,39 +192,23 @@ export default function HomePanel() {
 
             return (
               <View key={biz.id}>
-                {singleLocation ? (
-                  // Single location: non-interactive label row
-                  <View style={[styles.locationRow, styles.locationRowExpanded, { borderBottomColor: c.border }]}>
-                    <View style={styles.locationMain}>
-                      {isPopup && <Text style={[styles.popupBadge, { color: '#C0392B' }]}>POPUP</Text>}
-                      <Text style={[styles.locationName, { color: c.text }]}>{biz.name}</Text>
-                      {popupDate && <Text style={[styles.locationDate, { color: c.muted }]}>{popupDate}</Text>}
-                      {!!(biz as any).season_patron_handle && (
-                        <Text style={[styles.seasonPatronLine, { color: c.muted }]}>
-                          {`Season patron: @${(biz as any).season_patron_handle}`}
-                        </Text>
-                      )}
-                    </View>
+                <TouchableOpacity
+                  style={[styles.locationRow, { borderBottomColor: c.border }, isExpanded && styles.locationRowExpanded]}
+                  onPress={() => handleLocationToggle(biz)}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.locationMain}>
+                    {isPopup && <Text style={[styles.popupBadge, { color: '#C0392B' }]}>POPUP</Text>}
+                    <Text style={[styles.locationName, { color: c.text }]}>{biz.name}</Text>
+                    {popupDate && <Text style={[styles.locationDate, { color: c.muted }]}>{popupDate}</Text>}
+                    {!!(biz as any).season_patron_handle && (
+                      <Text style={[styles.seasonPatronLine, { color: c.muted }]}>
+                        {`Season patron: @${(biz as any).season_patron_handle}`}
+                      </Text>
+                    )}
                   </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.locationRow, { borderBottomColor: c.border }, isExpanded && styles.locationRowExpanded]}
-                    onPress={() => handleLocationToggle(biz)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={styles.locationMain}>
-                      {isPopup && <Text style={[styles.popupBadge, { color: '#C0392B' }]}>POPUP</Text>}
-                      <Text style={[styles.locationName, { color: c.text }]}>{biz.name}</Text>
-                      {popupDate && <Text style={[styles.locationDate, { color: c.muted }]}>{popupDate}</Text>}
-                      {!!(biz as any).season_patron_handle && (
-                        <Text style={[styles.seasonPatronLine, { color: c.muted }]}>
-                          {`Season patron: @${(biz as any).season_patron_handle}`}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={[styles.locationChevron, { color: c.muted }, isExpanded && styles.locationChevronOpen]}>›</Text>
-                  </TouchableOpacity>
-                )}
+                  <Text style={[styles.locationChevron, { color: c.muted }, isExpanded && styles.locationChevronOpen]}>›</Text>
+                </TouchableOpacity>
 
                 {isExpanded && (
                   <View style={[styles.varietyBlock, { borderBottomColor: c.border }]}>
