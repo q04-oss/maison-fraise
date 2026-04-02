@@ -13,6 +13,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_REVIEW_PIN": "4567",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51RcAlhKvPGIzTFOSIwpTd366LMTyCK7zCmQoWQ2xO48VFGOffz3BruPlGIe9bRq3ofUKuuV2pGwDBGSOswgsdyx600f0gkO722",
