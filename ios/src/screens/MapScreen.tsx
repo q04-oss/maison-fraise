@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated } from 'react-native';
-import MapView, { Marker, UserLocationChangeEvent } from 'react-native-maps';
+import MapView, { Callout, Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -408,6 +408,17 @@ export default function MapScreen() {
             <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]}>
               <View style={styles.pinCollectionDot} />
             </View>
+            <Callout tooltip>
+              <View style={[styles.callout, { backgroundColor: c.card }]}>
+                <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
+                {!!b.address && (
+                  <Text style={[styles.calloutAddress, { color: c.muted }]}>{b.address}</Text>
+                )}
+                {!!b.hours && (
+                  <Text style={[styles.calloutHours, { color: c.muted }]}>{b.hours}</Text>
+                )}
+              </View>
+            </Callout>
           </Marker>
         ))}
 
@@ -491,6 +502,17 @@ export default function MapScreen() {
                 <View style={styles.pinPlacedDot} />
               )}
             </View>
+            <Callout tooltip>
+              <View style={[styles.callout, { backgroundColor: c.card }]}>
+                <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
+                {!!b.address && (
+                  <Text style={[styles.calloutAddress, { color: c.muted }]}>{b.address}</Text>
+                )}
+                {!!b.hours && (
+                  <Text style={[styles.calloutHours, { color: c.muted }]}>{b.hours}</Text>
+                )}
+              </View>
+            </Callout>
           </Marker>
         ))}
       </MapView>
@@ -675,6 +697,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   bizErrorText: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
+  callout: {
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    minWidth: 140,
+    maxWidth: 220,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 5,
+    gap: 3,
+  },
+  calloutName: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  calloutAddress: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  calloutHours: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
   filterBar: { position: 'absolute', left: SPACING.md ?? 16, flexDirection: 'row', gap: 8, zIndex: 10 },
   filterPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
   filterPillText: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1 },
