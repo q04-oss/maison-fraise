@@ -6,7 +6,7 @@ import { stripe } from '../lib/stripe';
 import { db } from '../db';
 import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
-import { sendRsvpConfirmed, sendOrderConfirmation } from '../lib/resend';
+import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -40,6 +40,18 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       // New order flow — PI created by POST /api/orders/payment-intent (no pre-created order row)
       if (!type && pi.metadata?.variety_id && pi.metadata?.customer_email) {
+        // Idempotency check — skip if order already created for this payment intent
+        const existing = await db
+          .select({ id: orders.id })
+          .from(orders)
+          .where(eq(orders.payment_intent_id, pi.id))
+          .limit(1);
+        if (existing.length > 0) {
+          logger.info('Duplicate webhook, skipping');
+          res.json({ received: true });
+          return;
+        }
+
         const variety_id = parseInt(pi.metadata.variety_id, 10);
         const quantity = parseInt(pi.metadata.quantity, 10);
         const location_id = parseInt(pi.metadata.location_id, 10);
@@ -72,6 +84,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
             is_gift,
             total_cents: pi.amount,
             stripe_payment_intent_id: pi.id,
+            payment_intent_id: pi.id,
             status: 'paid',
             customer_email,
             gift_note,
@@ -100,6 +113,26 @@ router.post('/webhook', async (req: Request, res: Response) => {
             }).catch(() => {});
           }
         }).catch(() => {});
+
+        // Gift recipient push notification (fire-and-forget)
+        if (is_gift && pi.metadata.gift_recipient_id) {
+          const gift_recipient_id = parseInt(pi.metadata.gift_recipient_id, 10);
+          if (!isNaN(gift_recipient_id)) {
+            db.select({ push_token: users.push_token })
+              .from(users)
+              .where(eq(users.id, gift_recipient_id))
+              .then(([recipient]) => {
+                if (recipient?.push_token) {
+                  sendPushNotification(recipient.push_token, {
+                    title: 'You have a gift order from Maison Fraise 🍓',
+                    body: gift_note ?? 'Someone sent you a gift.',
+                    data: { order_id: newOrder.id },
+                  }).catch(() => {});
+                }
+              })
+              .catch(() => {});
+          }
+        }
 
       } else if (!type || type === 'order') {
         // Legacy order flow
@@ -162,13 +195,21 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const contracted_user_id = parseInt(pi.metadata?.contracted_user_id ?? '', 10);
         const amount = pi.amount;
         if (!isNaN(contracted_user_id)) {
-          const [user] = await db.select({ push_token: users.push_token })
+          const [tipUser] = await db.select({ push_token: users.push_token, email: users.email })
             .from(users).where(eq(users.id, contracted_user_id));
-          if (user?.push_token) {
-            sendPushNotification(user.push_token, {
+          if (tipUser?.push_token) {
+            sendPushNotification(tipUser.push_token, {
               title: 'You received a tip',
               body: `CA$${(amount / 100).toFixed(2)} — thank you!`,
               data: { screen: 'home' },
+            }).catch(() => {});
+          }
+          if (tipUser?.email) {
+            sendTipReceived({
+              to: tipUser.email,
+              amount_cents: amount,
+              popup_name: pi.metadata?.popup_name ?? 'a popup',
+              tipper_name: pi.metadata?.tipper_name,
             }).catch(() => {});
           }
         }

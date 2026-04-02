@@ -283,6 +283,33 @@ export async function sendDailySummary(to: string, params: {
   });
 }
 
+export async function sendTipReceived(params: {
+  to: string;
+  amount_cents: number;
+  popup_name: string;
+  tipper_name?: string;
+}) {
+  const { to, amount_cents, popup_name, tipper_name } = params;
+  const amount = (amount_cents / 100).toFixed(2);
+  const content = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      ${row('Amount', `CA$${amount}`)}
+      ${row('Popup', popup_name)}
+      ${tipper_name ? row('From', tipper_name) : ''}
+    </table>
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      Thank you for your presence at Maison Fraise.
+    </p>
+  `;
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: REPLY_TO,
+    subject: 'You received a tip',
+    html: baseTemplate(content, `You received a CA$${amount} tip.`),
+  });
+}
+
 export async function sendRsvpConfirmed(params: {
   to: string;
   popupName: string;

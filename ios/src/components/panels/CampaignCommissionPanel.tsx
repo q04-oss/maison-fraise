@@ -8,12 +8,12 @@ import { useStripe } from '@stripe/stripe-react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
-import { fetchNominationLeaderboard, createCampaignCommission } from '../../lib/api';
+import { fetchNominationLeaderboard, createCampaignCommission, createCampaignCommissionIntent } from '../../lib/api';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
 export default function CampaignCommissionPanel() {
-  const { goHome, activeLocation } = usePanel();
+  const { goHome, activeLocation, panelData } = usePanel();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -24,6 +24,10 @@ export default function CampaignCommissionPanel() {
   const [loading, setLoading] = useState(true);
   const [commissioning, setCommissioning] = useState(false);
   const [commissioned, setCommissioned] = useState(false);
+
+  // Amount-based commission flow (from panelData)
+  const amountCents: number | undefined = panelData?.amount_cents;
+  const campaignName: string | undefined = panelData?.campaign_name;
 
   const biz = activeLocation;
 
@@ -53,6 +57,35 @@ export default function CampaignCommissionPanel() {
       else next.add(id);
       return next;
     });
+  };
+
+  const handlePayCommission = async () => {
+    if (!userDbId || !amountCents || !campaignName) return;
+    setCommissioning(true);
+    try {
+      const { client_secret } = await createCampaignCommissionIntent({
+        amount_cents: amountCents,
+        campaign_name: campaignName,
+        user_id: userDbId,
+      });
+      const { error: initError } = await initPaymentSheet({
+        merchantDisplayName: 'Maison Fraise',
+        paymentIntentClientSecret: client_secret,
+        appearance: { colors: { primary: '#8B4513' } },
+      });
+      if (initError) throw new Error(initError.message);
+      const { error: payError } = await presentPaymentSheet();
+      if (payError) {
+        if (payError.code !== 'Canceled') Alert.alert('Payment failed', payError.message);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setCommissioned(true);
+    } catch (err: any) {
+      Alert.alert('Could not process payment', err.message ?? 'Try again.');
+    } finally {
+      setCommissioning(false);
+    }
   };
 
   const handleCommission = async () => {
@@ -87,6 +120,62 @@ export default function CampaignCommissionPanel() {
       setCommissioning(false);
     }
   };
+
+  // Amount-based commission payment UI
+  if (amountCents !== undefined && campaignName !== undefined) {
+    const amountDisplay = `CA$${(amountCents / 100).toFixed(2)}`;
+    if (commissioned) {
+      return (
+        <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+          <View style={styles.centeredBody}>
+            <Text style={[styles.successKanji, { color: c.border }]}>肖</Text>
+            <Text style={[styles.successTitle, { color: c.text }]}>Commission paid. Thank you.</Text>
+            <TouchableOpacity
+              style={[styles.successBtn, { borderColor: c.border }]}
+              onPress={goHome}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.successBtnText, { color: c.accent }]}>Back to home</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+        <View style={[styles.header, { borderBottomColor: c.border }]}>
+          <View style={styles.headerSpacer} />
+          <View style={styles.headerCenter}>
+            <Text style={[styles.title, { color: c.text }]}>Campaign Commission</Text>
+            <Text style={[styles.subtitle, { color: c.muted }]}>{campaignName}</Text>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
+        <View style={[styles.block, { borderBottomColor: c.border }]}>
+          <Text style={[styles.blockText, { color: c.muted }]}>
+            Pay your agreed commission for this campaign.
+          </Text>
+        </View>
+        <View style={[styles.amountRow, { borderBottomColor: c.border }]}>
+          <Text style={[styles.amountLabel, { color: c.muted }]}>AMOUNT DUE</Text>
+          <Text style={[styles.amountValue, { color: c.text }]}>{amountDisplay}</Text>
+        </View>
+        <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
+          <TouchableOpacity
+            style={[styles.cta, { backgroundColor: c.accent }]}
+            onPress={handlePayCommission}
+            disabled={commissioning || !userDbId}
+            activeOpacity={0.8}
+          >
+            {commissioning
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={[styles.ctaText, { color: '#fff' }]}>Pay {amountDisplay}</Text>
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   if (!biz) return null;
 
@@ -252,6 +341,14 @@ const styles = StyleSheet.create({
   cta: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   ctaText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
   ctaHint: { fontSize: 11, fontFamily: fonts.dmSans, textAlign: 'center', lineHeight: 16 },
+  amountRow: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  amountLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+  amountValue: { fontSize: 32, fontFamily: fonts.playfair },
   centeredBody: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
     padding: SPACING.lg, gap: SPACING.md,

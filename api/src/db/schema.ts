@@ -123,6 +123,7 @@ export const orders = pgTable('orders', {
   nfc_token: text('nfc_token').unique(),
   nfc_token_used: boolean('nfc_token_used').notNull().default(false),
   nfc_verified_at: timestamp('nfc_verified_at'),
+  payment_intent_id: text('payment_intent_id'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

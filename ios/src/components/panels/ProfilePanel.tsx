@@ -8,7 +8,8 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useApp } from '../../../App';
 import { usePanel } from '../../context/PanelContext';
 import {
-  signInWithApple, fetchStandingOrders, updateStandingOrder,
+  signInWithApple, verifyAppleSignIn, setAuthToken,
+  fetchStandingOrders, updateStandingOrder,
   cancelStandingOrder, fetchOrdersByEmail,
   fetchUserPopupRsvps, fetchDjGigs, fetchDjAllocations, registerAsDj,
   fetchHostedPopups, fetchActiveContract, fetchFollowerCount, logMemberVisit,
@@ -100,26 +101,47 @@ export default function ProfilePanel() {
         ],
       });
       if (!credential.identityToken) throw new Error('No identity token received.');
-      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
-        .filter(Boolean).join(' ') || null;
-      const result = await signInWithApple(credential.identityToken, pushToken, fullName);
-      await AsyncStorage.setItem('user_db_id', String(result.user_db_id));
-      await AsyncStorage.setItem('user_email', result.email);
-      setUserEmail(result.email);
-      setUserDbId(result.user_db_id);
-      fetchAuthToken(result.user_db_id).catch(() => {});
-      fetchStandingOrders(result.user_db_id).then(setStandingOrders).catch(() => {});
-      fetchOrdersByEmail(result.email)
-        .then((orders: any[]) => {
-          const paid = orders
-            .filter((o: any) => o.status === 'paid' || o.status === 'confirmed')
-            .sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
-          setRecentOrders(paid.slice(0, 3));
-        })
-        .catch(() => {});
+
+      // Primary flow: verify identity token with backend
+      const result = await verifyAppleSignIn({
+        identityToken: credential.identityToken,
+        firstName: credential.fullName?.givenName ?? undefined,
+        lastName: credential.fullName?.familyName ?? undefined,
+        email: credential.email ?? undefined,
+      });
+
+      await AsyncStorage.setItem('user_db_id', String(result.user_id));
+      await setAuthToken(result.token);
+
+      setUserDbId(result.user_id);
+
+      // Email: Apple only sends it on first sign-in; persist if present
+      const emailToUse = credential.email ?? (await AsyncStorage.getItem('user_email'));
+      if (credential.email) {
+        await AsyncStorage.setItem('user_email', credential.email);
+      }
+      if (emailToUse) {
+        setUserEmail(emailToUse);
+        fetchOrdersByEmail(emailToUse)
+          .then((orders: any[]) => {
+            const paid = orders
+              .filter((o: any) => o.status === 'paid' || o.status === 'confirmed')
+              .sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
+            setRecentOrders(paid.slice(0, 3));
+          })
+          .catch(() => {});
+      }
+
+      fetchStandingOrders(result.user_id).then(setStandingOrders).catch(() => {});
+
+      // Update push token after sign-in
+      if (pushToken) {
+        const { updatePushToken } = await import('../../lib/api');
+        updatePushToken(result.user_id, pushToken).catch(() => {});
+      }
     } catch (err: any) {
       if (err.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Sign in failed', err.message ?? 'Please try again.');
+        Alert.alert('Sign in failed. Please try again.');
       }
     } finally {
       setSigningIn(false);

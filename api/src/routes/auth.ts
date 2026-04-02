@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { createPublicKey, createVerify } from 'crypto';
+import appleSignin from 'apple-signin-auth';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
@@ -7,104 +7,67 @@ import { logger } from '../lib/logger';
 import { signToken } from '../lib/auth';
 
 const router = Router();
-const APPLE_BUNDLE_ID = 'com.maisonfraise.app';
 
-interface AppleJWK {
-  kid: string;
-  kty: string;
-  use: string;
-  alg: string;
-  n: string;
-  e: string;
-}
-
-// Verify Apple identity token using Apple's JWKS — no extra dependencies
-async function verifyAppleToken(identityToken: string): Promise<{ sub: string; email?: string }> {
-  const parts = identityToken.split('.');
-  if (parts.length !== 3) throw new Error('Invalid token format');
-  const [headerB64, payloadB64, signatureB64] = parts;
-
-  const header = JSON.parse(Buffer.from(headerB64, 'base64url').toString('utf-8'));
-
-  const jwksRes = await fetch('https://appleid.apple.com/auth/keys');
-  if (!jwksRes.ok) throw new Error('Failed to fetch Apple public keys');
-  const { keys } = await jwksRes.json() as { keys: AppleJWK[] };
-
-  const jwk = keys.find(k => k.kid === header.kid);
-  if (!jwk) throw new Error('Matching Apple public key not found');
-
-  const publicKey = createPublicKey({ key: jwk as any, format: 'jwk' });
-  const pem = publicKey.export({ type: 'spki', format: 'pem' }) as string;
-
-  const verifier = createVerify('RSA-SHA256');
-  verifier.update(`${headerB64}.${payloadB64}`);
-  const isValid = verifier.verify(pem, signatureB64, 'base64url');
-  if (!isValid) throw new Error('Invalid Apple token signature');
-
-  const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
-
-  if (payload.iss !== 'https://appleid.apple.com') throw new Error('Invalid issuer');
-  if (payload.aud !== APPLE_BUNDLE_ID) throw new Error('Invalid audience');
-  if (payload.exp < Math.floor(Date.now() / 1000)) throw new Error('Token expired');
-
-  return { sub: payload.sub as string, email: payload.email as string | undefined };
-}
-
-// POST /api/auth/apple
-// Body: { identity_token: string, push_token?: string }
-// Returns: { user_db_id: number, email: string }
-router.post('/apple', async (req: Request, res: Response) => {
-  const { identity_token, push_token, display_name } = req.body;
-  if (!identity_token) {
-    res.status(400).json({ error: 'identity_token is required' });
+async function handleAppleSignIn(req: Request, res: Response) {
+  const { identityToken, firstName, lastName, email: bodyEmail } = req.body;
+  if (!identityToken) {
+    res.status(400).json({ error: 'identityToken is required' });
     return;
   }
 
   try {
-    const { sub: appleUserId, email } = await verifyAppleToken(identity_token);
+    const payload = await appleSignin.verifyIdToken(identityToken, {
+      audience: process.env.APPLE_CLIENT_ID ?? 'com.maisonfraise.app',
+      ignoreExpiration: false,
+    });
+    const appleId = payload.sub;
+    const appleEmail = payload.email || bodyEmail;
+    const displayName = firstName || lastName
+      ? [firstName, lastName].filter(Boolean).join(' ')
+      : undefined;
 
-    const pushUpdate = push_token ? { push_token } : {};
-    const nameUpdate = display_name ? { display_name } : {};
-
-    // 1. Look up by apple_user_id first
-    const [byApple] = await db.select().from(users).where(eq(users.apple_user_id, appleUserId));
+    // 1. Look up by apple_user_id
+    const [byApple] = await db.select().from(users).where(eq(users.apple_user_id, appleId));
     if (byApple) {
-      const updates: Record<string, any> = {};
-      if (push_token && byApple.push_token !== push_token) updates.push_token = push_token;
-      if (display_name && !byApple.display_name) updates.display_name = display_name;
-      if (Object.keys(updates).length) await db.update(users).set(updates).where(eq(users.id, byApple.id));
-      res.json({ user_db_id: byApple.id, email: byApple.email });
+      const token = signToken(byApple.id);
+      res.json({ user_id: byApple.id, token, is_new: false });
       return;
     }
 
-    // 2. If email available, try to link to an existing account created via order
-    if (email) {
-      const [byEmail] = await db.select().from(users).where(eq(users.email, email));
+    // 2. If email available, try to link to an existing account
+    if (appleEmail) {
+      const [byEmail] = await db.select().from(users).where(eq(users.email, appleEmail));
       if (byEmail) {
-        const [linked] = await db
-          .update(users)
-          .set({ apple_user_id: appleUserId, ...pushUpdate, ...nameUpdate })
-          .where(eq(users.id, byEmail.id))
-          .returning();
-        res.json({ user_db_id: linked.id, email: linked.email });
+        await db.update(users).set({ apple_user_id: appleId }).where(eq(users.id, byEmail.id));
+        const token = signToken(byEmail.id);
+        res.json({ user_id: byEmail.id, token, is_new: false });
         return;
       }
 
       // 3. Brand new user — create account
       const [created] = await db
         .insert(users)
-        .values({ email, apple_user_id: appleUserId, ...pushUpdate, ...nameUpdate })
+        .values({
+          email: appleEmail,
+          apple_user_id: appleId,
+          ...(displayName ? { display_name: displayName } : {}),
+        })
         .returning();
-      res.json({ user_db_id: created.id, email: created.email });
+      const token = signToken(created.id);
+      res.json({ user_id: created.id, token, is_new: true });
       return;
     }
 
-    res.status(404).json({ error: 'Account not found. Place an order first so we can link your Apple ID.' });
+    res.status(404).json({ error: 'Account not found and no email provided.' });
   } catch (err: unknown) {
     logger.error('Apple auth error', err);
     res.status(401).json({ error: err instanceof Error ? err.message : 'Authentication failed' });
   }
-});
+}
+
+// POST /api/auth/apple and /api/auth/apple/verify (alias) — both accepted by iOS
+router.post('/apple', handleAppleSignIn);
+router.post('/apple/verify', handleAppleSignIn);
 
 // POST /api/auth/token — issue a JWT for a given user_id (verifies user exists)
 router.post('/token', async (req: Request, res: Response) => {

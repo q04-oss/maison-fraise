@@ -697,3 +697,32 @@ export async function searchAll(q: string): Promise<{ users: any[]; popups: any[
   if (!r.ok) return { users: [], popups: [], varieties: [] };
   return r.json();
 }
+
+export async function verifyAppleSignIn(params: {
+  identityToken: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}): Promise<{ user_id: number; token: string; is_new: boolean }> {
+  const r = await fetch(`${BASE_URL}/api/auth/apple/verify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!r.ok) throw new Error('apple_auth_failed');
+  return r.json();
+}
+
+export async function createCampaignCommissionIntent(params: {
+  amount_cents: number;
+  campaign_name: string;
+  user_id: number;
+}): Promise<{ client_secret: string }> {
+  const r = await fetch(`${BASE_URL}/api/campaign-commissions/payment-intent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!r.ok) throw new Error('commission_intent_failed');
+  return r.json();
+}

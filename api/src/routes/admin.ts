@@ -6,6 +6,7 @@ import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
 import { randomUUID } from 'crypto';
+import { stripe } from '../lib/stripe';
 
 const router = Router();
 
@@ -19,6 +20,22 @@ function requirePin(req: Request, res: Response, next: NextFunction): void {
   }
   next();
 }
+
+// POST /api/admin/campaign-commission/payment-intent — public, no PIN required
+router.post('/campaign-commission/payment-intent', async (req: Request, res: Response) => {
+  const { amount_cents, campaign_name, user_id } = req.body;
+  if (!amount_cents || !campaign_name) { res.status(400).json({ error: 'missing_fields' }); return; }
+  try {
+    const pi = await stripe.paymentIntents.create({
+      amount: amount_cents,
+      currency: 'cad',
+      metadata: { type: 'campaign_commission', campaign_name, user_id: String(user_id ?? '') },
+    });
+    res.json({ client_secret: pi.client_secret });
+  } catch (e) {
+    res.status(500).json({ error: 'stripe_error' });
+  }
+});
 
 router.use(requirePin);
 
@@ -775,6 +792,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
 
     await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS location_id integer REFERENCES locations(id)`);
     await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS image_url TEXT`);
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_intent_id TEXT`);
 
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {
@@ -1174,6 +1192,86 @@ router.get('/popups/:id/rsvps', async (req: Request, res: Response) => {
       .orderBy(popupRsvps.created_at);
 
     res.json(rows.map(r => ({ ...r, display_name: r.display_name ?? r.email.split('@')[0] })));
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/revenue/daily — daily order counts and totals for the last N days
+router.get('/revenue/daily', async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(parseInt(String(req.query.days ?? '14'), 10) || 14, 90);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const PAID_STATUSES: Array<'paid' | 'preparing' | 'ready' | 'collected'> = ['paid', 'preparing', 'ready', 'collected'];
+
+    const rows = await db
+      .select({
+        date: sql<string>`date(${orders.created_at})`,
+        order_count: sql<number>`cast(count(*) as int)`,
+        total_cents: sql<number>`cast(coalesce(sum(${orders.total_cents}),0) as int)`,
+      })
+      .from(orders)
+      .where(and(inArray(orders.status, PAID_STATUSES), gte(orders.created_at, since)))
+      .groupBy(sql`date(${orders.created_at})`)
+      .orderBy(sql`date(${orders.created_at})`);
+
+    // Build a full date array so every day is represented
+    const result: { date: string; order_count: number; total_cents: number }[] = [];
+    const rowMap = new Map(rows.map(r => [r.date, r]));
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = d.toISOString().slice(0, 10);
+      const row = rowMap.get(key);
+      result.push({ date: key, order_count: row?.order_count ?? 0, total_cents: row?.total_cents ?? 0 });
+    }
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/customers/export — export customers with orders as CSV
+router.get('/customers/export', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.execute<{
+      email: string;
+      display_name: string | null;
+      order_count: number;
+      total_spent_cents: number;
+      first_order_date: string;
+    }>(sql`
+      SELECT
+        u.email,
+        u.display_name,
+        COUNT(o.id)::int AS order_count,
+        COALESCE(SUM(o.total_cents), 0)::int AS total_spent_cents,
+        MIN(o.created_at)::date::text AS first_order_date
+      FROM users u
+      INNER JOIN orders o ON o.customer_email = u.email
+      GROUP BY u.id, u.email, u.display_name
+      HAVING COUNT(o.id) > 0
+      ORDER BY u.email ASC
+    `);
+
+    const escape = (v: string | null | undefined) =>
+      `"${(v ?? '').replace(/"/g, '""')}"`;
+
+    const header = 'email,display_name,order_count,total_spent_cents,first_order_date';
+    const lines = rows.map(r =>
+      [
+        escape(r.email),
+        escape(r.display_name),
+        String(r.order_count),
+        String(r.total_spent_cents),
+        escape(r.first_order_date),
+      ].join(',')
+    );
+
+    const csv = [header, ...lines].join('\n');
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="customers.csv"');
+    res.send(csv);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
