@@ -13,6 +13,7 @@
   "dependencies": {
     "@sentry/node": "^10.47.0",
     "apple-signin-auth": "^2.0.0",
+    "cloudinary": "^2.9.0",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.38.3",
     "express": "^4.21.2",

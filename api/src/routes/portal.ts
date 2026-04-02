@@ -1,18 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, gt, desc, asc, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { explicitPortals, portalAccess, portalContent, users, memberships } from '../db/schema';
+import { explicitPortals, portalAccess, portalContent, portalConsents, users, memberships } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
 import { calculateCut } from '../lib/portal';
 
 const router = Router();
 
-// POST /api/portal/opt-in
-router.post('/opt-in', requireUser, async (req: Request, res: Response) => {
-  const userId: number = (req as any).userId;
-
+// Shared opt-in logic
+async function performOptIn(userId: number, ipAddress: string | undefined, res: Response): Promise<void> {
   try {
+    // Upsert consent record
+    await db.execute(sql`
+      INSERT INTO portal_consents (user_id, ip_address)
+      VALUES (${userId}, ${ipAddress ?? null})
+      ON CONFLICT (user_id) DO UPDATE SET consented_at = now(), ip_address = ${ipAddress ?? null}
+    `);
+
+    // Upsert explicit_portals
     await db.execute(sql`
       INSERT INTO explicit_portals (user_id, opted_in)
       VALUES (${userId}, true)
@@ -21,10 +27,28 @@ router.post('/opt-in', requireUser, async (req: Request, res: Response) => {
 
     await db.update(users).set({ portal_opted_in: true }).where(eq(users.id, userId));
 
-    res.json({ ok: true });
+    const [consent] = await db.select({ consented_at: portalConsents.consented_at }).from(portalConsents).where(eq(portalConsents.user_id, userId)).limit(1);
+    res.json({ ok: true, consented_at: consent?.consented_at ?? new Date() });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
   }
+}
+
+// POST /api/portal/consent — canonical opt-in path with consent record
+router.post('/consent', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  const { confirmed } = req.body;
+  if (confirmed !== true) {
+    res.status(400).json({ error: 'confirmed must be true' });
+    return;
+  }
+  await performOptIn(userId, req.ip, res);
+});
+
+// POST /api/portal/opt-in — alias for /consent (kept for backwards compat)
+router.post('/opt-in', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  await performOptIn(userId, req.ip, res);
 });
 
 // POST /api/portal/request-access/:ownerId

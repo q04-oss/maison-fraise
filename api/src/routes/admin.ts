@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and, lte, sum, gte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -39,9 +39,10 @@ router.post('/campaign-commission/payment-intent', async (req: Request, res: Res
 
 router.use(requirePin);
 
-// GET /api/admin/orders — all orders enriched with variety name and slot time
+// GET /api/admin/orders — all orders enriched with variety name, slot time, and worker info
 router.get('/orders', async (_req: Request, res: Response) => {
   try {
+    const workerAlias = { display_name: users.display_name, portal_opted_in: users.portal_opted_in };
     const rows = await db
       .select({
         id: orders.id,
@@ -61,11 +62,15 @@ router.get('/orders', async (_req: Request, res: Response) => {
         customer_email: orders.customer_email,
         rating: orders.rating,
         rating_note: orders.rating_note,
+        worker_id: orders.worker_id,
+        worker_display_name: users.display_name,
+        worker_portal_opted_in: users.portal_opted_in,
         created_at: orders.created_at,
       })
       .from(orders)
       .leftJoin(varieties, eq(orders.variety_id, varieties.id))
       .leftJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
+      .leftJoin(users, eq(orders.worker_id, users.id))
       .orderBy(orders.created_at);
     res.json(rows);
   } catch (err) {
@@ -149,6 +154,21 @@ router.patch('/orders/:id/status', async (req: Request, res: Response) => {
     }
 
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/orders/:id/worker — assign a worker to an order
+router.patch('/orders/:id/worker', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid order id' }); return; }
+  const { worker_id } = req.body;
+  if (typeof worker_id !== 'number') { res.status(400).json({ error: 'worker_id must be a number' }); return; }
+  try {
+    const [updated] = await db.update(orders).set({ worker_id }).where(eq(orders.id, id)).returning();
+    if (!updated) { res.status(404).json({ error: 'Order not found' }); return; }
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -743,6 +763,41 @@ router.get('/portraits', async (req: Request, res: Response) => {
   }
 });
 
+// PATCH /api/admin/users/:userId/portrait
+router.patch('/users/:userId/portrait', async (req: Request, res: Response) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: 'Invalid userId' }); return; }
+  const { portrait_url } = req.body;
+  if (!portrait_url || typeof portrait_url !== 'string') {
+    res.status(400).json({ error: 'portrait_url is required' });
+    return;
+  }
+  try {
+    const [updated] = await db.update(users).set({ portrait_url }).where(eq(users.id, userId)).returning();
+    if (!updated) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/users/:userId/ban
+router.post('/users/:userId/ban', async (req: Request, res: Response) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: 'Invalid userId' }); return; }
+  const { reason } = req.body;
+  try {
+    const [updated] = await db.update(users)
+      .set({ banned: true, ban_reason: reason ?? null })
+      .where(eq(users.id, userId))
+      .returning();
+    if (!updated) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // PATCH /api/admin/users/:id/photographed
 router.patch('/users/:id/photographed', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
@@ -908,6 +963,24 @@ router.post('/migrate', async (_req: Request, res: Response) => {
         type text NOT NULL,
         caption text,
         created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+
+    // Worker ID on orders + payment_method
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS worker_id integer REFERENCES users(id)`);
+    await db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text`);
+
+    // Banned users
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS banned boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason text`);
+
+    // Portal consents
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS portal_consents (
+        id serial PRIMARY KEY,
+        user_id integer NOT NULL REFERENCES users(id) UNIQUE,
+        consented_at timestamp NOT NULL DEFAULT now(),
+        ip_address text
       )
     `);
 
@@ -1604,6 +1677,42 @@ router.get('/memberships/waitlist', async (_req: Request, res: Response) => {
       .innerJoin(users, eq(membershipWaitlist.user_id, users.id))
       .orderBy(membershipWaitlist.tier, membershipWaitlist.created_at);
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/portal/content — all portal content with user info
+router.get('/portal/content', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: portalContent.id,
+        user_id: portalContent.user_id,
+        media_url: portalContent.media_url,
+        type: portalContent.type,
+        caption: portalContent.caption,
+        created_at: portalContent.created_at,
+        display_name: users.display_name,
+        portrait_url: users.portrait_url,
+      })
+      .from(portalContent)
+      .leftJoin(users, eq(portalContent.user_id, users.id))
+      .orderBy(desc(portalContent.created_at))
+      .limit(100);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/admin/portal/content/:id — delete portal content
+router.delete('/portal/content/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    await db.delete(portalContent).where(eq(portalContent.id, id));
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

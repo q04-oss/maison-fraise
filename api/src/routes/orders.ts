@@ -3,7 +3,7 @@ import { eq, sql, and, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 import { db } from '../db';
-import { orders, varieties, timeSlots, legitimacyEvents, users, referralCodes } from '../db/schema';
+import { orders, varieties, timeSlots, legitimacyEvents, users, referralCodes, locations } from '../db/schema';
 import { stripe } from '../lib/stripe';
 import { sendOrderConfirmation } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -392,6 +392,61 @@ router.post('/:id/rate', requireUser, async (req: Request, res: Response) => {
     res.json(updated);
   } catch (err) {
     logger.error('Order rating error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/orders/:id/receipt — order receipt with worker info (requireUser, own orders only)
+router.get('/:id/receipt', requireUser, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid order id' }); return; }
+  const userId = (req as any).userId as number;
+
+  try {
+    const [currentUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!currentUser) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    // Fetch order with variety and location
+    const [row] = await db
+      .select({
+        id: orders.id,
+        variety_name: varieties.name,
+        price_cents: varieties.price_cents,
+        location_name: locations.name,
+        created_at: orders.created_at,
+        nfc_token: orders.nfc_token,
+        customer_email: orders.customer_email,
+        worker_id: orders.worker_id,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .leftJoin(locations, eq(orders.location_id, locations.id))
+      .where(eq(orders.id, id))
+      .limit(1);
+
+    if (!row) { res.status(404).json({ error: 'Order not found' }); return; }
+    if (row.customer_email !== currentUser.email) { res.status(403).json({ error: 'forbidden' }); return; }
+
+    let worker: { id: number; display_name: string | null; portrait_url: string | null; portal_opted_in: boolean } | null = null;
+    if (row.worker_id !== null && row.worker_id !== undefined) {
+      const [w] = await db
+        .select({ id: users.id, display_name: users.display_name, portrait_url: users.portrait_url, portal_opted_in: users.portal_opted_in })
+        .from(users)
+        .where(eq(users.id, row.worker_id))
+        .limit(1);
+      if (w) worker = w;
+    }
+
+    res.json({
+      id: row.id,
+      variety_name: row.variety_name,
+      price_cents: row.price_cents,
+      location_name: row.location_name,
+      created_at: row.created_at,
+      nfc_token: row.nfc_token,
+      worker,
+    });
+  } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });

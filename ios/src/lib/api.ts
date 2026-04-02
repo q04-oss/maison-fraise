@@ -998,3 +998,47 @@ export async function fetchMyPortalAccess(): Promise<any[]> {
   if (!r.ok) return [];
   return r.json();
 }
+
+export async function uploadToCloudinary(base64: string, type: 'image' | 'video'): Promise<string> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ data: base64, type }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'upload_failed'); }
+  const { url } = await r.json();
+  return url as string;
+}
+
+export async function givePortalConsent(): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portal/consent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ confirmed: true }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'consent_failed'); }
+}
+
+export async function fetchOrderReceipt(orderId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/orders/${orderId}/receipt`, { headers: auth });
+  if (!r.ok) throw new Error('receipt_not_found');
+  return r.json();
+}
+
+export async function placeStandingOrderFromFund(
+  varietyId: number,
+  quantity: number,
+  locationId: number,
+): Promise<{ ok: boolean; order_id: number; new_balance_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-orders/from-fund`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ variety_id: varietyId, quantity, location_id: locationId }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'fund_order_failed'); }
+  return r.json();
+}

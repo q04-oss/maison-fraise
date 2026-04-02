@@ -6,9 +6,13 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useApp } from '../../../App';
-import { searchVerifiedUsers, generateGiftNote, createStandingOrder } from '../../lib/api';
+import { searchVerifiedUsers, generateGiftNote, createStandingOrder, placeStandingOrderFromFund, fetchMyMembership } from '../../lib/api';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
+
+function fmtCents(cents: number): string {
+  return `CA$${(cents / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const FREQUENCIES = [
   { key: 'weekly', label: 'Weekly', cycles: 52, desc: 'Every week' },
@@ -32,9 +36,13 @@ export default function StandingOrderPanel() {
     Promise.all([
       AsyncStorage.getItem('user_db_id'),
       AsyncStorage.getItem('verified'),
-    ]).then(([dbId, verified]) => {
+      fetchMyMembership().catch(() => null),
+    ]).then(([dbId, verified, membership]) => {
       if (dbId) setUserDbId(parseInt(dbId, 10));
       setIsVerified(verified === 'true');
+      if (membership?.fund?.balance_cents != null) {
+        setFundBalanceCents(membership.fund.balance_cents);
+      }
     });
   }, []);
   const [freq, setFreq] = useState('monthly');
@@ -48,6 +56,9 @@ export default function StandingOrderPanel() {
   const [noteLoading, setNoteLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [fundBalanceCents, setFundBalanceCents] = useState<number>(0);
+  const [fundNewBalance, setFundNewBalance] = useState<number | null>(null);
+  const [fundError, setFundError] = useState<string | null>(null);
 
   const selectedFreq = FREQUENCIES.find(f => f.key === freq)!;
   const priceCents = varieties.find(v => v.id === order.variety_id)?.price_cents ?? order.price_cents ?? null;
@@ -143,14 +154,55 @@ export default function StandingOrderPanel() {
     }
   };
 
+  const handleConfirmFromFund = async () => {
+    const senderId = userDbId;
+    if (!senderId || !isVerified) return;
+    if (!order.variety_id || !order.location_id) {
+      Alert.alert('Incomplete order', 'Return to the order flow and complete your selection first.');
+      return;
+    }
+    if (totalCents === null) {
+      Alert.alert('Pricing unavailable', 'Return to the order flow and reselect your variety.');
+      return;
+    }
+    setFundError(null);
+    if (fundBalanceCents < totalCents) {
+      setFundError(
+        `ERR: insufficient fund balance\n     ${fmtCents(fundBalanceCents)} available · ${fmtCents(totalCents)} required`,
+      );
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const result = await placeStandingOrderFromFund(order.variety_id!, order.quantity, order.location_id!);
+      setFundNewBalance(result.new_balance_cents);
+      setSuccess(true);
+    } catch (err: unknown) {
+      Alert.alert('Could not place order from fund', err instanceof Error ? err.message : 'Try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (success) {
     return (
       <View style={[styles.container, styles.successContainer, { backgroundColor: c.panelBg }]}>
         <Text style={[styles.successCheck, { color: c.accent }]}>✓</Text>
-        <Text style={[styles.successTitle, { color: c.text }]}>Standing order set.</Text>
-        <Text style={[styles.successSub, { color: c.muted }]}>
-          Your {freq} order starts {selectedFreq.desc.toLowerCase()}.
-        </Text>
+        {fundNewBalance !== null ? (
+          <>
+            <Text style={[styles.successTitle, { color: c.text }]}>{'OK: order placed from fund_'}</Text>
+            <Text style={[styles.successSub, { color: c.muted }]}>
+              {`new balance: ${fmtCents(fundNewBalance)}`}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={[styles.successTitle, { color: c.text }]}>Standing order set.</Text>
+            <Text style={[styles.successSub, { color: c.muted }]}>
+              Your {freq} order starts {selectedFreq.desc.toLowerCase()}.
+            </Text>
+          </>
+        )}
         <TouchableOpacity
           style={[styles.confirmBtn, { backgroundColor: c.text, marginTop: SPACING.lg, paddingHorizontal: SPACING.xl }]}
           onPress={goHome}
@@ -310,14 +362,38 @@ export default function StandingOrderPanel() {
       )}
 
       <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
-        <TouchableOpacity
-          style={[styles.confirmBtn, { backgroundColor: c.text }, (!userDbId || !isVerified || submitting) && styles.confirmBtnDisabled]}
-          onPress={handleConfirm}
-          disabled={!userDbId || !isVerified || submitting}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.confirmBtnText, { color: c.ctaText }]}>{submitting ? 'Setting up...' : 'Confirm & Pay'}</Text>
-        </TouchableOpacity>
+        {/* Payment section */}
+        <View style={[styles.paymentSection, { borderColor: c.border }]}>
+          <Text style={[styles.paymentHeader, { color: c.muted }]}>{'PAYMENT'}</Text>
+          <View style={styles.paymentSeparator} />
+
+          <TouchableOpacity
+            style={[styles.paymentOption, (!userDbId || !isVerified || submitting) && { opacity: 0.4 }]}
+            onPress={handleConfirm}
+            disabled={!userDbId || !isVerified || submitting}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.paymentOptionText, { color: c.text }]}>
+              {submitting ? 'Setting up...' : '> PAY WITH CARD_'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.paymentOption, (!userDbId || !isVerified || submitting) && { opacity: 0.4 }]}
+            onPress={handleConfirmFromFund}
+            disabled={!userDbId || !isVerified || submitting}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.paymentOptionText, { color: c.text }]}>{'> PAY FROM FUND_'}</Text>
+            <Text style={[styles.paymentOptionSub, { color: c.muted }]}>
+              {`  Fund balance: ${fmtCents(fundBalanceCents)}`}
+            </Text>
+          </TouchableOpacity>
+
+          {fundError && (
+            <Text style={[styles.fundError, { color: '#E53935' }]}>{fundError}</Text>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -371,4 +447,11 @@ const styles = StyleSheet.create({
   successCheck: { fontSize: 48, marginBottom: SPACING.md },
   successTitle: { fontSize: 32, fontFamily: fonts.playfair, marginBottom: SPACING.sm },
   successSub: { fontSize: 14, fontFamily: fonts.dmSans, textAlign: 'center' },
+  paymentSection: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: SPACING.sm, gap: 8 },
+  paymentHeader: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
+  paymentSeparator: { height: StyleSheet.hairlineWidth },
+  paymentOption: { paddingVertical: 6 },
+  paymentOptionText: { fontSize: 13, fontFamily: fonts.dmMono },
+  paymentOptionSub: { fontSize: 12, fontFamily: fonts.dmMono, marginTop: 2 },
+  fundError: { fontSize: 12, fontFamily: fonts.dmMono, lineHeight: 18, marginTop: 4 },
 });

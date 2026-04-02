@@ -40,7 +40,9 @@ export type PanelId =
   | 'nfc-tap'
   | 'portal-owner'
   | 'portal-subscriber'
-  | 'portal-upload';
+  | 'portal-upload'
+  | 'portal-consent'
+  | 'receipt';
 
 export interface OrderState {
   variety_id: number | null;

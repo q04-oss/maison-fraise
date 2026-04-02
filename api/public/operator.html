@@ -1471,16 +1471,23 @@
           const tierStyle = TIER_STYLE[m.tier] || '';
           const name = m.display_name || m.email;
           const fund = m.fund_balance != null ? `CA$${(m.fund_balance / 100).toFixed(2)}` : 'CA$0.00';
+          const portraitHtml = m.portrait_url
+            ? `<img id="member-portrait-${m.id}" src="${m.portrait_url}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border2);" />`
+            : `<div id="member-portrait-${m.id}" style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.06);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);">${(name[0]||'?').toUpperCase()}</div>`;
           return `<div class="order-card" style="flex-direction:row;align-items:center;gap:12px;flex-wrap:wrap;">
+            ${portraitHtml}
             <div class="status-badge" style="${tierStyle}">${m.tier}</div>
             <div style="flex:1;min-width:0;">
               <div class="order-email">${name}</div>
               <div class="order-id">${m.email}</div>
               <div class="order-meta">${fmtDate(m.started_at)} → ${fmtDate(m.renews_at)}</div>
             </div>
-            <div style="text-align:right;flex-shrink:0;">
-              <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--amber);">${fund}</div>
-              <div class="order-id" style="margin-top:2px;">fund</div>
+            <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--amber);">${fund}</div>
+                <div class="order-id" style="margin-top:2px;">fund</div>
+              </div>
+              <button class="action-btn" style="font-size:9px;padding:5px 10px;" onclick="openPortraitModal(${m.id}, '${name.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/</g,'&lt;')}')">Set Portrait</button>
             </div>
           </div>`;
         }).join('');
@@ -1520,6 +1527,73 @@
         <span style="font-family:DM Mono,monospace;font-size:10px;color:#555">${new Date(e.created_at).toLocaleDateString('en-CA')}</span>
       </div>
     `).join('');
+  }
+
+  // ── MEMBER PORTRAIT MODAL ────────────────────────────
+  function openPortraitModal(userId, displayName) {
+    const existing = document.getElementById('portrait-modal');
+    if (existing) existing.remove();
+    const safeName = String(displayName).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const modal = document.createElement('div');
+    modal.id = 'portrait-modal';
+    modal.className = 'modal-backdrop';
+    modal.innerHTML = `
+      <div class="modal-box" style="max-width:400px;">
+        <div class="modal-header">
+          <div class="modal-title">Set Portrait for ${safeName}</div>
+          <button class="modal-close" onclick="closePortraitModal()">×</button>
+        </div>
+        <div class="modal-body" style="gap:14px;">
+          <div class="form-row">
+            <div class="form-label">URL</div>
+            <input class="form-input" id="portrait-modal-url" type="text" placeholder="https://…" />
+          </div>
+          <div class="action-row">
+            <button class="action-btn primary" onclick="saveUserPortrait(${userId})">Save</button>
+            <button class="action-btn" onclick="closePortraitModal()">Cancel</button>
+          </div>
+          <div id="portrait-modal-result" style="font-family:'DM Mono',monospace;font-size:12px;min-height:16px;"></div>
+        </div>
+      </div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) closePortraitModal(); });
+    document.body.appendChild(modal);
+    document.getElementById('portrait-modal-url').focus();
+  }
+
+  function closePortraitModal() {
+    const modal = document.getElementById('portrait-modal');
+    if (modal) modal.remove();
+  }
+
+  async function saveUserPortrait(userId) {
+    const urlEl = document.getElementById('portrait-modal-url');
+    const resultEl = document.getElementById('portrait-modal-result');
+    const portrait_url = urlEl ? urlEl.value.trim() : '';
+    if (!portrait_url) { resultEl.style.color = '#E05A5A'; resultEl.textContent = 'URL is required.'; return; }
+    resultEl.style.color = 'var(--muted)'; resultEl.textContent = 'Saving…';
+    const res = await fetch(`${BASE}/api/admin/users/${userId}/portrait`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ portrait_url }),
+    });
+    if (res.ok) {
+      resultEl.style.color = 'rgba(80,200,120,0.9)';
+      resultEl.textContent = 'Saved';
+      // Update the portrait element in the member card if it exists
+      const portraitEl = document.getElementById(`member-portrait-${userId}`);
+      if (portraitEl) {
+        const img = document.createElement('img');
+        img.id = `member-portrait-${userId}`;
+        img.src = portrait_url;
+        img.style.cssText = 'width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:1px solid var(--border2);';
+        portraitEl.replaceWith(img);
+      }
+      setTimeout(() => closePortraitModal(), 1200);
+    } else {
+      const err = await res.json().catch(() => ({}));
+      resultEl.style.color = '#E05A5A';
+      resultEl.textContent = err.error || 'Failed.';
+    }
   }
 
   // ── CHOCOLATIER ───────────────────────────────────────
@@ -1907,9 +1981,88 @@
             </thead>
             <tbody>${tableRows}</tbody>
           </table>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;margin-bottom:8px;">
+          <div class="section-label" style="margin:0;">Portal Content</div>
+          <button class="action-btn" onclick="loadPortalContent()" style="flex-shrink:0;">Load Content</button>
+        </div>
+        <div id="portal-content-grid"></div>
+        <div class="section-label" style="margin-top:24px;">Ban User</div>
+        <div class="form-card">
+          <div class="form-grid">
+            <div class="form-row">
+              <div class="form-label">User ID</div>
+              <input class="form-input" id="ban-user-id" type="number" placeholder="User ID" />
+            </div>
+            <div class="form-row">
+              <div class="form-label">Reason (optional)</div>
+              <input class="form-input" id="ban-reason" type="text" placeholder="Reason…" />
+            </div>
+          </div>
+          <button class="action-btn danger" onclick="banPortalUser()" style="align-self:flex-start;padding:10px 24px;">Ban</button>
+          <div id="ban-result" style="font-family:'DM Mono',monospace;font-size:12px;min-height:16px;"></div>
         </div>`;
     } catch (e) {
       body.innerHTML = '<div class="empty">Could not load portal data.</div>';
+    }
+  }
+
+  async function loadPortalContent() {
+    const grid = document.getElementById('portal-content-grid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="empty">Loading…</div>';
+    const res = await fetch(`${BASE}/api/admin/portal/content`, { headers: { 'X-Admin-PIN': currentPin } });
+    if (!res.ok) { grid.innerHTML = '<div class="empty">Failed to load content.</div>'; return; }
+    const items = await res.json();
+    if (!items.length) { grid.innerHTML = '<div class="empty">No content items.</div>'; return; }
+    grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">${items.map(item => {
+      const thumb = item.type === 'video'
+        ? `<div style="width:100%;aspect-ratio:1;background:rgba(255,255,255,0.06);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:28px;">▶</div>`
+        : `<img src="${item.thumbnail_url || item.url || ''}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:rgba(255,255,255,0.04);" onerror="this.style.display='none'" />`;
+      return `<div class="order-card" id="portal-item-${item.id}" style="padding:12px;gap:8px;">
+        ${thumb}
+        <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.uploader_display_name || item.uploader_email || '—'}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);">${fmtDate(item.created_at)}</div>
+        <button class="action-btn danger" style="font-size:9px;padding:5px 10px;" onclick="removePortalContent(${item.id})">Remove</button>
+      </div>`;
+    }).join('')}</div>`;
+  }
+
+  async function removePortalContent(id) {
+    const res = await fetch(`${BASE}/api/admin/portal/content/${id}`, {
+      method: 'DELETE',
+      headers: { 'X-Admin-PIN': currentPin },
+    });
+    if (res.ok) {
+      const card = document.getElementById(`portal-item-${id}`);
+      if (card) card.remove();
+    } else {
+      alert('Failed to remove content.');
+    }
+  }
+
+  async function banPortalUser() {
+    const idEl = document.getElementById('ban-user-id');
+    const reasonEl = document.getElementById('ban-reason');
+    const resultEl = document.getElementById('ban-result');
+    const userId = parseInt(idEl ? idEl.value : '');
+    if (!userId) { resultEl.style.color = '#E05A5A'; resultEl.textContent = 'User ID is required.'; return; }
+    const reason = reasonEl ? reasonEl.value.trim() || null : null;
+    resultEl.style.color = 'var(--muted)'; resultEl.textContent = 'Banning…';
+    const res = await fetch(`${BASE}/api/admin/users/${userId}/ban`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ reason }),
+    });
+    if (res.ok) {
+      resultEl.style.color = 'rgba(80,200,120,0.9)';
+      resultEl.textContent = `User ${userId} banned.`;
+      if (idEl) idEl.value = '';
+      if (reasonEl) reasonEl.value = '';
+    } else {
+      const err = await res.json().catch(() => ({}));
+      resultEl.style.color = '#E05A5A';
+      resultEl.textContent = err.error || 'Failed.';
     }
   }
 

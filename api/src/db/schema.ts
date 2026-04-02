@@ -127,6 +127,8 @@ export const orders = pgTable('orders', {
   rating: integer('rating'),
   rating_note: text('rating_note'),
   discount_applied: boolean('discount_applied').notNull().default(false),
+  worker_id: integer('worker_id').references(() => users.id),
+  payment_method: text('payment_method'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -148,6 +150,8 @@ export const users = pgTable('users', {
   portrait_url: text('portrait_url'),
   worker_status: text('worker_status'),
   portal_opted_in: boolean('portal_opted_in').notNull().default(false),
+  banned: boolean('banned').notNull().default(false),
+  ban_reason: text('ban_reason'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -474,4 +478,11 @@ export const portalContent = pgTable('portal_content', {
   type: text('type').notNull(), // 'photo' | 'video'
   caption: text('caption'),
   created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const portalConsents = pgTable('portal_consents', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id).unique(),
+  consented_at: timestamp('consented_at').notNull().defaultNow(),
+  ip_address: text('ip_address'),
 });

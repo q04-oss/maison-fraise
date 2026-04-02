@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, Image,
-  StyleSheet, Alert, RefreshControl,
+  StyleSheet, RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
@@ -9,7 +9,6 @@ import {
   fetchMySubscribers,
   fetchPortalContent,
   fetchMyMembership,
-  optInToPortal,
 } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 
@@ -41,7 +40,6 @@ export default function PortalOwnerPanel() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [portalOptedIn, setPortalOptedIn] = useState(false);
-  const [optingIn, setOptingIn] = useState(false);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [content, setContent] = useState<any[]>([]);
   const [fundIncome, setFundIncome] = useState<number>(0);
@@ -79,18 +77,8 @@ export default function PortalOwnerPanel() {
     load();
   };
 
-  const handleOptIn = async () => {
-    if (optingIn) return;
-    setOptingIn(true);
-    try {
-      await optInToPortal();
-      setPortalOptedIn(true);
-      await load();
-    } catch (e: any) {
-      Alert.alert('ERR: could not enable portal', e.message ?? 'Please try again.');
-    } finally {
-      setOptingIn(false);
-    }
+  const handleOptIn = () => {
+    showPanel('portal-consent');
   };
 
   const numColumns = 3;
@@ -128,10 +116,9 @@ export default function PortalOwnerPanel() {
               style={styles.actionLine}
               onPress={handleOptIn}
               activeOpacity={0.7}
-              disabled={optingIn}
             >
               <Text style={[styles.actionText, { color: c.accent }]}>
-                {optingIn ? '> enabling_' : '> ENABLE PORTAL_'}
+                {'> ENABLE PORTAL_'}
               </Text>
             </TouchableOpacity>
           </View>

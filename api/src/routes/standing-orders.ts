@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { eq, or } from 'drizzle-orm';
+import { eq, or, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { standingOrders, users, legitimacyEvents, varieties } from '../db/schema';
+import { standingOrders, users, legitimacyEvents, varieties, orders, membershipFunds } from '../db/schema';
 import { stripe } from '../lib/stripe';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -159,6 +160,62 @@ router.delete('/:id', async (req: Request, res: Response) => {
     res.json({ cancelled: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/standing-orders/from-fund — create an order paid from the user's fund balance
+router.post('/from-fund', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  const { variety_id, quantity, location_id, time_slot_id, chocolate, finish } = req.body;
+
+  if (!variety_id || !quantity || !location_id || !time_slot_id || !chocolate || !finish) {
+    res.status(400).json({ error: 'variety_id, quantity, location_id, time_slot_id, chocolate, and finish are required' });
+    return;
+  }
+
+  try {
+    const [variety] = await db.select({ price_cents: varieties.price_cents }).from(varieties).where(eq(varieties.id, variety_id)).limit(1);
+    if (!variety) { res.status(404).json({ error: 'variety_not_found' }); return; }
+
+    const required_cents = variety.price_cents * quantity;
+
+    const [fund] = await db.select({ balance_cents: membershipFunds.balance_cents }).from(membershipFunds).where(eq(membershipFunds.user_id, userId)).limit(1);
+    const balance_cents = fund?.balance_cents ?? 0;
+
+    if (balance_cents < required_cents) {
+      res.status(400).json({ error: 'insufficient_fund_balance', balance_cents, required_cents });
+      return;
+    }
+
+    // Deduct from fund
+    await db.execute(sql`
+      UPDATE membership_funds
+      SET balance_cents = balance_cents - ${required_cents}, updated_at = now()
+      WHERE user_id = ${userId}
+    `);
+
+    // Look up user email for order
+    const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!user) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    const [order] = await db.insert(orders).values({
+      variety_id,
+      location_id,
+      time_slot_id,
+      chocolate,
+      finish,
+      quantity,
+      is_gift: false,
+      total_cents: required_cents,
+      customer_email: user.email,
+      status: 'paid',
+      payment_method: 'fund',
+    }).returning();
+
+    const new_balance_cents = balance_cents - required_cents;
+    res.json({ ok: true, order_id: order.id, new_balance_cents });
+  } catch (err) {
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

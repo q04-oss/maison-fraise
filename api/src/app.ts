@@ -33,6 +33,8 @@ import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
 import { eq, and, desc } from 'drizzle-orm';
+import { requireUser } from './lib/auth';
+import { uploadMedia } from './lib/upload';
 
 const app = express();
 
@@ -80,6 +82,24 @@ app.use('/api/nfc', nfcRouter);
 app.use('/api/contacts', contactsRouter);
 app.use('/api/portal', portalRouter);
 app.use('/api/profiles', profilesRouter);
+
+// POST /api/upload — Cloudinary media upload (50mb limit on this route only)
+app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {
+  if (!process.env.CLOUDINARY_URL) {
+    return res.status(503).json({ error: 'Upload service not configured' });
+  }
+  const { data, type } = req.body;
+  if (!data || !type || !['image', 'video'].includes(type)) {
+    return res.status(400).json({ error: 'data and type (image|video) are required' });
+  }
+  try {
+    const url = await uploadMedia(data as string, type as 'image' | 'video');
+    return res.json({ url });
+  } catch (err) {
+    logger.error('Upload failed', err);
+    return res.status(500).json({ error: 'upload_failed' });
+  }
+});
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
