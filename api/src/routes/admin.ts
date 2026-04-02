@@ -2266,6 +2266,20 @@ router.post('/migrate/greenhouses', async (_req: Request, res: Response) => {
 // Migration for location / chocolate shop additions
 router.post('/migrate/locations', async (_req: Request, res: Response) => {
   try {
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS description text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS instagram_handle text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS neighbourhood text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS starts_at timestamp`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS ends_at timestamp`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS dj_name text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS organizer_note text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS capacity integer`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS entrance_fee_cents integer`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS is_audition boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS audition_status text`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS partner_business_id integer`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS host_user_id integer`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS checkin_token text`);
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS location_type text NOT NULL DEFAULT 'collection'`);
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS partner_name text`);
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS operating_cost_cents integer`);
@@ -2273,6 +2287,7 @@ router.post('/migrate/locations', async (_req: Request, res: Response) => {
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS founding_term_ends_at timestamp`);
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS inaugurated_at timestamp`);
     await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS approved_by_admin boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`);
     await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS variety_type text NOT NULL DEFAULT 'strawberry'`);
     await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS token_type text NOT NULL DEFAULT 'standard'`);
     await db.execute(sql`ALTER TABLE tokens ADD COLUMN IF NOT EXISTS partner_name text`);
