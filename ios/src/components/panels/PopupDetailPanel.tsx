@@ -115,7 +115,7 @@ export default function PopupDetailPanel() {
       const tag = await NfcManager.getTag();
       const record = tag?.ndefMessage?.[0];
       if (!record?.payload) throw new Error('No data on chip.');
-      const token = Ndef.text.decodePayload(record.payload as number[]);
+      const token = Ndef.text.decodePayload(new Uint8Array(record.payload as number[]));
       await checkInPopup(biz.id, userDbId, token);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Welcome.', 'You\'re checked in. Enjoy the night.');
@@ -136,7 +136,7 @@ export default function PopupDetailPanel() {
   if (!biz) return null;
 
   const dateStr = formatPopupDate(biz.launched_at);
-  const timeStr = formatPopupTime(biz.launched_at, biz.hours);
+  const timeStr = formatPopupTime(biz.launched_at, biz.hours ?? undefined);
   const hasPartner = !!(biz.description || biz.neighbourhood || biz.instagram_handle);
 
   const renderCta = () => {

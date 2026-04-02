@@ -285,6 +285,51 @@ export default function ProfilePanel() {
           <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
         ) : (
           <>
+            {/* Quick access */}
+            {userDbId && (
+              <View style={[styles.verifiedActions, { borderColor: c.border }]}>
+                <TouchableOpacity
+                  style={styles.actionRow}
+                  onPress={() => showPanel('order-history')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.actionInfo}>
+                    <Text style={[styles.actionTitle, { color: c.text }]}>Order History</Text>
+                    <Text style={[styles.actionSub, { color: c.muted }]}>View all your past orders</Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
+
+                <TouchableOpacity
+                  style={styles.actionRow}
+                  onPress={() => showPanel('activity-feed')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.actionInfo}>
+                    <Text style={[styles.actionTitle, { color: c.text }]}>Activity</Text>
+                    <Text style={[styles.actionSub, { color: c.muted }]}>See what people you follow are up to</Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
+                </TouchableOpacity>
+
+                <View style={[styles.actionRowDivider, { backgroundColor: c.border }]} />
+
+                <TouchableOpacity
+                  style={[styles.actionRow, styles.actionRowLast]}
+                  onPress={() => showPanel('notification-inbox')}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.actionInfo}>
+                    <Text style={[styles.actionTitle, { color: c.text }]}>Notifications</Text>
+                    <Text style={[styles.actionSub, { color: c.muted }]}>Your inbox from Maison Fraise</Text>
+                  </View>
+                  <Text style={[styles.chevron, { color: c.muted }]}>›</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* Active contract / placement */}
             {activeContract && (
               <View style={[styles.contractCard, { backgroundColor: c.card, borderColor: c.border }]}>

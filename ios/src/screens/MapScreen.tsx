@@ -109,7 +109,7 @@ export default function MapScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const DETENTS = useMemo<[number, number, number]>(() => [COLLAPSED_HEIGHT / SCREEN_HEIGHT, 0.5, 1], [SCREEN_HEIGHT]);
   const { setBusinesses, setActiveLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight } = usePanel();
-  const { pendingScreen, pendingData, clearPendingScreen } = useApp();
+  const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
   const [bizError, setBizError] = useState(false);
@@ -460,7 +460,7 @@ export default function MapScreen() {
         grabber
         grabberOptions={{ color: 'rgba(0,0,0,0.2)' }}
         onPositionChange={onPositionChange}
-        onPresent={(e: any) => {
+        onDidPresent={(e: any) => {
           const idx = e.nativeEvent.index;
           const h = [COLLAPSED_HEIGHT, Math.round(SCREEN_HEIGHT * 0.5), SCREEN_HEIGHT][idx] ?? COLLAPSED_HEIGHT;
           setSheetHeight(h);

@@ -1,176 +1,103 @@
-import React, { useRef, useState } from 'react';
-import {
-  View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../types';
-import { fonts } from '../theme';
+import { useColors, fonts } from '../theme';
+import { SPACING } from '../theme';
 
-type Props = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Onboarding'>;
-};
+const { width: W } = Dimensions.get('window');
 
-const BG = '#F7F5F2';
-const TEXT = '#1C1C1E';
-const MUTED = '#8E8E93';
-const ACCENT = '#8B4513';
-
-const PAGES = [
+const STEPS = [
   {
     kanji: '旬',
-    title: 'Maison Fraise.',
-    body: 'Seasonal strawberries, sourced and curated with precision. Available while the season lasts.',
+    title: 'Maison Fraise',
+    subtitle: 'A seasonal strawberry atelier in Montréal.',
+    body: 'We source directly from small farms and offer curated varieties by the box — chocolate-dipped, finished with fleur de sel or or fin.',
   },
   {
-    kanji: '所',
-    title: 'Find. Order. Collect.',
-    body: 'Select a collection point on the map, choose your variety, and collect the same day. Nothing is kept overnight.',
+    kanji: '場',
+    title: 'The Platform',
+    subtitle: 'More than an order.',
+    body: 'Follow photographers and DJs. Discover popup events. Nominate people you love into our world.',
   },
   {
-    kanji: '縁',
-    title: 'A deeper layer.',
-    body: 'Verify your membership by tapping the NFC chip inside your box lid. Unlock popups, standing orders, and a community built around the season.',
+    kanji: '始',
+    title: 'Ready?',
+    subtitle: 'Sign in to continue.',
+    body: 'Your Apple ID keeps everything private. No passwords, no newsletters — just strawberries.',
   },
 ];
 
-export default function OnboardingScreen({ navigation }: Props) {
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
-  const [page, setPage] = useState(0);
+interface Props {
+  onDone: () => void;
+}
 
-  const isLast = page === PAGES.length - 1;
+export default function OnboardingScreen({ onDone }: Props) {
+  const c = useColors();
+  const [step, setStep] = useState(0);
+  const current = STEPS[step];
+  const isLast = step === STEPS.length - 1;
 
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const newPage = Math.round(e.nativeEvent.contentOffset.x / width);
-    setPage(newPage);
-  };
-
-  const handleNext = () => {
+  const handleNext = async () => {
     if (isLast) {
-      handleEnter();
+      await AsyncStorage.setItem('onboarding_done', '1');
+      onDone();
     } else {
-      scrollRef.current?.scrollTo({ x: (page + 1) * width, animated: true });
+      setStep(s => s + 1);
     }
   };
 
-  const handleEnter = async () => {
-    await AsyncStorage.setItem('has_onboarded', 'true');
-    navigation.replace('Main');
+  const handleSkip = async () => {
+    await AsyncStorage.setItem('onboarding_done', '1');
+    onDone();
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: BG }]}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleScroll}
-        scrollEventThrottle={16}
-      >
-        {PAGES.map((p, i) => (
-          <View key={i} style={[styles.page, { width }]}>
-            <Text style={styles.kanji}>{p.kanji}</Text>
-            <View style={styles.pageContent}>
-              <Text style={styles.pageTitle}>{p.title}</Text>
-              <Text style={styles.pageBody}>{p.body}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
+    <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+      <SafeAreaView style={styles.safe}>
+        {/* Kanji */}
+        <Text style={[styles.kanji, { color: c.border }]}>{current.kanji}</Text>
 
-      {/* Dots */}
-      <View style={styles.dots}>
-        {PAGES.map((_, i) => (
-          <View
-            key={i}
-            style={[
-              styles.dot,
-              { backgroundColor: i === page ? ACCENT : MUTED, opacity: i === page ? 1 : 0.3 },
-            ]}
-          />
-        ))}
-      </View>
+        {/* Content */}
+        <View style={styles.content}>
+          <Text style={[styles.title, { color: c.text }]}>{current.title}</Text>
+          <Text style={[styles.subtitle, { color: c.accent }]}>{current.subtitle}</Text>
+          <Text style={[styles.body, { color: c.muted }]}>{current.body}</Text>
+        </View>
 
-      {/* CTA */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity
-          style={[styles.cta, { backgroundColor: isLast ? ACCENT : 'transparent', borderColor: isLast ? 'transparent' : MUTED }]}
-          onPress={handleNext}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.ctaText, { color: isLast ? '#fff' : MUTED }]}>
-            {isLast ? 'Enter' : 'Next'}
-          </Text>
+        {/* Dots */}
+        <View style={styles.dots}>
+          {STEPS.map((_, i) => (
+            <View key={i} style={[styles.dot, { backgroundColor: i === step ? c.accent : c.border }]} />
+          ))}
+        </View>
+
+        {/* Button */}
+        <TouchableOpacity style={[styles.btn, { backgroundColor: c.accent }]} onPress={handleNext} activeOpacity={0.85}>
+          <Text style={styles.btnText}>{isLast ? 'GET STARTED' : 'CONTINUE'}</Text>
         </TouchableOpacity>
 
-        {!isLast && (
-          <TouchableOpacity onPress={handleEnter} activeOpacity={0.6} style={styles.skipBtn}>
-            <Text style={[styles.skipText, { color: MUTED }]}>Skip</Text>
+        {isLast && (
+          <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
+            <Text style={[styles.skipText, { color: c.muted }]}>Skip</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  page: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  kanji: {
-    fontSize: 120,
-    color: 'rgba(0,0,0,0.04)',
-    fontFamily: fonts.playfair,
-    position: 'absolute',
-    top: '20%',
-  },
-  pageContent: { alignItems: 'center', gap: 20 },
-  pageTitle: {
-    fontSize: 32,
-    fontFamily: fonts.playfair,
-    color: TEXT,
-    textAlign: 'center',
-  },
-  pageBody: {
-    fontSize: 16,
-    fontFamily: fonts.dmSans,
-    color: MUTED,
-    textAlign: 'center',
-    lineHeight: 26,
-  },
-  dots: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 32,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  footer: {
-    paddingHorizontal: 32,
-    gap: 12,
-    alignItems: 'center',
-  },
-  cta: {
-    width: '100%',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  ctaText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
-  skipBtn: { paddingVertical: 4 },
-  skipText: { fontSize: 14, fontFamily: fonts.dmSans },
+  safe: { flex: 1, alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 60, paddingBottom: 48 },
+  kanji: { fontSize: 120, fontFamily: fonts.playfair, opacity: 0.15, position: 'absolute', top: 40, right: -10 },
+  content: { flex: 1, justifyContent: 'center', alignItems: 'flex-start', width: '100%', gap: 16, paddingTop: 60 },
+  title: { fontSize: 36, fontFamily: fonts.playfair, lineHeight: 44 },
+  subtitle: { fontSize: 16, fontFamily: fonts.dmSans, fontStyle: 'italic' },
+  body: { fontSize: 15, fontFamily: fonts.dmSans, lineHeight: 24 },
+  dots: { flexDirection: 'row', gap: 8, marginBottom: 32 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  btn: { width: '100%', paddingVertical: 18, borderRadius: 30, alignItems: 'center' },
+  btnText: { fontFamily: fonts.dmMono, fontSize: 12, letterSpacing: 2, color: '#0C0C0E' },
+  skipBtn: { marginTop: 20, paddingVertical: 8 },
+  skipText: { fontFamily: fonts.dmSans, fontSize: 13 },
 });

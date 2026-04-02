@@ -44,7 +44,7 @@ export default function NFCPanel() {
       const tag = await NfcManager.getTag();
       const record = tag?.ndefMessage?.[0];
       if (!record?.payload) throw new Error('No data on chip.');
-      const token = Ndef.text.decodePayload(record.payload as number[]);
+      const token = Ndef.text.decodePayload(new Uint8Array(record.payload as number[]));
       await doVerify(token);
     } catch (err: any) {
       if (err?.message !== 'UserCancel') {

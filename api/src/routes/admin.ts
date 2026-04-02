@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { eq, isNull, sql, and, lte } from 'drizzle-orm';
+import { eq, isNull, sql, and, lte, sum, gte, desc, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits } from '../db/schema';
 import { logger } from '../lib/logger';
@@ -600,6 +600,31 @@ router.post('/migrate', async (_req: Request, res: Response) => {
       )
     `);
 
+    // User follows table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS user_follows (
+        id serial PRIMARY KEY,
+        follower_id integer NOT NULL REFERENCES users(id),
+        followee_id integer NOT NULL REFERENCES users(id),
+        created_at timestamp NOT NULL DEFAULT now(),
+        UNIQUE(follower_id, followee_id)
+      )
+    `);
+
+    // Notifications table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id serial PRIMARY KEY,
+        user_id integer NOT NULL REFERENCES users(id),
+        type text NOT NULL,
+        title text NOT NULL,
+        body text NOT NULL,
+        read boolean NOT NULL DEFAULT false,
+        data jsonb NOT NULL DEFAULT '{}',
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {
     res.status(500).json({ error: String(err) });
@@ -783,6 +808,53 @@ router.patch('/contract-requests/:id', async (req: Request, res: Response) => {
     const [updated] = await db.update(contractRequests).set(req.body).where(eq(contractRequests.id, id)).returning();
     if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/revenue — aggregate revenue summary
+router.get('/revenue', async (_req: Request, res: Response) => {
+  try {
+    const PAID_STATUSES: Array<'paid' | 'preparing' | 'ready' | 'collected'> = ['paid', 'preparing', 'ready', 'collected'];
+
+    const [orderAgg] = await db
+      .select({
+        count: sql<number>`cast(count(*) as int)`,
+        total_cents: sum(orders.total_cents),
+      })
+      .from(orders)
+      .where(inArray(orders.status, PAID_STATUSES));
+
+    const [rsvpAgg] = await db
+      .select({ count: sql<number>`cast(count(*) as int)` })
+      .from(popupRsvps)
+      .where(eq(popupRsvps.status, 'paid'));
+
+    const recentOrders = await db
+      .select({
+        id: orders.id,
+        variety_name: varieties.name,
+        total_cents: orders.total_cents,
+        customer_email: orders.customer_email,
+        created_at: orders.created_at,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .where(inArray(orders.status, PAID_STATUSES))
+      .orderBy(desc(orders.created_at))
+      .limit(10);
+
+    res.json({
+      orders: {
+        count: orderAgg?.count ?? 0,
+        total_cents: Number(orderAgg?.total_cents ?? 0),
+      },
+      rsvps: {
+        paid_count: rsvpAgg?.count ?? 0,
+      },
+      recent_orders: recentOrders,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

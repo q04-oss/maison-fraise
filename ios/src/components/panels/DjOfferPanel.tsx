@@ -78,7 +78,7 @@ export default function DjOfferPanel() {
   if (!biz) return null;
 
   const dateStr = formatDate(biz.launched_at);
-  const timeStr = formatTime(biz.launched_at, biz.hours);
+  const timeStr = formatTime(biz.launched_at, biz.hours ?? undefined);
 
   if (accepted) {
     return (

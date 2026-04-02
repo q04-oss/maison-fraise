@@ -11,7 +11,7 @@ interface GeofenceLocation {
   lng: number;
 }
 
-TaskManager.defineTask(GEOFENCE_TASK, ({ data, error }: TaskManager.TaskManagerTaskBody) => {
+TaskManager.defineTask(GEOFENCE_TASK, async ({ data, error }: TaskManager.TaskManagerTaskBody) => {
   if (error) return;
 
   const { eventType, region } = data as {

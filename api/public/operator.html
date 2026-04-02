@@ -156,6 +156,15 @@
     .stat-num { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--text); }
     .stat-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
 
+    /* ── STAT CARD (Revenue tab) ── */
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 16px; }
+    .stat-value { font-family: 'Playfair Display', serif; font-size: 28px; color: var(--text); }
+    .stat-card .stat-label { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); margin-top: 6px; }
+    .stat-sub { font-family: 'DM Sans', sans-serif; font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* ── SECTION LABEL ── */
+    .section-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--amber); padding: 4px 0; margin-bottom: 8px; }
+
     /* ── NOMINATION ROW ── */
     .nom-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .nom-row:last-child { border-bottom: none; }
@@ -302,6 +311,7 @@
       { id:'requests', label:'Requests' },
       { id:'portraits',label:'Portraits' },
       { id:'talent',   label:'Talent' },
+      { id:'revenue',  label:'Revenue' },
     ];
     document.getElementById('tab-row').innerHTML = tabs.map(t =>
       `<div class="tab ${t.id === currentTab ? 'active' : ''}" onclick="switchTab('${t.id}')">${t.label}</div>`
@@ -316,6 +326,7 @@
     else if (tab === 'requests')  renderRequestsTab();
     else if (tab === 'portraits') renderPortraitsTab();
     else if (tab === 'talent')   renderTalentTab();
+    else if (tab === 'revenue')  renderRevenueTab();
   }
 
   // ── ORDERS TAB ────────────────────────────────────────
@@ -798,6 +809,49 @@
     });
     if (res.ok) { alert('Contract offer sent.'); renderTalentTab(); }
     else { const e = await res.json(); alert(e.error || 'Failed'); }
+  }
+
+  // ── REVENUE TAB ───────────────────────────────────────
+  async function renderRevenueTab() {
+    const body = document.getElementById('dash-body');
+    body.innerHTML = '<div class="empty">Loading revenue...</div>';
+    try {
+      const res = await fetch(BASE + '/api/admin/revenue', { headers: { 'X-Admin-PIN': currentPin } });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+
+      body.innerHTML = `
+        <div class="section-label">Revenue Overview</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-value">CA$${((data.orders.total_cents || 0)/100).toFixed(2)}</div>
+            <div class="stat-label">ORDER REVENUE</div>
+            <div class="stat-sub">${data.orders.count} paid orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${data.rsvps.paid_count}</div>
+            <div class="stat-label">PAID RSVPs</div>
+            <div class="stat-sub">popup entries</div>
+          </div>
+        </div>
+        <div class="section-label">Recent Orders</div>
+        ${(data.recent_orders || []).map(o => `
+          <div class="order-card" style="margin-bottom:8px;">
+            <div class="order-top">
+              <div>
+                <div class="order-id">#${o.id} · CA$${(o.total_cents/100).toFixed(2)}</div>
+                <div class="order-email">${o.customer_email}</div>
+              </div>
+              <div class="status-badge s-${o.status}">${o.status}</div>
+            </div>
+            <div class="order-variety">${o.variety_name || 'Variety'}</div>
+            <div class="order-details">${new Date(o.created_at).toLocaleDateString('en-CA')}</div>
+          </div>
+        `).join('') || '<div class="empty">No recent orders.</div>'}
+      `;
+    } catch (e) {
+      body.innerHTML = '<div class="empty">Could not load revenue.</div>';
+    }
   }
 
   // ── CHOCOLATIER ───────────────────────────────────────

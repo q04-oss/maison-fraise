@@ -3,8 +3,9 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchPublicProfile } from '../../lib/api';
+import { fetchPublicProfile, followUser, unfollowUser, fetchFollowStatus } from '../../lib/api';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
@@ -19,16 +20,53 @@ export default function UserProfilePanel() {
   const c = useColors();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const userId: number | null = panelData?.userId ?? null;
 
   useEffect(() => {
     if (!userId) { setLoading(false); return; }
-    fetchPublicProfile(userId)
-      .then(setProfile)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    AsyncStorage.getItem('user_db_id').then(async storedId => {
+      const cid = storedId ? parseInt(storedId) : null;
+      setCurrentUserId(cid);
+      try {
+        const [profileData] = await Promise.all([
+          fetchPublicProfile(userId),
+        ]);
+        setProfile(profileData);
+        if (cid && cid !== userId) {
+          const status = await fetchFollowStatus(userId, cid).catch(() => null);
+          if (status) setIsFollowing(status.is_following);
+        }
+      } catch {
+        // non-fatal
+      } finally {
+        setLoading(false);
+      }
+    });
   }, [userId]);
+
+  const handleFollowToggle = async () => {
+    if (!userId || !currentUserId || followLoading) return;
+    setFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await unfollowUser(userId, currentUserId);
+        setIsFollowing(false);
+      } else {
+        await followUser(userId, currentUserId);
+        setIsFollowing(true);
+      }
+    } catch {
+      // non-fatal
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const showFollowBtn = currentUserId !== null && userId !== null && currentUserId !== userId;
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -66,6 +104,30 @@ export default function UserProfilePanel() {
                 <Text style={[styles.statLabel, { color: c.muted }]}>PLACEMENTS</Text>
               </View>
             </View>
+
+            {/* Follow button */}
+            {showFollowBtn && (
+              <TouchableOpacity
+                style={[
+                  styles.followBtn,
+                  isFollowing
+                    ? { borderColor: c.border, backgroundColor: 'transparent' }
+                    : { borderColor: c.accent, backgroundColor: c.accent },
+                ]}
+                onPress={handleFollowToggle}
+                disabled={followLoading}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.followBtnText,
+                    { color: isFollowing ? c.muted : '#0C0C0E' },
+                  ]}
+                >
+                  {followLoading ? '…' : isFollowing ? 'Following' : 'Follow'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Active placement */}
             {profile.active_placement && (
@@ -132,6 +194,9 @@ const styles = StyleSheet.create({
   statDivider: { width: StyleSheet.hairlineWidth },
   statValue: { fontSize: 22, fontFamily: fonts.playfair },
   statLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+
+  followBtn: { marginTop: 4, borderRadius: 20, paddingVertical: 10, paddingHorizontal: 24, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
+  followBtnText: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 1.5 },
 
   placementCard: {
     flexDirection: 'row',

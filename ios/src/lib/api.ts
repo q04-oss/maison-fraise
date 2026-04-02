@@ -484,3 +484,79 @@ export async function fetchLegitimacyBreakdown(userId: number) {
   if (!res.ok) throw new Error('Failed to fetch legitimacy');
   return res.json() as Promise<{ total: number; breakdown: { event_type: string; total: number; count: number }[] }>;
 }
+
+export async function followUser(userId: number, followerId: number) {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ follower_id: followerId }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Failed to follow'); }
+  return res.json();
+}
+
+export async function unfollowUser(userId: number, followerId: number) {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ follower_id: followerId }),
+  });
+  if (!res.ok) throw new Error('Failed to unfollow');
+  return res.json();
+}
+
+export async function fetchFollowStatus(userId: number, followerId: number) {
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow-status?follower_id=${followerId}`);
+  if (!res.ok) throw new Error('Failed to fetch follow status');
+  return res.json() as Promise<{ is_following: boolean }>;
+}
+
+export async function fetchOrderHistory(userId: number) {
+  const res = await fetch(`${BASE_URL}/api/users/me/orders`, {
+    headers: { 'X-User-ID': String(userId) },
+  });
+  if (!res.ok) throw new Error('Failed to fetch orders');
+  return res.json() as Promise<{
+    id: number;
+    variety_name: string;
+    chocolate: string;
+    finish: string;
+    quantity: number;
+    total_cents: number;
+    status: string;
+    slot_date: string;
+    slot_time: string;
+    created_at: string;
+  }[]>;
+}
+
+export async function fetchActivityFeed(userId: number) {
+  const res = await fetch(`${BASE_URL}/api/feed?user_id=${userId}`);
+  if (!res.ok) throw new Error('Failed to fetch feed');
+  return res.json() as Promise<{
+    type: string;
+    actor_id: number;
+    actor_name: string;
+    subject: string;
+    created_at: string;
+  }[]>;
+}
+
+export async function fetchNotifications(userId: number) {
+  const res = await fetch(`${BASE_URL}/api/notifications?user_id=${userId}`);
+  if (!res.ok) throw new Error('Failed to fetch notifications');
+  return res.json() as Promise<{
+    id: number;
+    type: string;
+    title: string;
+    body: string;
+    read: boolean;
+    created_at: string;
+  }[]>;
+}
+
+export async function markNotificationRead(notificationId: number) {
+  const res = await fetch(`${BASE_URL}/api/notifications/${notificationId}/read`, { method: 'PATCH' });
+  if (!res.ok) throw new Error('Failed to mark read');
+  return res.json();
+}

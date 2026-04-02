@@ -23,7 +23,10 @@ export type PanelId =
   | 'campaign-commission'
   | 'contract-offer'
   | 'lookbook'
-  | 'user-profile';
+  | 'user-profile'
+  | 'order-history'
+  | 'notification-inbox'
+  | 'activity-feed';
 
 export interface OrderState {
   variety_id: number | null;

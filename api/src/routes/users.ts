@@ -1,9 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { eq, sum, and, sql } from 'drizzle-orm';
+import { eq, sum, and, sql, desc, inArray, gte } from 'drizzle-orm';
 import { db } from '../db';
 import {
   users, legitimacyEvents, businesses, popupRsvps, djOffers, popupNominations,
-  employmentContracts,
+  employmentContracts, orders, varieties, timeSlots, userFollows, notifications,
 } from '../db/schema';
 
 const router = Router();
@@ -53,6 +53,74 @@ router.get('/search', async (req: Request, res: Response) => {
 
     const filtered = rows.filter(u => String(u.id).includes(q));
     res.json(filtered);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/users/:id/follow — body: { follower_id: number }
+router.post('/:id/follow', async (req: Request, res: Response) => {
+  const followee_id = parseInt(req.params.id, 10);
+  const { follower_id } = req.body;
+  if (isNaN(followee_id) || !follower_id) {
+    res.status(400).json({ error: 'follower_id is required' });
+    return;
+  }
+  try {
+    await db.insert(userFollows).values({ follower_id, followee_id });
+
+    // Notify the followee
+    await db.insert(notifications).values({
+      user_id: followee_id,
+      type: 'follow',
+      title: 'New follower',
+      body: 'Someone started following you.',
+      data: { follower_id },
+    });
+
+    res.json({ success: true });
+  } catch (err: any) {
+    // unique violation
+    if (err?.code === '23505') {
+      res.status(409).json({ error: 'Already following' });
+      return;
+    }
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/users/:id/follow — body: { follower_id: number }
+router.delete('/:id/follow', async (req: Request, res: Response) => {
+  const followee_id = parseInt(req.params.id, 10);
+  const { follower_id } = req.body;
+  if (isNaN(followee_id) || !follower_id) {
+    res.status(400).json({ error: 'follower_id is required' });
+    return;
+  }
+  try {
+    await db.delete(userFollows).where(
+      and(eq(userFollows.follower_id, follower_id), eq(userFollows.followee_id, followee_id))
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/users/:id/follow-status?follower_id=
+router.get('/:id/follow-status', async (req: Request, res: Response) => {
+  const followee_id = parseInt(req.params.id, 10);
+  const follower_id = parseInt(String(req.query.follower_id), 10);
+  if (isNaN(followee_id) || isNaN(follower_id)) {
+    res.status(400).json({ error: 'follower_id is required' });
+    return;
+  }
+  try {
+    const rows = await db
+      .select({ id: userFollows.id })
+      .from(userFollows)
+      .where(and(eq(userFollows.follower_id, follower_id), eq(userFollows.followee_id, followee_id)));
+    res.json({ is_following: rows.length > 0 });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -312,6 +380,159 @@ router.get('/:id/public-profile', async (req: Request, res: Response) => {
       } : null,
       past_placements: pastRow?.total ?? 0,
     });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/users/me/orders — order history identified by X-User-ID header
+router.get('/me/orders', async (req: Request, res: Response) => {
+  const rawId = req.headers['x-user-id'];
+  const user_id = parseInt(String(rawId), 10);
+  if (isNaN(user_id)) {
+    res.status(400).json({ error: 'X-User-ID header is required' });
+    return;
+  }
+  try {
+    const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, user_id));
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+    const rows = await db
+      .select({
+        id: orders.id,
+        variety_name: varieties.name,
+        chocolate: orders.chocolate,
+        finish: orders.finish,
+        quantity: orders.quantity,
+        total_cents: orders.total_cents,
+        status: orders.status,
+        slot_date: timeSlots.date,
+        slot_time: timeSlots.time,
+        created_at: orders.created_at,
+      })
+      .from(orders)
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .leftJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
+      .where(eq(orders.customer_email, user.email))
+      .orderBy(desc(orders.created_at))
+      .limit(50);
+
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/notifications?user_id=
+router.get('/notifications', async (req: Request, res: Response) => {
+  const user_id = parseInt(String(req.query.user_id), 10);
+  if (isNaN(user_id)) { res.status(400).json({ error: 'user_id is required' }); return; }
+  try {
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.user_id, user_id))
+      .orderBy(desc(notifications.created_at))
+      .limit(40);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/notifications/:id/read
+router.patch('/notifications/:id/read', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/feed?user_id= — activity feed from followed users
+router.get('/feed', async (req: Request, res: Response) => {
+  const user_id = parseInt(String(req.query.user_id), 10);
+  if (isNaN(user_id)) { res.status(400).json({ error: 'user_id is required' }); return; }
+  try {
+    const followRows = await db
+      .select({ followee_id: userFollows.followee_id })
+      .from(userFollows)
+      .where(eq(userFollows.follower_id, user_id));
+
+    if (followRows.length === 0) { res.json([]); return; }
+
+    const followeeIds = followRows.map(r => r.followee_id);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const [nomRows, contractRows, rsvpRows] = await Promise.all([
+      db
+        .select({
+          type: sql<string>`'nomination'`,
+          actor_id: popupNominations.nominator_id,
+          actor_name: users.display_name,
+          actor_email: users.email,
+          subject: businesses.name,
+          created_at: popupNominations.created_at,
+        })
+        .from(popupNominations)
+        .innerJoin(users, eq(popupNominations.nominator_id, users.id))
+        .innerJoin(businesses, eq(popupNominations.popup_id, businesses.id))
+        .where(and(
+          inArray(popupNominations.nominator_id, followeeIds),
+          gte(popupNominations.created_at, thirtyDaysAgo),
+        )),
+
+      db
+        .select({
+          type: sql<string>`'placement'`,
+          actor_id: employmentContracts.user_id,
+          actor_name: users.display_name,
+          actor_email: users.email,
+          subject: businesses.name,
+          created_at: employmentContracts.created_at,
+        })
+        .from(employmentContracts)
+        .innerJoin(users, eq(employmentContracts.user_id, users.id))
+        .innerJoin(businesses, eq(employmentContracts.business_id, businesses.id))
+        .where(and(
+          inArray(employmentContracts.user_id, followeeIds),
+          eq(employmentContracts.status, 'active'),
+          gte(employmentContracts.created_at, thirtyDaysAgo),
+        )),
+
+      db
+        .select({
+          type: sql<string>`'rsvp'`,
+          actor_id: popupRsvps.user_id,
+          actor_name: users.display_name,
+          actor_email: users.email,
+          subject: businesses.name,
+          created_at: popupRsvps.created_at,
+        })
+        .from(popupRsvps)
+        .innerJoin(users, eq(popupRsvps.user_id, users.id))
+        .innerJoin(businesses, eq(popupRsvps.popup_id, businesses.id))
+        .where(and(
+          inArray(popupRsvps.user_id, followeeIds),
+          inArray(popupRsvps.status, ['paid', 'waitlist']),
+          gte(popupRsvps.created_at, thirtyDaysAgo),
+        )),
+    ]);
+
+    const allItems = [...nomRows, ...contractRows, ...rsvpRows].map(item => ({
+      type: item.type,
+      actor_id: item.actor_id,
+      actor_name: item.actor_name ?? item.actor_email.split('@')[0],
+      subject: item.subject,
+      created_at: item.created_at,
+    }));
+
+    allItems.sort((a, b) => b.created_at.getTime() - a.created_at.getTime());
+
+    res.json(allItems.slice(0, 30));
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

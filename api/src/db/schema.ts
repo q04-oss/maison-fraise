@@ -334,3 +334,21 @@ export const businessVisits = pgTable('business_visits', {
   visitor_user_id: integer('visitor_user_id').references(() => users.id),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+export const userFollows = pgTable('user_follows', {
+  id: serial('id').primaryKey(),
+  follower_id: integer('follower_id').notNull().references(() => users.id),
+  followee_id: integer('followee_id').notNull().references(() => users.id),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  type: text('type').notNull(), // 'nomination' | 'contract' | 'tip' | 'rsvp' | 'follow'
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  read: boolean('read').notNull().default(false),
+  data: jsonb('data').$type<Record<string, any>>().notNull().default({}),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
