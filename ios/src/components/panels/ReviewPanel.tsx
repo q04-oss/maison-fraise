@@ -113,6 +113,7 @@ export default function ReviewPanel() {
           paymentIntentClientSecret: client_secret,
           applePay: {
             merchantCountryCode: 'CA',
+            merchantIdentifier: 'merchant.com.maisonfraise.app',
           },
           googlePay: {
             merchantCountryCode: 'CA',

@@ -4,15 +4,16 @@ import { db } from '../db';
 import { employmentContracts, users, businesses, popupNominations } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { logger } from '../lib/logger';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
 // POST /api/contracts/:id/accept
-router.post('/:id/accept', async (req: Request, res: Response) => {
+router.post('/:id/accept', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid contract id' });
     return;
   }
 
@@ -61,11 +62,11 @@ router.post('/:id/accept', async (req: Request, res: Response) => {
 });
 
 // POST /api/contracts/:id/decline
-router.post('/:id/decline', async (req: Request, res: Response) => {
+router.post('/:id/decline', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(id)) {
+    res.status(400).json({ error: 'Invalid contract id' });
     return;
   }
 
@@ -74,6 +75,7 @@ router.post('/:id/decline', async (req: Request, res: Response) => {
       and(eq(employmentContracts.id, id), eq(employmentContracts.user_id, user_id))
     );
     if (!contract) { res.status(404).json({ error: 'Contract not found' }); return; }
+    if (contract.status !== 'pending') { res.status(400).json({ error: 'Contract already resolved' }); return; }
 
     await db.update(employmentContracts).set({ status: 'declined' }).where(eq(employmentContracts.id, id));
     res.json({ success: true });

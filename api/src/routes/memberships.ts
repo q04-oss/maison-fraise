@@ -85,7 +85,7 @@ membershipsRouter.get('/me', requireUser, async (req: Request, res: Response) =>
 
     res.json({
       membership: membership ?? null,
-      fund: fund ? { balance_cents: fund.balance_cents, cycle_start: fund.cycle_start } : { balance_cents: 0 },
+      fund: fund ? { balance_cents: fund.balance_cents, cycle_start: fund.cycle_start } : { balance_cents: 0, cycle_start: null },
     });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
@@ -299,9 +299,6 @@ fundRouter.post('/contribute/:userId', async (req: Request, res: Response) => {
     const { verifyToken } = await import('../lib/auth');
     const payload = verifyToken(auth.slice(7));
     if (payload) fromUserId = payload.userId;
-  } else {
-    const uid = parseInt(req.headers['x-user-id'] as string ?? '', 10);
-    if (!isNaN(uid)) fromUserId = uid;
   }
 
   const isAnonymous = anonymous === true;

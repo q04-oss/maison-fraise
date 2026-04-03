@@ -374,7 +374,15 @@ router.patch('/campaigns/:id', async (req: Request, res: Response) => {
     return;
   }
   try {
-    const [updated] = await db.update(campaigns).set(req.body).where(eq(campaigns.id, id)).returning();
+    const { title, concept, date, total_spots, spots_remaining, status } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (title !== undefined) patch.title = title;
+    if (concept !== undefined) patch.concept = concept;
+    if (date !== undefined) patch.date = date;
+    if (total_spots !== undefined) patch.total_spots = total_spots;
+    if (spots_remaining !== undefined) patch.spots_remaining = spots_remaining;
+    if (status !== undefined) patch.status = status;
+    const [updated] = await db.update(campaigns).set(patch).where(eq(campaigns.id, id)).returning();
     if (!updated) {
       res.status(404).json({ error: 'Campaign not found' });
       return;
@@ -543,10 +551,34 @@ router.patch('/businesses/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
-    const body = { ...req.body };
-    if (body.starts_at) body.starts_at = new Date(body.starts_at);
-    if (body.ends_at) body.ends_at = new Date(body.ends_at);
-    const [updated] = await db.update(businesses).set(body).where(eq(businesses.id, id)).returning();
+    const {
+      name, address, neighbourhood, starts_at, ends_at, total_spots, spots_remaining,
+      status, is_audition, audition_status, approved_by_admin, partner_business_id,
+      host_user_id, checkin_token, location_type, partner_name, operating_cost_cents,
+      founding_patron_id, founding_term_ends_at, inaugurated_at,
+    } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (name !== undefined) patch.name = name;
+    if (address !== undefined) patch.address = address;
+    if (neighbourhood !== undefined) patch.neighbourhood = neighbourhood;
+    if (starts_at !== undefined) patch.starts_at = new Date(starts_at);
+    if (ends_at !== undefined) patch.ends_at = new Date(ends_at);
+    if (total_spots !== undefined) patch.total_spots = total_spots;
+    if (spots_remaining !== undefined) patch.spots_remaining = spots_remaining;
+    if (status !== undefined) patch.status = status;
+    if (is_audition !== undefined) patch.is_audition = is_audition;
+    if (audition_status !== undefined) patch.audition_status = audition_status;
+    if (approved_by_admin !== undefined) patch.approved_by_admin = approved_by_admin;
+    if (partner_business_id !== undefined) patch.partner_business_id = partner_business_id;
+    if (host_user_id !== undefined) patch.host_user_id = host_user_id;
+    if (checkin_token !== undefined) patch.checkin_token = checkin_token;
+    if (location_type !== undefined) patch.location_type = location_type;
+    if (partner_name !== undefined) patch.partner_name = partner_name;
+    if (operating_cost_cents !== undefined) patch.operating_cost_cents = operating_cost_cents;
+    if (founding_patron_id !== undefined) patch.founding_patron_id = founding_patron_id;
+    if (founding_term_ends_at !== undefined) patch.founding_term_ends_at = founding_term_ends_at;
+    if (inaugurated_at !== undefined) patch.inaugurated_at = inaugurated_at;
+    const [updated] = await db.update(businesses).set(patch).where(eq(businesses.id, id)).returning();
     if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
 
     // Notify host user of audition result
@@ -1058,7 +1090,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
 
     res.json({ ok: true, message: 'Migration complete' });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1211,7 +1243,13 @@ router.patch('/contracts/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
-    const [updated] = await db.update(employmentContracts).set(req.body).where(eq(employmentContracts.id, id)).returning();
+    const { starts_at, ends_at, status: cStatus, note } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (starts_at !== undefined) patch.starts_at = starts_at;
+    if (ends_at !== undefined) patch.ends_at = ends_at;
+    if (cStatus !== undefined) patch.status = cStatus;
+    if (note !== undefined) patch.note = note;
+    const [updated] = await db.update(employmentContracts).set(patch).where(eq(employmentContracts.id, id)).returning();
     if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(updated);
   } catch (err) {
@@ -1246,7 +1284,12 @@ router.patch('/contract-requests/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
-    const [updated] = await db.update(contractRequests).set(req.body).where(eq(contractRequests.id, id)).returning();
+    const { description, desired_start, status: crStatus } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (description !== undefined) patch.description = description;
+    if (desired_start !== undefined) patch.desired_start = desired_start;
+    if (crStatus !== undefined) patch.status = crStatus;
+    const [updated] = await db.update(contractRequests).set(patch).where(eq(contractRequests.id, id)).returning();
     if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
     res.json(updated);
   } catch (err) {
@@ -1961,7 +2004,7 @@ router.post('/migrate/tokens', async (_req: Request, res: Response) => {
     `);
     res.json({ ok: true, message: 'Token migration complete' });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -1999,7 +2042,7 @@ router.post('/migrate/patronages', async (_req: Request, res: Response) => {
     `);
     res.json({ ok: true, message: 'Patronage migration complete' });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -2276,7 +2319,7 @@ router.post('/migrate/greenhouses', async (_req: Request, res: Response) => {
     `);
     res.json({ ok: true, message: 'Greenhouse migration complete' });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -2325,7 +2368,7 @@ router.post('/migrate/locations', async (_req: Request, res: Response) => {
     `);
     res.json({ ok: true, message: 'Location migration complete' });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { db } from '../db';
 import { varieties, businesses, orders } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
-router.post('/', async (req, res) => {
+router.post('/', requireUser, async (req, res) => {
   const { query, user_id, context } = req.body;
 
   if (!query) return res.status(400).json({ error: 'query required' });
@@ -68,8 +69,7 @@ User order history: ${JSON.stringify(history)}`,
 
     res.json({ response, action });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed';
-    res.status(500).json({ error: msg });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

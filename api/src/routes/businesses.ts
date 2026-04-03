@@ -3,6 +3,8 @@ import { eq, asc, and, sql, lt, gte } from 'drizzle-orm';
 import { db } from '../db';
 import { businesses, portraits, businessVisits, employmentContracts, users } from '../db/schema';
 import { stripe } from '../lib/stripe';
+import { logger } from '../lib/logger';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -33,7 +35,7 @@ router.get('/', async (_req: Request, res: Response) => {
       placed_user_name: placedByBiz.get(b.id) ?? null,
     })));
   } catch (err) {
-    console.error('[businesses] GET / error:', err);
+    logger.error('[businesses] GET / error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -90,11 +92,12 @@ router.get('/:id/portraits', async (req: Request, res: Response) => {
 });
 
 // POST /api/businesses/:id/visits — contracted user logs a member visit (POS seed)
-router.post('/:id/visits', async (req: Request, res: Response) => {
+router.post('/:id/visits', requireUser, async (req: Request, res: Response) => {
   const business_id = parseInt(req.params.id, 10);
-  const { contracted_user_id, visitor_user_id } = req.body;
-  if (isNaN(business_id) || !contracted_user_id) {
-    res.status(400).json({ error: 'contracted_user_id is required' });
+  const contracted_user_id: number = (req as any).userId;
+  const { visitor_user_id } = req.body;
+  if (isNaN(business_id)) {
+    res.status(400).json({ error: 'Invalid business id' });
     return;
   }
   try {

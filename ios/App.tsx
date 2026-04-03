@@ -78,7 +78,7 @@ export default function App() {
     const sub = AppState.addEventListener('change', async (state) => {
       if (state === 'active' && pushToken) {
         const id = await AsyncStorage.getItem('user_db_id').catch(() => null);
-        if (id) updatePushToken(parseInt(id), pushToken).catch(() => {});
+        if (id) updatePushToken(pushToken).catch(() => {});
       }
     });
     return () => sub.remove();
@@ -104,7 +104,7 @@ export default function App() {
   return (
     <AppContext.Provider value={{ reviewMode, enableReviewMode: handleEnableReviewMode, pushToken, pendingScreen, pendingData, clearPendingScreen: () => { setPendingScreen(null); setPendingData(null); } }}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <StripeProvider key={reviewMode ? 'test' : 'live'} publishableKey={publishableKey} merchantIdentifier="merchant.maison.fraise">
+      <StripeProvider key={reviewMode ? 'test' : 'live'} publishableKey={publishableKey} merchantIdentifier="merchant.com.maisonfraise.app">
         <SafeAreaProvider>
           <RootNavigator />
         </SafeAreaProvider>

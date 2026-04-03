@@ -9,7 +9,7 @@ interface PushPayload {
 // TODO: check notification_prefs before sending
 export async function sendPushNotification(pushToken: string, payload: PushPayload): Promise<void> {
   if (!pushToken.startsWith('ExponentPushToken[') && !pushToken.startsWith('ExpoPushToken[')) {
-    logger.warn('Skipping push — not an Expo token:', pushToken);
+    logger.warn('Skipping push — not an Expo token (prefix: ' + pushToken.slice(0, 8) + '...)');
     return;
   }
 

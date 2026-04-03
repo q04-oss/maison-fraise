@@ -4,6 +4,7 @@ import { businesses, popupRequests } from '../db/schema';
 import { stripe } from '../lib/stripe';
 import { logger } from '../lib/logger';
 import { eq } from 'drizzle-orm';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -11,10 +12,11 @@ const router = Router();
 const POPUP_REQUEST_FEE_CENTS = 2500;
 
 // POST /api/popup-requests
-router.post('/', async (req: Request, res: Response) => {
-  const { user_id, venue_id, date, time, notes } = req.body;
-  if (!user_id || !venue_id || !date || !time) {
-    res.status(400).json({ error: 'user_id, venue_id, date, and time are required' });
+router.post('/', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  const { venue_id, date, time, notes } = req.body;
+  if (!venue_id || !date || !time) {
+    res.status(400).json({ error: 'venue_id, date, and time are required' });
     return;
   }
 
@@ -28,13 +30,13 @@ router.post('/', async (req: Request, res: Response) => {
     const pi = await stripe.paymentIntents.create({
       amount: POPUP_REQUEST_FEE_CENTS,
       currency: 'cad',
-      metadata: { type: 'popup_request', user_id: String(user_id), venue_id: String(venue_id) },
+      metadata: { type: 'popup_request', user_id: String(userId), venue_id: String(venue_id) },
     });
 
     const [request] = await db
       .insert(popupRequests)
       .values({
-        user_id,
+        user_id: userId,
         venue_id,
         requested_date: date,
         requested_time: time,

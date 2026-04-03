@@ -101,7 +101,6 @@ export default function StandingOrderPanel() {
       else { next.setDate(1); next.setMonth(today.getMonth() + 1); }
 
       const { client_secret } = await createStandingOrder({
-        sender_id: senderId,
         recipient_id: type === 'gift' ? selectedRecipient?.id : undefined,
         variety_id: order.variety_id!,
         chocolate: order.chocolate!,
@@ -119,6 +118,10 @@ export default function StandingOrderPanel() {
         const { error: initErr } = await initPaymentSheet({
           merchantDisplayName: 'Maison Fraise',
           paymentIntentClientSecret: client_secret,
+          applePay: {
+            merchantCountryCode: 'CA',
+            merchantIdentifier: 'merchant.com.maisonfraise.app',
+          },
           defaultBillingDetails: { email: email ?? undefined },
           appearance: {
             colors: {
@@ -153,7 +156,7 @@ export default function StandingOrderPanel() {
   const handleConfirmFromFund = async () => {
     const senderId = userDbId;
     if (!senderId || !isVerified) return;
-    if (!order.variety_id || !order.location_id) {
+    if (!order.variety_id || !order.location_id || !order.time_slot_id || !order.chocolate || !order.finish) {
       Alert.alert('Incomplete order', 'Return to the order flow and complete your selection first.');
       return;
     }
@@ -170,7 +173,7 @@ export default function StandingOrderPanel() {
     }
     setSubmitting(true);
     try {
-      const result = await placeStandingOrderFromFund(order.variety_id!, order.quantity, order.location_id!);
+      const result = await placeStandingOrderFromFund(order.variety_id!, order.quantity, order.location_id!, order.time_slot_id!, order.chocolate!, order.finish!);
       setFundNewBalance(result.new_balance_cents);
       setSuccess(true);
     } catch (err: unknown) {

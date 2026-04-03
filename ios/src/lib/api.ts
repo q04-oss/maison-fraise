@@ -10,21 +10,6 @@ export async function setAuthToken(token: string): Promise<void> {
   return AsyncStorage.setItem('auth_token', token);
 }
 
-export async function fetchAuthToken(userId: number): Promise<string | null> {
-  try {
-    const r = await fetch(`${BASE_URL}/api/auth/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_id: userId }),
-    });
-    if (!r.ok) return null;
-    const { token } = await r.json();
-    await setAuthToken(token);
-    return token;
-  } catch {
-    return null;
-  }
-}
 
 async function authHeader(): Promise<Record<string, string>> {
   const token = await getAuthToken();
@@ -48,8 +33,9 @@ export async function fetchSlots(locationId: number, date: string) {
   return res.json();
 }
 
-export async function fetchOrdersByEmail(email: string) {
-  const res = await fetch(`${BASE_URL}/api/orders?email=${encodeURIComponent(email)}`);
+export async function fetchOrdersByEmail() {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/orders`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch orders');
   return res.json();
 }
@@ -68,9 +54,10 @@ export async function searchVerifiedUsers(q: string) {
 
 
 export async function generateGiftNote(tone: string, variety_name: string, recipient_context: string) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/gift-note`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ tone, variety_name, recipient_context }),
   });
   if (!res.ok) throw new Error('Failed to generate note');
@@ -78,7 +65,6 @@ export async function generateGiftNote(tone: string, variety_name: string, recip
 }
 
 export async function createStandingOrder(body: {
-  sender_id: number;
   recipient_id?: number;
   variety_id: number;
   chocolate: string;
@@ -100,19 +86,21 @@ export async function createStandingOrder(body: {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? err.detail ?? 'Failed to create standing order');
   }
-  return res.json() as Promise<{ id: number; client_secret: string }>;
+  return res.json();
 }
 
-export async function fetchStandingOrders(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/standing-orders?user_id=${userId}`);
+export async function fetchStandingOrders() {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/standing-orders`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch standing orders');
   return res.json();
 }
 
 export async function updateStandingOrder(id: number, status: 'active' | 'paused') {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/standing-orders/${id}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ status }),
   });
   if (!res.ok) throw new Error('Failed to update standing order');
@@ -120,7 +108,11 @@ export async function updateStandingOrder(id: number, status: 'active' | 'paused
 }
 
 export async function cancelStandingOrder(id: number) {
-  const res = await fetch(`${BASE_URL}/api/standing-orders/${id}`, { method: 'DELETE' });
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/standing-orders/${id}`, {
+    method: 'DELETE',
+    headers: auth,
+  });
   if (!res.ok) throw new Error('Failed to cancel standing order');
   return res.json();
 }
@@ -176,24 +168,14 @@ export async function confirmOrder(orderId: number) {
   }>;
 }
 
-export async function signInWithApple(identity_token: string, push_token?: string | null, display_name?: string | null): Promise<{ user_db_id: number; email: string }> {
-  const res = await fetch(`${BASE_URL}/api/auth/apple`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identity_token, push_token: push_token ?? undefined, display_name: display_name ?? undefined }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error ?? 'Sign in failed');
-  }
-  return res.json();
-}
 
-export async function updatePushToken(user_id: number, push_token: string): Promise<void> {
+export async function updatePushToken(push_token: string): Promise<void> {
+  const auth = await authHeader();
+  if (!auth['Authorization']) return; // No token, skip silently
   await fetch(`${BASE_URL}/api/auth/push-token`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id, push_token }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ push_token }),
   });
 }
 
@@ -219,12 +201,12 @@ export async function fetchNominationLeaderboard(popupId: number) {
 
 export async function createCampaignCommission(body: {
   popup_id: number;
-  user_id: number;
   invited_user_ids: number[];
 }) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/campaign-commissions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -240,11 +222,12 @@ export async function fetchPopupAttendees(popupId: number) {
   return res.json() as Promise<{ user_id: number; display_name: string }[]>;
 }
 
-export async function submitNomination(popupId: number, nominatorId: number, nomineeId: number) {
+export async function submitNomination(popupId: number, nomineeId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/nominations`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nominator_id: nominatorId, nominee_id: nomineeId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nominee_id: nomineeId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -253,8 +236,9 @@ export async function submitNomination(popupId: number, nominatorId: number, nom
   return res.json();
 }
 
-export async function fetchNominationStatus(popupId: number, userId: number) {
-  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/nominations/status?user_id=${userId}`);
+export async function fetchNominationStatus(popupId: number) {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/nominations/status`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch nomination status');
   return res.json() as Promise<{ has_nominated: boolean }>;
 }
@@ -265,11 +249,12 @@ export async function fetchBusinessPortraits(businessId: number) {
   return res.json() as Promise<{ id: number; url: string; season: string; subject_name?: string }[]>;
 }
 
-export async function acceptDjOffer(popupId: number, userId: number) {
+export async function acceptDjOffer(popupId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/dj-accept`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -278,24 +263,27 @@ export async function acceptDjOffer(popupId: number, userId: number) {
   return res.json();
 }
 
-export async function passDjOffer(popupId: number, userId: number) {
+export async function passDjOffer(popupId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/dj-pass`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error('Failed to pass offer');
   return res.json();
 }
 
 export async function fetchUserPopupRsvps(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/users/${userId}/popup-rsvps`);
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/popup-rsvps`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch popup RSVPs');
   return res.json();
 }
 
 export async function fetchDjGigs(userId: number) {
-  const res = await fetch(`${BASE_URL}/api/users/${userId}/dj-gigs`);
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/dj-gigs`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch DJ gigs');
   return res.json();
 }
@@ -307,26 +295,29 @@ export async function fetchDjAllocations(userId: number) {
 }
 
 export async function registerAsDj(userId: number, isDj: boolean) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/${userId}/dj`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ is_dj: isDj }),
   });
   if (!res.ok) throw new Error('Failed to update DJ status');
   return res.json();
 }
 
-export async function fetchPopupRsvpStatus(popupId: number, userId: number) {
-  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/rsvp-status?user_id=${userId}`);
+export async function fetchPopupRsvpStatus(popupId: number) {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/rsvp-status`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch RSVP status');
   return res.json() as Promise<{ has_rsvp: boolean }>;
 }
 
-export async function createPopupRsvp(popupId: number, userId: number) {
+export async function createPopupRsvp(popupId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/rsvp`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -335,11 +326,12 @@ export async function createPopupRsvp(popupId: number, userId: number) {
   return res.json() as Promise<{ id: number; client_secret: string }>;
 }
 
-export async function checkInPopup(popupId: number, userId: number, nfc_token: string) {
+export async function checkInPopup(popupId: number, nfc_token: string) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/checkin`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId, nfc_token }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nfc_token }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -349,15 +341,15 @@ export async function checkInPopup(popupId: number, userId: number, nfc_token: s
 }
 
 export async function submitPopupRequest(body: {
-  user_id: number;
   venue_id: number;
   date: string;
   time: string;
   notes?: string;
 }) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popup-requests`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -397,11 +389,12 @@ export async function fetchActiveContract(userId: number) {
   } | null>;
 }
 
-export async function acceptContract(contractId: number, userId: number) {
+export async function acceptContract(contractId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/contracts/${contractId}/accept`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -410,21 +403,23 @@ export async function acceptContract(contractId: number, userId: number) {
   return res.json();
 }
 
-export async function declineContract(contractId: number, userId: number) {
+export async function declineContract(contractId: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/contracts/${contractId}/decline`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_id: userId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error('Failed to decline contract');
   return res.json();
 }
 
-export async function logMemberVisit(businessId: number, contractedUserId: number) {
+export async function logMemberVisit(businessId: number, visitorUserId?: number) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/businesses/${businessId}/visits`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contracted_user_id: contractedUserId }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ visitor_user_id: visitorUserId ?? null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -465,11 +460,12 @@ export async function fetchFollowerCount(userId: number) {
   return res.json() as Promise<{ follower_count: number }>;
 }
 
-export async function verifyNfc(nfc_token: string, user_db_id: number) {
+export async function verifyNfc(nfc_token: string) {
+  const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/verify/nfc`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nfc_token, user_id: user_db_id }),
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nfc_token }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -517,31 +513,31 @@ export async function fetchLegitimacyBreakdown(userId: number) {
   return res.json() as Promise<{ total: number; breakdown: { event_type: string; total: number; count: number }[] }>;
 }
 
-export async function followUser(userId: number, followerId: number) {
+export async function followUser(userId: number) {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ follower_id: followerId }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Failed to follow'); }
   return res.json();
 }
 
-export async function unfollowUser(userId: number, followerId: number) {
+export async function unfollowUser(userId: number) {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/${userId}/follow`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ follower_id: followerId }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) throw new Error('Failed to unfollow');
   return res.json();
 }
 
-export async function fetchFollowStatus(userId: number, followerId: number) {
+export async function fetchFollowStatus(userId: number) {
   const auth = await authHeader();
-  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow-status?follower_id=${followerId}`, { headers: auth });
+  const res = await fetch(`${BASE_URL}/api/users/${userId}/follow-status`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch follow status');
   return res.json() as Promise<{ is_following: boolean }>;
 }
@@ -549,7 +545,7 @@ export async function fetchFollowStatus(userId: number, followerId: number) {
 export async function fetchOrderHistory(userId: number, offset = 0, limit = 20) {
   const headers = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/me/orders?offset=${offset}&limit=${limit}`, {
-    headers: { 'X-User-ID': String(userId), ...headers },
+    headers,
   });
   if (!res.ok) throw new Error('Failed to fetch orders');
   return res.json() as Promise<{
@@ -568,7 +564,7 @@ export async function fetchOrderHistory(userId: number, offset = 0, limit = 20) 
 
 export async function fetchActivityFeed(userId: number) {
   const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/api/feed?user_id=${userId}`, { headers });
+  const res = await fetch(`${BASE_URL}/api/feed`, { headers });
   if (!res.ok) throw new Error('Failed to fetch feed');
   return res.json() as Promise<{
     type: string;
@@ -581,7 +577,7 @@ export async function fetchActivityFeed(userId: number) {
 
 export async function fetchNotifications(userId: number) {
   const headers = await authHeader();
-  const res = await fetch(`${BASE_URL}/api/notifications?user_id=${userId}`, { headers });
+  const res = await fetch(`${BASE_URL}/api/notifications`, { headers });
   if (!res.ok) throw new Error('Failed to fetch notifications');
   return res.json() as Promise<{
     id: number;
@@ -604,7 +600,7 @@ export async function updateDisplayName(userId: number, display_name: string) {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/me/display-name`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'X-User-ID': String(userId), ...auth },
+    headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ display_name }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error ?? 'Failed to update name'); }
@@ -641,12 +637,12 @@ export async function fetchNominationsReceived(userId: number) {
   return res.json() as Promise<{ id: number; popup_name: string; popup_starts_at: string | null; nominator_id: number; nominator_name: string; created_at: string }[]>;
 }
 
-export async function cancelPopupRsvp(popupId: number, userId: number) {
+export async function cancelPopupRsvp(popupId: number) {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/rsvp`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ user_id: userId }),
+    body: JSON.stringify({}),
   });
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
@@ -657,7 +653,7 @@ export async function cancelPopupRsvp(popupId: number, userId: number) {
 
 export async function fetchTimeSlots(locationId: number, date: string): Promise<any[]> {
   const r = await fetch(`${BASE_URL}/api/time-slots?location_id=${locationId}&date=${date}`);
-  if (!r.ok) return [];
+  if (!r.ok) throw new Error('Failed to fetch time slots');
   return r.json();
 }
 
@@ -671,9 +667,9 @@ export async function createOrderPaymentIntent(order: {
   variety_id: number;
   quantity: number;
   location_id: number;
-  time_slot_id: number | null;
-  chocolate: string | null;
-  finish: string | null;
+  time_slot_id: number;
+  chocolate: string;
+  finish: string;
   is_gift: boolean;
   gift_note: string | null;
   customer_email: string;
@@ -687,11 +683,6 @@ export async function createOrderPaymentIntent(order: {
   return r.json();
 }
 
-export async function fetchLatestOrderByEmail(email: string): Promise<any | null> {
-  const r = await fetch(`${BASE_URL}/api/orders/by-email/${encodeURIComponent(email)}`);
-  if (!r.ok) return null;
-  return r.json();
-}
 
 export async function searchAll(q: string): Promise<{ users: any[]; popups: any[]; varieties: any[] }> {
   const r = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(q)}`);
@@ -704,7 +695,7 @@ export async function verifyAppleSignIn(params: {
   firstName?: string;
   lastName?: string;
   email?: string;
-}): Promise<{ user_id: number; token: string; is_new: boolean }> {
+}): Promise<{ user_id: number; token: string; is_new: boolean; email?: string }> {
   const r = await fetch(`${BASE_URL}/api/auth/apple/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -716,11 +707,15 @@ export async function verifyAppleSignIn(params: {
 
 export async function rateOrder(orderId: number, rating: number, note?: string): Promise<void> {
   const headers = await authHeader();
-  await fetch(`${BASE_URL}/api/orders/${orderId}/rate`, {
+  const res = await fetch(`${BASE_URL}/api/orders/${orderId}/rate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify({ rating, note }),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? 'Failed to submit rating');
+  }
 }
 
 export async function demoLogin(): Promise<{ user_id: number; token: string }> {
@@ -1105,12 +1100,15 @@ export async function placeStandingOrderFromFund(
   varietyId: number,
   quantity: number,
   locationId: number,
+  timeSlotId: number,
+  chocolate: string,
+  finish: string,
 ): Promise<{ ok: boolean; order_id: number; new_balance_cents: number }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/standing-orders/from-fund`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ variety_id: varietyId, quantity, location_id: locationId }),
+    body: JSON.stringify({ variety_id: varietyId, quantity, location_id: locationId, time_slot_id: timeSlotId, chocolate, finish }),
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'fund_order_failed'); }
   return r.json();

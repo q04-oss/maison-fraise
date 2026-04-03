@@ -60,30 +60,45 @@ export default function HomePanel() {
     }
   }, [activeLocation?.id]);
 
-  const loadVarieties = () => {
+  const loadVarieties = async () => {
     if (hasFetched.current || varieties.length > 0) { setLoading(false); return; }
     hasFetched.current = true;
     setFetchError(false);
     setLoading(true);
-    fetchVarieties()
-      .then((vars: any[]) => {
-        const merged = vars.map((v: any) => {
-          const seed = STRAWBERRIES.find(s => s.name === v.name);
-          return { ...(seed ?? {}), ...v, harvestDate: v.harvest_date ?? seed?.harvestDate };
-        });
-        setVarieties(merged);
-      })
-      .catch(() => { hasFetched.current = false; setFetchError(true); })
-      .finally(() => setLoading(false));
+    try {
+      const vars: any[] = await fetchVarieties();
+      const merged = vars.map((v: any) => {
+        const seed = STRAWBERRIES.find(s => s.name === v.name);
+        return { ...(seed ?? {}), ...v, harvestDate: v.harvest_date ?? seed?.harvestDate };
+      });
+      setVarieties(merged);
+    } catch {
+      hasFetched.current = false;
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadVarieties(); }, []);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    hasFetched.current = false;
-    loadVarieties();
-    setRefreshing(false);
+    hasFetched.current = true; // Prevent loadVarieties from short-circuiting
+    setFetchError(false);
+    try {
+      const vars: any[] = await fetchVarieties();
+      const merged = vars.map((v: any) => {
+        const seed = STRAWBERRIES.find(s => s.name === v.name);
+        return { ...(seed ?? {}), ...v, harvestDate: v.harvest_date ?? seed?.harvestDate };
+      });
+      setVarieties(merged);
+    } catch {
+      hasFetched.current = false;
+      setFetchError(true);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleLocationToggle = (biz: any) => {

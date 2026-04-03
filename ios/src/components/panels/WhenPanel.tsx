@@ -19,6 +19,7 @@ export default function WhenPanel() {
   });
   const [slots, setSlots] = useState<any[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [slotError, setSlotError] = useState(false);
 
   const activeBiz = businesses.find((b: any) => b.id === order.location_id);
   const isPopup = activeBiz?.type === 'popup';
@@ -43,9 +44,10 @@ export default function WhenPanel() {
   useEffect(() => {
     if (!order.location_id || !order.date) return;
     setLoadingSlots(true);
+    setSlotError(false);
     fetchTimeSlots(order.location_id, order.date)
       .then(setSlots)
-      .catch(() => setSlots([]))
+      .catch(() => { setSlots([]); setSlotError(true); })
       .finally(() => setLoadingSlots(false));
   }, [order.location_id, order.date]);
 
@@ -129,6 +131,8 @@ export default function WhenPanel() {
               <Text style={[styles.emptyText, { color: c.muted }]}>Select a date above.</Text>
             ) : loadingSlots ? (
               <ActivityIndicator color={c.accent} style={styles.loader} />
+            ) : slotError ? (
+              <Text style={[styles.emptyText, { color: c.muted }]}>Could not load time slots. Pull down to retry.</Text>
             ) : visibleSlots.length === 0 ? (
               <Text style={[styles.emptyText, { color: c.muted }]}>No slots available for this date.</Text>
             ) : (

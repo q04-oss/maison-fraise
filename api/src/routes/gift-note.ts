@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
 // POST /api/gift-note
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireUser, async (req: Request, res: Response) => {
   const { tone, variety_name, recipient_context } = req.body;
   if (!tone || !variety_name || !recipient_context) {
     res.status(400).json({ error: 'tone, variety_name, and recipient_context are required' });

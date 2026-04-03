@@ -9,15 +9,16 @@ import { stripe } from '../lib/stripe';
 import { sendPushNotification } from '../lib/push';
 import { sendNominationReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
-// GET /api/popups/:id/rsvp-status?user_id=
-router.get('/:id/rsvp-status', async (req: Request, res: Response) => {
+// GET /api/popups/:id/rsvp-status
+router.get('/:id/rsvp-status', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const user_id = parseInt(String(req.query.user_id), 10);
-  if (isNaN(popup_id) || isNaN(user_id)) {
-    res.status(400).json({ error: 'Invalid ids' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid id' });
     return;
   }
 
@@ -34,11 +35,11 @@ router.get('/:id/rsvp-status', async (req: Request, res: Response) => {
 });
 
 // POST /api/popups/:id/rsvp
-router.post('/:id/rsvp', async (req: Request, res: Response) => {
+router.post('/:id/rsvp', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(popup_id) || !user_id) {
-    res.status(400).json({ error: 'popup_id and user_id are required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid popup id' });
     return;
   }
 
@@ -105,12 +106,12 @@ router.post('/:id/rsvp', async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/popups/:id/rsvp — cancel an RSVP (body: { user_id: number })
-router.delete('/:id/rsvp', async (req: Request, res: Response) => {
+// DELETE /api/popups/:id/rsvp — cancel own RSVP
+router.delete('/:id/rsvp', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(popup_id) || !user_id) {
-    res.status(400).json({ error: 'popup_id and user_id are required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid popup id' });
     return;
   }
   try {
@@ -143,24 +144,27 @@ router.delete('/:id/rsvp', async (req: Request, res: Response) => {
           .limit(1);
 
         if (nextWaitlisted) {
-          // Promote to pending (they need to pay if there's a fee)
+          // Atomically claim the waitlist slot — only proceed if we won the race
           const [popup] = await db.select().from(businesses).where(eq(businesses.id, popup_id));
           const fee = popup?.entrance_fee_cents ?? 0;
 
           if (fee > 0) {
-            // Create a new payment intent for them
             const pi = await stripe.paymentIntents.create({
               amount: fee,
               currency: 'cad',
               metadata: { type: 'popup_rsvp', popup_id: String(popup_id), user_id: String(nextWaitlisted.user_id) },
             });
-            await db.update(popupRsvps)
+            const promoted = await db.update(popupRsvps)
               .set({ status: 'pending', stripe_payment_intent_id: pi.id })
-              .where(eq(popupRsvps.id, nextWaitlisted.id));
+              .where(and(eq(popupRsvps.id, nextWaitlisted.id), eq(popupRsvps.status, 'waitlist')))
+              .returning();
+            if (promoted.length === 0) return; // Another request already promoted this entry
           } else {
-            await db.update(popupRsvps)
+            const promoted = await db.update(popupRsvps)
               .set({ status: 'paid' })
-              .where(eq(popupRsvps.id, nextWaitlisted.id));
+              .where(and(eq(popupRsvps.id, nextWaitlisted.id), eq(popupRsvps.status, 'waitlist')))
+              .returning();
+            if (promoted.length === 0) return; // Another request already promoted this entry
           }
 
           // Notify the promoted user
@@ -185,11 +189,12 @@ router.delete('/:id/rsvp', async (req: Request, res: Response) => {
 });
 
 // POST /api/popups/:id/checkin
-router.post('/:id/checkin', async (req: Request, res: Response) => {
+router.post('/:id/checkin', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { user_id, nfc_token } = req.body;
-  if (isNaN(popup_id) || !user_id) {
-    res.status(400).json({ error: 'popup_id and user_id are required' });
+  const user_id: number = (req as any).userId;
+  const { nfc_token } = req.body;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid popup id' });
     return;
   }
 
@@ -300,12 +305,12 @@ router.get('/:id/nominations/leaderboard', async (req: Request, res: Response) =
   }
 });
 
-// GET /api/popups/:id/nominations/status?user_id=
-router.get('/:id/nominations/status', async (req: Request, res: Response) => {
+// GET /api/popups/:id/nominations/status
+router.get('/:id/nominations/status', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const user_id = parseInt(String(req.query.user_id), 10);
-  if (isNaN(popup_id) || isNaN(user_id)) {
-    res.status(400).json({ error: 'Invalid ids' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid id' });
     return;
   }
 
@@ -322,11 +327,12 @@ router.get('/:id/nominations/status', async (req: Request, res: Response) => {
 });
 
 // POST /api/popups/:id/nominations
-router.post('/:id/nominations', async (req: Request, res: Response) => {
+router.post('/:id/nominations', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { nominator_id, nominee_id } = req.body;
-  if (isNaN(popup_id) || !nominator_id || !nominee_id) {
-    res.status(400).json({ error: 'popup_id, nominator_id, nominee_id are required' });
+  const nominator_id: number = (req as any).userId;
+  const { nominee_id } = req.body;
+  if (isNaN(popup_id) || !nominee_id) {
+    res.status(400).json({ error: 'nominee_id is required' });
     return;
   }
   if (nominator_id === nominee_id) {
@@ -399,11 +405,11 @@ router.post('/:id/nominations', async (req: Request, res: Response) => {
 });
 
 // POST /api/popups/:id/dj-accept
-router.post('/:id/dj-accept', async (req: Request, res: Response) => {
+router.post('/:id/dj-accept', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(popup_id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid popup id' });
     return;
   }
 
@@ -435,11 +441,11 @@ router.post('/:id/dj-accept', async (req: Request, res: Response) => {
 });
 
 // POST /api/popups/:id/dj-pass
-router.post('/:id/dj-pass', async (req: Request, res: Response) => {
+router.post('/:id/dj-pass', requireUser, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
-  if (isNaN(popup_id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) {
+    res.status(400).json({ error: 'Invalid popup id' });
     return;
   }
 

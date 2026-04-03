@@ -17,9 +17,9 @@ async function requireVerified(userId: number, res: Response): Promise<boolean> 
 }
 
 // POST /api/standing-orders
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
   const {
-    sender_id,
     recipient_id,
     variety_id,
     chocolate,
@@ -32,13 +32,17 @@ router.post('/', async (req: Request, res: Response) => {
     gift_tone,
   } = req.body;
 
-  if (!sender_id || !variety_id || !chocolate || !finish || !quantity || !location_id || !time_slot_preference || !frequency || !next_order_date) {
+  if (!variety_id || !chocolate || !finish || !quantity || !location_id || !time_slot_preference || !frequency || !next_order_date) {
     res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    res.status(400).json({ error: 'quantity must be a positive integer' });
     return;
   }
 
   try {
-    if (!await requireVerified(sender_id, res)) return;
+    if (!await requireVerified(userId, res)) return;
 
     if (recipient_id) {
       const [recipient] = await db.select().from(users).where(eq(users.id, recipient_id));
@@ -49,7 +53,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     const [standing] = await db.insert(standingOrders).values({
-      sender_id,
+      sender_id: userId,
       recipient_id: recipient_id ?? null,
       variety_id,
       chocolate,
@@ -64,7 +68,7 @@ router.post('/', async (req: Request, res: Response) => {
     }).returning();
 
     await db.insert(legitimacyEvents).values({
-      user_id: sender_id,
+      user_id: userId,
       event_type: 'standing_order_active',
       weight: 5,
     });
@@ -75,13 +79,9 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/standing-orders?user_id=
-router.get('/', async (req: Request, res: Response) => {
-  const user_id = parseInt(String(req.query.user_id), 10);
-  if (isNaN(user_id)) {
-    res.status(400).json({ error: 'user_id query parameter is required' });
-    return;
-  }
+// GET /api/standing-orders — own standing orders only
+router.get('/', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
 
   try {
     const rows = await db
@@ -98,7 +98,7 @@ router.get('/', async (req: Request, res: Response) => {
       })
       .from(standingOrders)
       .leftJoin(varieties, eq(standingOrders.variety_id, varieties.id))
-      .where(or(eq(standingOrders.sender_id, user_id), eq(standingOrders.recipient_id, user_id)));
+      .where(or(eq(standingOrders.sender_id, userId), eq(standingOrders.recipient_id, userId)));
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
@@ -106,13 +106,14 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // PATCH /api/standing-orders/:id
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: 'Invalid id' });
     return;
   }
 
+  const userId: number = (req as any).userId;
   const { status } = req.body;
   if (status !== 'active' && status !== 'paused') {
     res.status(400).json({ error: 'status must be active or paused' });
@@ -120,14 +121,20 @@ router.patch('/:id', async (req: Request, res: Response) => {
   }
 
   try {
+    const [existing] = await db.select().from(standingOrders).where(eq(standingOrders.id, id));
+    if (!existing) {
+      res.status(404).json({ error: 'Standing order not found' });
+      return;
+    }
+    if (existing.sender_id !== userId) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
     const [updated] = await db.update(standingOrders)
       .set({ status })
       .where(eq(standingOrders.id, id))
       .returning();
-    if (!updated) {
-      res.status(404).json({ error: 'Standing order not found' });
-      return;
-    }
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
@@ -135,17 +142,23 @@ router.patch('/:id', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/standing-orders/:id
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) {
     res.status(400).json({ error: 'Invalid id' });
     return;
   }
 
+  const userId: number = (req as any).userId;
+
   try {
     const [standing] = await db.select().from(standingOrders).where(eq(standingOrders.id, id));
     if (!standing) {
       res.status(404).json({ error: 'Standing order not found' });
+      return;
+    }
+    if (standing.sender_id !== userId) {
+      res.status(403).json({ error: 'Forbidden' });
       return;
     }
 
@@ -187,33 +200,46 @@ router.post('/from-fund', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
-    // Deduct from fund
-    await db.execute(sql`
-      UPDATE membership_funds
-      SET balance_cents = balance_cents - ${required_cents}, updated_at = now()
-      WHERE user_id = ${userId}
-    `);
-
-    // Look up user email for order
+    // Look up user email before the transaction
     const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
     if (!user) { res.status(401).json({ error: 'unauthorized' }); return; }
 
-    const [order] = await db.insert(orders).values({
-      variety_id,
-      location_id,
-      time_slot_id,
-      chocolate,
-      finish,
-      quantity,
-      is_gift: false,
-      total_cents: required_cents,
-      customer_email: user.email,
-      status: 'paid',
-      payment_method: 'fund',
-    }).returning();
+    // Atomically deduct and create order in a single transaction
+    const result = await db.transaction(async (tx) => {
+      const deducted = await tx.execute(sql`
+        UPDATE membership_funds
+        SET balance_cents = balance_cents - ${required_cents}, updated_at = now()
+        WHERE user_id = ${userId} AND balance_cents >= ${required_cents}
+      `);
 
-    const new_balance_cents = balance_cents - required_cents;
-    res.json({ ok: true, order_id: order.id, new_balance_cents });
+      // If no rows updated, balance was insufficient (race condition guard)
+      const rowCount = (deducted as any).rowCount ?? (deducted as any).rowsAffected ?? 0;
+      if (rowCount === 0) return null;
+
+      const [order] = await tx.insert(orders).values({
+        variety_id,
+        location_id,
+        time_slot_id,
+        chocolate,
+        finish,
+        quantity,
+        is_gift: false,
+        total_cents: required_cents,
+        customer_email: user.email,
+        status: 'paid',
+        payment_method: 'fund',
+      }).returning();
+
+      return order;
+    });
+
+    if (!result) {
+      res.status(400).json({ error: 'insufficient_fund_balance' });
+      return;
+    }
+
+    const [updatedFund] = await db.select({ balance_cents: membershipFunds.balance_cents }).from(membershipFunds).where(eq(membershipFunds.user_id, userId)).limit(1);
+    res.json({ ok: true, order_id: result.id, new_balance_cents: updatedFund?.balance_cents ?? 0 });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
   }

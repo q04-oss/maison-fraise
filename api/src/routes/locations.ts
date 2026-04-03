@@ -52,7 +52,16 @@ slotsRouter.get('/', async (req: Request, res: Response) => {
         capacity: Math.floor(Math.random() * 4) + 2,
         booked: 0,
       }));
-      rows = await db.insert(timeSlots).values(newSlots).returning();
+      try {
+        rows = await db.insert(timeSlots).values(newSlots).returning();
+      } catch {
+        // Race condition: another request already inserted slots — re-fetch
+        rows = await db
+          .select()
+          .from(timeSlots)
+          .where(and(eq(timeSlots.location_id, locationIdNum), eq(timeSlots.date, String(date))))
+          .orderBy(timeSlots.time);
+      }
       rows.sort((a, b) => a.time.localeCompare(b.time));
     }
 

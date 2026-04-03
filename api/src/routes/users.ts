@@ -11,14 +11,9 @@ import { stripe } from '../lib/stripe';
 
 const router = Router();
 
-// GET /api/users/me — identified by X-User-ID header
-router.get('/me', async (req: Request, res: Response) => {
-  const rawId = req.headers['x-user-id'];
-  const user_id = parseInt(String(rawId), 10);
-  if (isNaN(user_id)) {
-    res.status(400).json({ error: 'X-User-ID header is required' });
-    return;
-  }
+// GET /api/users/me — identified by Bearer token
+router.get('/me', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
 
   try {
     const [user] = await db.select().from(users).where(eq(users.id, user_id));
@@ -56,8 +51,10 @@ router.get('/search', async (req: Request, res: Response) => {
       )
       .limit(20);
     res.json(rows.map(r => ({
-      ...r,
+      id: r.id,
       display_name: r.display_name ?? r.email.split('@')[0],
+      verified: r.verified,
+      is_dj: r.is_dj,
     })));
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
@@ -80,12 +77,16 @@ router.patch('/me/display-name', requireUser, async (req: Request, res: Response
   }
 });
 
-// POST /api/users/:id/follow — body: { follower_id: number }
+// POST /api/users/:id/follow
 router.post('/:id/follow', requireUser, async (req: Request, res: Response) => {
   const followee_id = parseInt(req.params.id, 10);
-  const { follower_id } = req.body;
-  if (isNaN(followee_id) || !follower_id) {
-    res.status(400).json({ error: 'follower_id is required' });
+  const follower_id = (req as any).userId as number;
+  if (isNaN(followee_id)) {
+    res.status(400).json({ error: 'Invalid user id' });
+    return;
+  }
+  if (follower_id === followee_id) {
+    res.status(400).json({ error: 'Cannot follow yourself' });
     return;
   }
   try {
@@ -111,12 +112,12 @@ router.post('/:id/follow', requireUser, async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/users/:id/follow — body: { follower_id: number }
+// DELETE /api/users/:id/follow
 router.delete('/:id/follow', requireUser, async (req: Request, res: Response) => {
   const followee_id = parseInt(req.params.id, 10);
-  const { follower_id } = req.body;
-  if (isNaN(followee_id) || !follower_id) {
-    res.status(400).json({ error: 'follower_id is required' });
+  const follower_id = (req as any).userId as number;
+  if (isNaN(followee_id)) {
+    res.status(400).json({ error: 'Invalid user id' });
     return;
   }
   try {
@@ -129,12 +130,12 @@ router.delete('/:id/follow', requireUser, async (req: Request, res: Response) =>
   }
 });
 
-// GET /api/users/:id/follow-status?follower_id=
-router.get('/:id/follow-status', async (req: Request, res: Response) => {
+// GET /api/users/:id/follow-status
+router.get('/:id/follow-status', requireUser, async (req: Request, res: Response) => {
   const followee_id = parseInt(req.params.id, 10);
-  const follower_id = parseInt(String(req.query.follower_id), 10);
-  if (isNaN(followee_id) || isNaN(follower_id)) {
-    res.status(400).json({ error: 'follower_id is required' });
+  const follower_id = (req as any).userId as number;
+  if (isNaN(followee_id)) {
+    res.status(400).json({ error: 'Invalid id' });
     return;
   }
   try {
@@ -148,12 +149,17 @@ router.get('/:id/follow-status', async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /api/users/:id/dj — toggle DJ status
-router.patch('/:id/dj', async (req: Request, res: Response) => {
+// PATCH /api/users/:id/dj — toggle own DJ status
+router.patch('/:id/dj', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
+  const caller_id = (req as any).userId as number;
   const { is_dj } = req.body;
   if (isNaN(user_id) || typeof is_dj !== 'boolean') {
     res.status(400).json({ error: 'is_dj boolean is required' });
+    return;
+  }
+  if (user_id !== caller_id) {
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
 
@@ -166,10 +172,15 @@ router.patch('/:id/dj', async (req: Request, res: Response) => {
 });
 
 // GET /api/users/:id/popup-rsvps
-router.get('/:id/popup-rsvps', async (req: Request, res: Response) => {
+router.get('/:id/popup-rsvps', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
+  const caller_id = (req as any).userId as number;
   if (isNaN(user_id)) {
     res.status(400).json({ error: 'Invalid user id' });
+    return;
+  }
+  if (user_id !== caller_id) {
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
 
@@ -195,10 +206,15 @@ router.get('/:id/popup-rsvps', async (req: Request, res: Response) => {
 });
 
 // GET /api/users/:id/dj-gigs — pending + accepted DJ offers
-router.get('/:id/dj-gigs', async (req: Request, res: Response) => {
+router.get('/:id/dj-gigs', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
+  const caller_id = (req as any).userId as number;
   if (isNaN(user_id)) {
     res.status(400).json({ error: 'Invalid user id' });
+    return;
+  }
+  if (user_id !== caller_id) {
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
 
@@ -407,7 +423,7 @@ router.get('/:id/public-profile', async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/users/me/orders — order history identified by JWT or X-User-ID header
+// GET /api/users/me/orders — order history for authenticated user
 router.get('/me/orders', requireUser, async (req: Request, res: Response) => {
   const user_id = (req as any).userId as number;
   try {
@@ -460,9 +476,10 @@ router.get('/notifications', requireUser, async (req: Request, res: Response) =>
 // PATCH /api/notifications/:id/read
 router.patch('/notifications/:id/read', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
+  const user_id = (req as any).userId as number;
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
-    await db.update(notifications).set({ read: true }).where(eq(notifications.id, id));
+    await db.update(notifications).set({ read: true }).where(and(eq(notifications.id, id), eq(notifications.user_id, user_id)));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

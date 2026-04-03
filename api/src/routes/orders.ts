@@ -109,7 +109,7 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(201).json({ order, client_secret: clientSecret });
   } catch (err: any) {
     logger.error('Order creation error: ' + String(err?.message ?? err));
-    res.status(500).json({ error: 'Internal server error', detail: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -130,27 +130,36 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       return;
     }
     if (order.status !== 'pending') {
-      res.json({ success: true, order_id: order.id, status: order.status });
+      // Already processed — return the full order so iOS app can read id, nfc_token, total_cents
+      res.json(order);
       return;
     }
 
-    // Stripe confirmation already happened client-side via presentPaymentSheet.
-    // No need to re-verify — if the client got here, payment was collected.
+    // Verify with Stripe that payment was actually collected before marking paid.
+    if (!isReview && order.stripe_payment_intent_id) {
+      const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id);
+      if (pi.status !== 'succeeded') {
+        res.status(402).json({ error: 'payment_not_confirmed' });
+        return;
+      }
+    }
 
     const nfc_token = randomUUID();
 
-    // Mark order paid and update inventory
-    await db.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
-    if (!isReview) {
-      await db
-        .update(varieties)
-        .set({ stock_remaining: sql`${varieties.stock_remaining} - ${order.quantity}` })
-        .where(eq(varieties.id, order.variety_id));
-      await db
-        .update(timeSlots)
-        .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
-        .where(eq(timeSlots.id, order.time_slot_id));
-    }
+    // Atomically mark order paid, decrement stock, and increment slot booking
+    await db.transaction(async (tx) => {
+      await tx.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
+      if (!isReview) {
+        await tx
+          .update(varieties)
+          .set({ stock_remaining: sql`${varieties.stock_remaining} - ${order.quantity}` })
+          .where(eq(varieties.id, order.variety_id));
+        await tx
+          .update(timeSlots)
+          .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
+          .where(eq(timeSlots.id, order.time_slot_id));
+      }
+    });
 
     const [updated] = await db.select().from(orders).where(eq(orders.id, id));
 
@@ -209,7 +218,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
     res.json({ ...updated, nfc_token, user_db_id: dbUserId });
   } catch (err) {
     logger.error('Order confirm error', err);
-    res.status(500).json({ error: 'Internal server error', detail: String(err) });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
@@ -292,63 +301,20 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
     res.status(201).json({ client_secret: paymentIntent.client_secret, total_cents, discount_applied });
   } catch (err) {
     logger.error('Payment intent creation error', err);
-    res.status(500).json({ error: 'Internal server error', detail: String(err) });
-  }
-});
-
-// GET /api/orders/by-email/:email — most recent paid order for an email (iOS polls after PaymentSheet)
-router.get('/by-email/:email', async (req: Request, res: Response) => {
-  const email = req.params.email;
-  if (!email) {
-    res.status(400).json({ error: 'email is required' });
-    return;
-  }
-
-  try {
-    const [order] = await db
-      .select({
-        id: orders.id,
-        variety_id: orders.variety_id,
-        variety_name: varieties.name,
-        location_id: orders.location_id,
-        time_slot_id: orders.time_slot_id,
-        chocolate: orders.chocolate,
-        finish: orders.finish,
-        quantity: orders.quantity,
-        is_gift: orders.is_gift,
-        total_cents: orders.total_cents,
-        status: orders.status,
-        nfc_token: orders.nfc_token,
-        gift_note: orders.gift_note,
-        created_at: orders.created_at,
-      })
-      .from(orders)
-      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
-      .where(and(eq(orders.customer_email, email), eq(orders.status, 'paid')))
-      .orderBy(desc(orders.created_at))
-      .limit(1);
-
-    if (!order) {
-      res.status(404).json({ error: 'No paid order found for this email' });
-      return;
-    }
-
-    res.json(order);
-  } catch (err) {
-    logger.error('by-email lookup error', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
+
 // GET /api/orders?email= — orders by customer email, enriched with variety/slot
-router.get('/', async (req: Request, res: Response) => {
-  const { email } = req.query;
-  if (!email) {
-    res.status(400).json({ error: 'email query parameter is required' });
-    return;
-  }
+router.get('/', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
 
   try {
+    const [currentUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!currentUser) { res.status(401).json({ error: 'unauthorized' }); return; }
+    const email = currentUser.email;
+
     const rows = await db
       .select({
         id: orders.id,
@@ -371,7 +337,8 @@ router.get('/', async (req: Request, res: Response) => {
       .leftJoin(varieties, eq(orders.variety_id, varieties.id))
       .leftJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
       .where(eq(orders.customer_email, String(email)))
-      .orderBy(orders.created_at);
+      .orderBy(orders.created_at)
+      .limit(50);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

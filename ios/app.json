@@ -16,7 +16,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.maisonfraise.app",
       "entitlements": {
-        "com.apple.developer.in-app-payments": ["merchant.maison.fraise"]
+        "com.apple.developer.in-app-payments": ["merchant.com.maisonfraise.app"],
+        "com.apple.developer.applesignin": ["Default"]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

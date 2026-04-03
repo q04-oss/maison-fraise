@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { eq, or, and, desc } from 'drizzle-orm';
+import { randomBytes } from 'crypto';
 import { db } from '../db';
 import { nfcConnections, users, memberships } from '../db/schema';
 import { requireUser } from '../lib/auth';
@@ -15,11 +16,8 @@ const pairingTokens = new Map<string, PairingEntry>();
 
 function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let token = '';
-  for (let i = 0; i < 6; i++) {
-    token += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return token;
+  const bytes = randomBytes(6);
+  return Array.from(bytes).map(b => chars[b % chars.length]).join('');
 }
 
 // POST /api/nfc/initiate

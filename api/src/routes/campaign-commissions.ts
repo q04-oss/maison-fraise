@@ -4,6 +4,7 @@ import { db } from '../db';
 import { businesses, campaignCommissions } from '../db/schema';
 import { stripe } from '../lib/stripe';
 import { logger } from '../lib/logger';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -11,10 +12,11 @@ const router = Router();
 const COMMISSION_FEE_CENTS = 35000;
 
 // POST /api/campaign-commissions
-router.post('/', async (req: Request, res: Response) => {
-  const { popup_id, user_id, invited_user_ids } = req.body;
-  if (!popup_id || !user_id || !Array.isArray(invited_user_ids)) {
-    res.status(400).json({ error: 'popup_id, user_id, and invited_user_ids are required' });
+router.post('/', requireUser, async (req: Request, res: Response) => {
+  const user_id: number = (req as any).userId;
+  const { popup_id, invited_user_ids } = req.body;
+  if (!popup_id || !Array.isArray(invited_user_ids)) {
+    res.status(400).json({ error: 'popup_id and invited_user_ids are required' });
     return;
   }
 

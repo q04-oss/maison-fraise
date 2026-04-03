@@ -25,16 +25,16 @@ router.post('/webhook', async (req: Request, res: Response) => {
   }
 
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    logger.error('STRIPE_WEBHOOK_SECRET is not set — rejecting webhook');
+    res.status(500).json({ error: 'Webhook not configured' });
+    return;
+  }
   let event: Stripe.Event;
   try {
-    if (!webhookSecret) {
-      logger.warn('STRIPE_WEBHOOK_SECRET is not set — skipping signature verification (dev mode)');
-      event = JSON.parse(req.body.toString()) as Stripe.Event;
-    } else {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    }
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
-    console.error('Webhook signature verification failed:', err);
+    logger.error('Webhook signature verification failed:', err);
     res.status(400).json({ error: 'Invalid signature' });
     return;
   }
@@ -324,29 +324,36 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const fromUserId = pi.metadata.from_user_id ? parseInt(pi.metadata.from_user_id, 10) : null;
         const amount = pi.amount;
         const note = pi.metadata.note || null;
-        await db.insert(fundContributions).values({
-          from_user_id: fromUserId,
-          to_user_id: toUserId,
-          amount_cents: amount,
-          stripe_payment_intent_id: pi.id,
-          note,
-        });
-        await db.execute(sql`
-          INSERT INTO membership_funds (user_id, balance_cents, cycle_start, updated_at)
-          VALUES (${toUserId}, ${amount}, NOW(), NOW())
-          ON CONFLICT (user_id) DO UPDATE SET balance_cents = membership_funds.balance_cents + ${amount}, updated_at = NOW()
-        `);
-        const [recipient] = await db.select({ push_token: users.push_token, display_name: users.display_name }).from(users).where(eq(users.id, toUserId));
-        if (recipient?.push_token) {
-          const fromLabel = fromUserId ? 'Someone' : 'An anonymous member';
-          sendPushNotification(recipient.push_token, {
-            title: 'Membership contribution',
-            body: `${fromLabel} contributed CA$${(amount / 100).toFixed(2)} to your membership fund.`,
-            data: { screen: 'membership' },
-          }).catch(() => {});
+        const [existingContribution] = await db
+          .select({ id: fundContributions.id })
+          .from(fundContributions)
+          .where(eq(fundContributions.stripe_payment_intent_id, pi.id))
+          .limit(1);
+        if (!existingContribution) {
+          await db.insert(fundContributions).values({
+            from_user_id: fromUserId,
+            to_user_id: toUserId,
+            amount_cents: amount,
+            stripe_payment_intent_id: pi.id,
+            note,
+          });
+          await db.execute(sql`
+            INSERT INTO membership_funds (user_id, balance_cents, cycle_start, updated_at)
+            VALUES (${toUserId}, ${amount}, NOW(), NOW())
+            ON CONFLICT (user_id) DO UPDATE SET balance_cents = membership_funds.balance_cents + ${amount}, updated_at = NOW()
+          `);
+          const [recipient] = await db.select({ push_token: users.push_token, display_name: users.display_name }).from(users).where(eq(users.id, toUserId));
+          if (recipient?.push_token) {
+            const fromLabel = fromUserId ? 'Someone' : 'An anonymous member';
+            sendPushNotification(recipient.push_token, {
+              title: 'Membership contribution',
+              body: `${fromLabel} contributed CA$${(amount / 100).toFixed(2)} to your membership fund.`,
+              data: { screen: 'membership' },
+            }).catch(() => {});
+          }
+          // Check if fund now covers membership — trigger auto-order if so
+          checkAndTriggerAutoOrder(toUserId, db).catch(() => {});
         }
-        // Check if fund now covers membership — trigger auto-order if so
-        checkAndTriggerAutoOrder(toUserId, db).catch(() => {});
       } else if (type === 'patronage_claim') {
         const patronageId = parseInt(pi.metadata.patronage_id);
         const userId = parseInt(pi.metadata.user_id);

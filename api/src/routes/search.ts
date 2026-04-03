@@ -23,7 +23,6 @@ router.get('/', async (req: Request, res: Response) => {
         .select({
           id: users.id,
           display_name: users.display_name,
-          email: users.email,
           is_dj: users.is_dj,
           verified: users.verified,
         })
@@ -66,10 +65,7 @@ router.get('/', async (req: Request, res: Response) => {
     ]);
 
     res.json({
-      users: usersResult.map(u => ({
-        ...u,
-        display_name: u.display_name ?? u.email.split('@')[0],
-      })),
+      users: usersResult,
       popups: popupsResult,
       varieties: varietiesResult,
     });

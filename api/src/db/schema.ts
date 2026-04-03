@@ -9,6 +9,8 @@ import {
   date,
   decimal,
   jsonb,
+  unique,
+  index,
 } from 'drizzle-orm/pg-core';
 
 export const chocolateEnum = pgEnum('chocolate', [
@@ -117,7 +119,7 @@ export const orders = pgTable('orders', {
   is_gift: boolean('is_gift').notNull().default(false),
   total_cents: integer('total_cents').notNull(),
   apple_id: text('apple_id'),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   status: orderStatusEnum('status').notNull().default('pending'),
   customer_email: text('customer_email').notNull(),
   push_token: text('push_token'),
@@ -134,7 +136,9 @@ export const orders = pgTable('orders', {
   excess_amount_cents: integer('excess_amount_cents').notNull().default(0),
   token_id: integer('token_id'),
   created_at: timestamp('created_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  idx_customer_email: index('orders_customer_email_idx').on(t.customer_email),
+}));
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
@@ -224,7 +228,9 @@ export const campaignSignups = pgTable('campaign_signups', {
   waitlist: boolean('waitlist').notNull().default(false),
   status: campaignSignupStatusEnum('status').notNull().default('confirmed'),
   signed_up_at: timestamp('signed_up_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  uniq_campaign_user: unique().on(t.campaign_id, t.user_id),
+}));
 
 export const standingOrders = pgTable('standing_orders', {
   id: serial('id').primaryKey(),
@@ -269,7 +275,7 @@ export const popupRsvps = pgTable('popup_rsvps', {
   id: serial('id').primaryKey(),
   popup_id: integer('popup_id').notNull().references(() => businesses.id),
   user_id: integer('user_id').notNull().references(() => users.id),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   status: text('status').notNull().default('pending'), // 'pending' | 'paid' | 'cancelled'
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -315,7 +321,7 @@ export const campaignCommissions = pgTable('campaign_commissions', {
   id: serial('id').primaryKey(),
   popup_id: integer('popup_id').notNull().references(() => businesses.id),
   commissioner_user_id: integer('commissioner_user_id').notNull().references(() => users.id),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   invited_user_ids: jsonb('invited_user_ids').$type<number[]>().notNull().default([]),
   status: text('status').notNull().default('pending'), // 'pending' | 'paid'
   created_at: timestamp('created_at').notNull().defaultNow(),
@@ -328,7 +334,7 @@ export const popupRequests = pgTable('popup_requests', {
   requested_date: text('requested_date').notNull(),
   requested_time: text('requested_time').notNull(),
   notes: text('notes'),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   status: text('status').notNull().default('pending'), // 'pending' | 'paid' | 'approved' | 'rejected'
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -368,7 +374,9 @@ export const userFollows = pgTable('user_follows', {
   follower_id: integer('follower_id').notNull().references(() => users.id),
   followee_id: integer('followee_id').notNull().references(() => users.id),
   created_at: timestamp('created_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  uniq_follow: unique().on(t.follower_id, t.followee_id),
+}));
 
 export const notifications = pgTable('notifications', {
   id: serial('id').primaryKey(),
@@ -407,7 +415,7 @@ export const memberships = pgTable('memberships', {
   started_at: timestamp('started_at'),
   renews_at: timestamp('renews_at'),
   amount_cents: integer('amount_cents').notNull(),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   renewal_notified_at: timestamp('renewal_notified_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -425,7 +433,7 @@ export const fundContributions = pgTable('fund_contributions', {
   from_user_id: integer('from_user_id').references(() => users.id),
   to_user_id: integer('to_user_id').notNull().references(() => users.id),
   amount_cents: integer('amount_cents').notNull(),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   note: text('note'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -478,7 +486,7 @@ export const portalAccess = pgTable('portal_access', {
   amount_cents: integer('amount_cents').notNull(),
   platform_cut_cents: integer('platform_cut_cents').notNull(),
   source: text('source').notNull(), // 'tap' | 'receipt'
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   expires_at: timestamp('expires_at').notNull(),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -553,7 +561,7 @@ export const seasonPatronages = pgTable('season_patronages', {
   patron_user_id: integer('patron_user_id').references(() => users.id),
   platform_cut_cents: integer('platform_cut_cents').notNull().default(0),
   status: text('status').notNull().default('available'), // available | pending | claimed
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   claimed_at: timestamp('claimed_at'),
   requested_by: integer('requested_by').references(() => users.id), // operator who requested
   approved_by_admin: boolean('approved_by_admin').notNull().default(false),
@@ -608,7 +616,7 @@ export const greenhouseFunding = pgTable('greenhouse_funding', {
   user_id: integer('user_id').notNull().references(() => users.id),
   amount_cents: integer('amount_cents').notNull(),
   years: integer('years').notNull(), // 3, 5, or 10
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   status: text('status').notNull().default('pending'), // pending | confirmed
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -620,7 +628,7 @@ export const locationFunding = pgTable('location_funding', {
   business_id: integer('business_id').notNull().references(() => businesses.id),
   user_id: integer('user_id').notNull().references(() => users.id),
   amount_cents: integer('amount_cents').notNull(),
-  stripe_payment_intent_id: text('stripe_payment_intent_id'),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
   status: text('status').notNull().default('pending'), // pending | confirmed
   created_at: timestamp('created_at').notNull().defaultNow(),
 });

@@ -7,7 +7,7 @@
  * editorial commission).
  */
 
-import { eq, and, gte, desc } from 'drizzle-orm';
+import { eq, and, gte, desc, sql } from 'drizzle-orm';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import type * as schema from '../db/schema';
 import {
@@ -94,29 +94,40 @@ export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<
 
       if (!userRow) return;
 
-      // Deduct from fund
-      await db
-        .update(membershipFunds)
-        .set({
-          balance_cents: fund.balance_cents - orderCost,
-          updated_at: new Date(),
-        })
-        .where(eq(membershipFunds.user_id, userId));
+      // Atomically deduct and insert order in a transaction
+      const autoResult = await db.transaction(async (tx) => {
+        const deducted = await tx.execute(sql`
+          UPDATE membership_funds
+          SET balance_cents = balance_cents - ${orderCost}, updated_at = now()
+          WHERE user_id = ${userId} AND balance_cents >= ${orderCost}
+        `);
+        const rowCount = (deducted as any).rowCount ?? (deducted as any).rowsAffected ?? 0;
+        if (rowCount === 0) return null;
 
-      // Insert order
-      await db.insert(orders).values({
-        variety_id: defaultVariety.id,
-        location_id: locationId,
-        time_slot_id: slot.id,
-        chocolate: 'guanaja_70',
-        finish: 'plain',
-        quantity: 1,
-        is_gift: false,
-        total_cents: orderCost,
-        status: 'paid',
-        customer_email: userRow.email,
-        payment_method: 'fund',
+        const stockDeducted = await tx.execute(sql`
+          UPDATE varieties
+          SET stock_remaining = stock_remaining - 1
+          WHERE id = ${defaultVariety.id} AND stock_remaining >= 1
+        `);
+        const stockRows = (stockDeducted as any).rowCount ?? (stockDeducted as any).rowsAffected ?? 0;
+        if (stockRows === 0) return null;
+
+        return tx.insert(orders).values({
+          variety_id: defaultVariety.id,
+          location_id: locationId,
+          time_slot_id: slot.id,
+          chocolate: 'guanaja_70',
+          finish: 'plain',
+          quantity: 1,
+          is_gift: false,
+          total_cents: orderCost,
+          status: 'paid',
+          customer_email: userRow.email,
+          payment_method: 'fund',
+        });
       });
+
+      if (!autoResult) return;
 
       if (userRow.push_token) {
         sendPushNotification(userRow.push_token, {
@@ -173,29 +184,40 @@ export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<
 
     if (!userRow) return;
 
-    // Deduct from fund
-    await db
-      .update(membershipFunds)
-      .set({
-        balance_cents: fund.balance_cents - orderCost,
-        updated_at: new Date(),
-      })
-      .where(eq(membershipFunds.user_id, userId));
+    // Atomically deduct and insert order in a transaction
+    const standingResult = await db.transaction(async (tx) => {
+      const deducted = await tx.execute(sql`
+        UPDATE membership_funds
+        SET balance_cents = balance_cents - ${orderCost}, updated_at = now()
+        WHERE user_id = ${userId} AND balance_cents >= ${orderCost}
+      `);
+      const rowCount = (deducted as any).rowCount ?? (deducted as any).rowsAffected ?? 0;
+      if (rowCount === 0) return null;
 
-    // Insert order
-    await db.insert(orders).values({
-      variety_id,
-      location_id,
-      time_slot_id: slot.id,
-      chocolate: standingOrder.chocolate,
-      finish: standingOrder.finish,
-      quantity,
-      is_gift: false,
-      total_cents: orderCost,
-      status: 'paid',
-      customer_email: userRow.email,
-      payment_method: 'fund',
+      const stockDeducted = await tx.execute(sql`
+        UPDATE varieties
+        SET stock_remaining = stock_remaining - ${quantity}
+        WHERE id = ${variety_id} AND stock_remaining >= ${quantity}
+      `);
+      const stockRows = (stockDeducted as any).rowCount ?? (stockDeducted as any).rowsAffected ?? 0;
+      if (stockRows === 0) return null;
+
+      return tx.insert(orders).values({
+        variety_id,
+        location_id,
+        time_slot_id: slot.id,
+        chocolate: standingOrder.chocolate,
+        finish: standingOrder.finish,
+        quantity,
+        is_gift: false,
+        total_cents: orderCost,
+        status: 'paid',
+        customer_email: userRow.email,
+        payment_method: 'fund',
+      });
     });
+
+    if (!standingResult) return;
 
     if (userRow.push_token) {
       sendPushNotification(userRow.push_token, {

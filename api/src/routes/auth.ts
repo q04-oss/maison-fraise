@@ -4,7 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
 import { logger } from '../lib/logger';
-import { signToken } from '../lib/auth';
+import { signToken, requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -30,7 +30,7 @@ async function handleAppleSignIn(req: Request, res: Response) {
     const [byApple] = await db.select().from(users).where(eq(users.apple_user_id, appleId));
     if (byApple) {
       const token = signToken(byApple.id);
-      res.json({ user_id: byApple.id, token, is_new: false });
+      res.json({ user_id: byApple.id, token, is_new: false, email: byApple.email });
       return;
     }
 
@@ -40,7 +40,7 @@ async function handleAppleSignIn(req: Request, res: Response) {
       if (byEmail) {
         await db.update(users).set({ apple_user_id: appleId }).where(eq(users.id, byEmail.id));
         const token = signToken(byEmail.id);
-        res.json({ user_id: byEmail.id, token, is_new: false });
+        res.json({ user_id: byEmail.id, token, is_new: false, email: byEmail.email });
         return;
       }
 
@@ -54,41 +54,20 @@ async function handleAppleSignIn(req: Request, res: Response) {
         })
         .returning();
       const token = signToken(created.id);
-      res.json({ user_id: created.id, token, is_new: true });
+      res.json({ user_id: created.id, token, is_new: true, email: created.email });
       return;
     }
 
     res.status(404).json({ error: 'Account not found and no email provided.' });
   } catch (err: unknown) {
     logger.error('Apple auth error', err);
-    res.status(401).json({ error: err instanceof Error ? err.message : 'Authentication failed' });
+    res.status(401).json({ error: 'Authentication failed' });
   }
 }
 
 // POST /api/auth/apple and /api/auth/apple/verify (alias) — both accepted by iOS
 router.post('/apple', handleAppleSignIn);
 router.post('/apple/verify', handleAppleSignIn);
-
-// POST /api/auth/token — issue a JWT for a given user_id (verifies user exists)
-router.post('/token', async (req: Request, res: Response) => {
-  const { user_id } = req.body;
-  if (!user_id || typeof user_id !== 'number') {
-    res.status(400).json({ error: 'user_id (number) is required' });
-    return;
-  }
-  try {
-    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.id, user_id));
-    if (!user) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-    const token = signToken(user.id);
-    res.json({ token });
-  } catch (err) {
-    logger.error('Token generation error', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // POST /api/auth/demo — demo login for Apple reviewers
 router.post('/demo', async (req: Request, res: Response) => {
@@ -112,19 +91,20 @@ router.post('/demo', async (req: Request, res: Response) => {
     res.json({ user_id: userId, token: signToken(userId), is_new: false });
   } catch (e) {
     logger.error('Demo login error: ' + String(e));
-    res.status(500).json({ error: 'internal', detail: String(e) });
+    res.status(500).json({ error: 'internal' });
   }
 });
 
-// PATCH /api/auth/push-token — update push token for an existing user
-router.patch('/push-token', async (req: Request, res: Response) => {
-  const { user_id, push_token } = req.body;
-  if (!user_id || !push_token) {
-    res.status(400).json({ error: 'user_id and push_token are required' });
+// PATCH /api/auth/push-token — update push token for the authenticated user
+router.patch('/push-token', requireUser, async (req: Request, res: Response) => {
+  const { push_token } = req.body;
+  const userId = (req as any).userId as number;
+  if (!push_token) {
+    res.status(400).json({ error: 'push_token is required' });
     return;
   }
   try {
-    await db.update(users).set({ push_token }).where(eq(users.id, user_id));
+    await db.update(users).set({ push_token }).where(eq(users.id, userId));
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

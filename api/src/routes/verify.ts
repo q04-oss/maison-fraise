@@ -2,14 +2,16 @@ import { Router, Request, Response } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, users, legitimacyEvents } from '../db/schema';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
 // POST /api/verify/nfc
-router.post('/nfc', async (req: Request, res: Response) => {
-  const { nfc_token, user_id } = req.body;
-  if (!nfc_token || !user_id) {
-    res.status(400).json({ error: 'nfc_token and user_id are required' });
+router.post('/nfc', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
+  const { nfc_token } = req.body;
+  if (!nfc_token) {
+    res.status(400).json({ error: 'nfc_token is required' });
     return;
   }
 
@@ -46,10 +48,11 @@ router.post('/nfc', async (req: Request, res: Response) => {
 });
 
 // POST /api/verify/reorder
-router.post('/reorder', async (req: Request, res: Response) => {
-  const { nfc_token, user_id } = req.body;
-  if (!nfc_token || !user_id) {
-    res.status(400).json({ error: 'nfc_token and user_id are required' });
+router.post('/reorder', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
+  const { nfc_token } = req.body;
+  if (!nfc_token) {
+    res.status(400).json({ error: 'nfc_token is required' });
     return;
   }
 

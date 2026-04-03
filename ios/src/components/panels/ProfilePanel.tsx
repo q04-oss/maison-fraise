@@ -36,7 +36,7 @@ export default function ProfilePanel() {
       if (dbId) setUserDbId(parseInt(dbId, 10));
       if (email) {
         setUserEmail(email);
-        fetchOrdersByEmail(email)
+        fetchOrdersByEmail()
           .then((orders: any[]) => {
             const paid = orders
               .filter((o: any) => o.status === 'paid' || o.status === 'confirmed')
@@ -67,10 +67,11 @@ export default function ProfilePanel() {
       await AsyncStorage.setItem('user_db_id', String(result.user_id));
       await setAuthToken(result.token);
       setUserDbId(result.user_id);
-      if (credential.email) {
-        await AsyncStorage.setItem('user_email', credential.email);
-        setUserEmail(credential.email);
-        fetchOrdersByEmail(credential.email)
+      const email = credential.email ?? result.email ?? null;
+      if (email) {
+        await AsyncStorage.setItem('user_email', email);
+        setUserEmail(email);
+        fetchOrdersByEmail()
           .then((orders: any[]) => {
             const paid = orders
               .filter((o: any) => o.status === 'paid' || o.status === 'confirmed')
@@ -81,7 +82,7 @@ export default function ProfilePanel() {
       }
       if (pushToken) {
         const { updatePushToken } = await import('../../lib/api');
-        updatePushToken(result.user_id, pushToken).catch(() => {});
+        updatePushToken(pushToken).catch(() => {});
       }
     } catch (err: any) {
       if (err.code !== 'ERR_REQUEST_CANCELED') {
@@ -103,7 +104,7 @@ export default function ProfilePanel() {
       setUserEmail('demo@maison-fraise.com');
       if (pushToken) {
         const { updatePushToken } = await import('../../lib/api');
-        updatePushToken(result.user_id, pushToken).catch(() => {});
+        updatePushToken(pushToken).catch(() => {});
       }
     } catch (e: any) {
       Alert.alert('Demo unavailable', String(e?.message ?? e));
@@ -117,7 +118,7 @@ export default function ProfilePanel() {
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Sign out', style: 'destructive', onPress: async () => {
-          await AsyncStorage.multiRemove(['user_email', 'user_db_id', 'verified', 'is_dj']);
+          await AsyncStorage.multiRemove(['user_email', 'user_db_id', 'verified', 'is_dj', 'auth_token']);
           setUserEmail(null);
           setUserDbId(null);
           setIsVerified(false);

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { eq, inArray, sql, and } from 'drizzle-orm';
 import { db } from '../db';
 import { campaigns, campaignSignups, users, legitimacyEvents } from '../db/schema';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -37,12 +38,12 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // POST /api/campaigns/:id/signup
-router.post('/:id/signup', async (req: Request, res: Response) => {
+router.post('/:id/signup', requireUser, async (req: Request, res: Response) => {
   const campaign_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
+  const user_id: number = (req as any).userId;
 
-  if (isNaN(campaign_id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  if (isNaN(campaign_id)) {
+    res.status(400).json({ error: 'Invalid campaign id' });
     return;
   }
 
@@ -56,6 +57,13 @@ router.post('/:id/signup', async (req: Request, res: Response) => {
     const [campaign] = await db.select().from(campaigns).where(eq(campaigns.id, campaign_id));
     if (!campaign) {
       res.status(404).json({ error: 'Campaign not found' });
+      return;
+    }
+
+    const [existing] = await db.select({ id: campaignSignups.id }).from(campaignSignups)
+      .where(and(eq(campaignSignups.campaign_id, campaign_id), eq(campaignSignups.user_id, user_id)));
+    if (existing) {
+      res.status(409).json({ error: 'already_signed_up' });
       return;
     }
 
@@ -87,18 +95,18 @@ router.post('/:id/signup', async (req: Request, res: Response) => {
 });
 
 // DELETE /api/campaigns/:id/signup
-router.delete('/:id/signup', async (req: Request, res: Response) => {
+router.delete('/:id/signup', requireUser, async (req: Request, res: Response) => {
   const campaign_id = parseInt(req.params.id, 10);
-  const { user_id } = req.body;
+  const user_id: number = (req as any).userId;
 
-  if (isNaN(campaign_id) || !user_id) {
-    res.status(400).json({ error: 'user_id is required' });
+  if (isNaN(campaign_id)) {
+    res.status(400).json({ error: 'Invalid campaign id' });
     return;
   }
 
   try {
     const [signup] = await db.select().from(campaignSignups)
-      .where(eq(campaignSignups.campaign_id, campaign_id));
+      .where(and(eq(campaignSignups.campaign_id, campaign_id), eq(campaignSignups.user_id, user_id)));
 
     if (!signup) {
       res.status(404).json({ error: 'Signup not found' });

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, sql, asc } from 'drizzle-orm';
 import { db } from '../db';
 import { varieties } from '../db/schema';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -26,8 +27,8 @@ router.get('/', async (_req: Request, res: Response) => {
     res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
     res.json(result);
   } catch (err) {
-    console.error('varieties error:', err);
-    res.status(500).json({ error: 'Internal server error', detail: String(err) });
+    logger.error('varieties error:', err);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

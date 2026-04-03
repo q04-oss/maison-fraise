@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState } from 'react-native';
 import MapView, { Callout, Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -9,7 +9,7 @@ import { usePanel } from '../context/PanelContext';
 import PanelNavigator from '../components/PanelNavigator';
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
-import { fetchBusinesses, updatePushToken, fetchAuthToken } from '../lib/api';
+import { fetchBusinesses, updatePushToken } from '../lib/api';
 import { useColors, fonts, SPACING } from '../theme';
 import { useApp } from '../../App';
 
@@ -120,16 +120,8 @@ export default function MapScreen() {
   const userCoords = useRef<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    AsyncStorage.getItem('user_db_id').then(id => {
-      if (id) fetchAuthToken(parseInt(id, 10)).catch(() => {});
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (!pushToken) return;
-    AsyncStorage.getItem('user_db_id').then(id => {
-      if (id) updatePushToken(parseInt(id, 10), pushToken).catch(() => {});
-    }).catch(() => {});
+    updatePushToken(pushToken).catch(() => {});
   }, [pushToken]);
 
   const onSheetLayout = useCallback((e: LayoutChangeEvent) => {
@@ -178,6 +170,14 @@ export default function MapScreen() {
   };
 
   useEffect(() => { loadBusinesses(); }, []);
+
+  // Refresh businesses when app comes to foreground (popup status may have changed)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') loadBusinesses();
+    });
+    return () => sub.remove();
+  }, []);
 
   const doMarkerNav = (biz: any) => {
     setActiveLocation(biz);
