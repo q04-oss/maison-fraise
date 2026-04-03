@@ -17,7 +17,7 @@ async function handleAppleSignIn(req: Request, res: Response) {
 
   try {
     const payload = await appleSignin.verifyIdToken(identityToken, {
-      audience: process.env.APPLE_CLIENT_ID ?? 'com.maisonfraise.app',
+      audience: 'com.maisonfraise.app',
       ignoreExpiration: false,
     });
     const appleId = payload.sub;
@@ -74,7 +74,10 @@ router.post('/demo', async (req: Request, res: Response) => {
   const { email, password } = req.body;
   const demoEmail = process.env.DEMO_EMAIL ?? 'demo@maison-fraise.com';
   const demoPassword = process.env.DEMO_PASSWORD ?? 'demo1234';
-  if (email !== demoEmail || password !== demoPassword) { res.status(401).json({ error: 'invalid_credentials' }); return; }
+  if (email !== demoEmail || password !== demoPassword) {
+    logger.warn('Demo login rejected', { receivedEmail: email, expectedEmail: demoEmail, passwordMatch: password === demoPassword });
+    res.status(401).json({ error: 'invalid_credentials' }); return;
+  }
   try {
     const existing = await db.execute<{ id: number }>(sql`SELECT id FROM users WHERE email = ${demoEmail} LIMIT 1`);
     const rows = (existing as any).rows ?? existing;

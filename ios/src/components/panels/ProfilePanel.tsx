@@ -285,7 +285,7 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 40 },
   signOutBtn: { paddingVertical: 4, paddingHorizontal: 4 },
   signOutText: { fontSize: 13, fontFamily: fonts.dmSans },
-  appleBtn: { height: 44 },
+  appleBtn: { height: 44, width: '100%' },
   signInStack: { gap: 8, alignItems: 'center' },
   demoBtn: { paddingVertical: 4, paddingHorizontal: 8 },
   demoBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
