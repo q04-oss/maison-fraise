@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { and, eq, gt, SQL } from 'drizzle-orm';
+import { and, eq, gt, lt, SQL, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { locations, timeSlots } from '../db/schema';
 
@@ -78,7 +78,7 @@ timeSlotsPublicRouter.get('/', async (req: Request, res: Response) => {
   const { location_id, date } = req.query;
 
   try {
-    const conditions: SQL[] = [gt(timeSlots.capacity, 0)];
+    const conditions: SQL[] = [gt(timeSlots.capacity, 0), sql`${timeSlots.booked} < ${timeSlots.capacity}`];
 
     if (location_id) {
       const locationIdNum = parseInt(String(location_id), 10);
