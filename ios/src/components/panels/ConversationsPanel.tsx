@@ -74,7 +74,7 @@ export default function ConversationsPanel() {
                   </Text>
                   {item.unread_count > 0 && (
                     <View style={[styles.badge, { backgroundColor: c.accent }]}>
-                      <Text style={styles.badgeText}>{item.unread_count}</Text>
+                      <Text style={[styles.badgeText, { color: c.ctaText }]}>{item.unread_count}</Text>
                     </View>
                   )}
                 </View>
@@ -109,5 +109,5 @@ const styles = StyleSheet.create({
   rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   preview: { fontSize: 13, fontFamily: fonts.dmSans, flex: 1 },
   badge: { borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, marginLeft: 8 },
-  badgeText: { fontSize: 11, fontFamily: fonts.dmMono, color: '#fff' },
+  badgeText: { fontSize: 11, fontFamily: fonts.dmMono },
 });

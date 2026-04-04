@@ -95,7 +95,7 @@ export default function MessageThreadPanel() {
           renderItem={({ item }) => {
             const isMine = item.sender_id === myId;
             return (
-              <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
+              <View style={[styles.bubble, isMine ? [styles.bubbleMine, { backgroundColor: c.accent }] : [styles.bubbleTheirs, { backgroundColor: c.card }]]}>
                 <Text style={[
                   styles.bubbleText,
                   { color: isMine ? '#fff' : c.text },
@@ -158,8 +158,8 @@ const styles = StyleSheet.create({
   bubble: {
     maxWidth: '78%', borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 2,
   },
-  bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#C9973A' },
-  bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: 'rgba(120,120,128,0.15)' },
+  bubbleMine: { alignSelf: 'flex-end' },
+  bubbleTheirs: { alignSelf: 'flex-start' },
   bubbleText: { fontSize: 15, fontFamily: fonts.dmSans, lineHeight: 21 },
   bubbleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   bubbleTime: { fontSize: 10, fontFamily: fonts.dmMono },
