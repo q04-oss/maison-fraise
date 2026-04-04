@@ -101,7 +101,7 @@ export default function ProfilePanel() {
         updatePushToken(pushToken).catch(() => {});
       }
     } catch (err: any) {
-      if (err.code !== 'ERR_REQUEST_CANCELED') {
+      if (err.code !== 'ERR_REQUEST_CANCELED' && !userDbId) {
         Alert.alert('Sign in failed', 'Please try again.');
       }
     } finally {
