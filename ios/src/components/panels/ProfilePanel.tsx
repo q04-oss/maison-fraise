@@ -221,8 +221,6 @@ export default function ProfilePanel() {
               )}
             </View>
 
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-
             {/* Last order */}
             {lastOrder && (
               <View style={styles.block}>
@@ -249,7 +247,6 @@ export default function ProfilePanel() {
             {/* History */}
             {recentOrders.length > 1 && (
               <>
-                <View style={[styles.divider, { backgroundColor: c.border }]} />
                 <View style={styles.block}>
                   <Text style={[styles.label, { color: c.muted }]}>HISTORY</Text>
                   {recentOrders.slice(1).map((o: any) => (
@@ -263,8 +260,6 @@ export default function ProfilePanel() {
                 </View>
               </>
             )}
-
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
 
             {/* Sign out */}
             <TouchableOpacity onPress={handleSignOut} activeOpacity={0.6} style={styles.block}>
