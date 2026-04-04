@@ -1,13 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { isReviewMode } from './reviewMode';
 import { API_BASE_URL as BASE_URL } from '../config/api';
 
 export async function getAuthToken(): Promise<string | null> {
-  return AsyncStorage.getItem('auth_token');
+  return SecureStore.getItemAsync('auth_token');
 }
 
 export async function setAuthToken(token: string): Promise<void> {
-  return AsyncStorage.setItem('auth_token', token);
+  await SecureStore.setItemAsync('auth_token', token);
+}
+
+export async function deleteAuthToken(): Promise<void> {
+  await SecureStore.deleteItemAsync('auth_token');
 }
 
 
@@ -715,6 +720,19 @@ export async function rateOrder(orderId: number, rating: number, note?: string):
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error ?? 'Failed to submit rating');
   }
+}
+
+export async function operatorLogin(code: string): Promise<{
+  user_id: number; token: string; is_shop: boolean;
+  business_id: number | null; display_name: string | null; fraise_chat_email: string | null;
+}> {
+  const r = await fetch(`${BASE_URL}/api/auth/operator`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  if (!r.ok) throw new Error('invalid_code');
+  return r.json();
 }
 
 export async function demoLogin(): Promise<{ user_id: number; token: string }> {

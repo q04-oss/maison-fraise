@@ -5,7 +5,7 @@ import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
 export default function LocationPanel() {
-  const { goBack, showPanel, setOrder, setActiveLocation, activeLocation, varieties, businesses, order } = usePanel();
+  const { goBack, showPanel, setOrder, setActiveLocation, activeLocation, varieties, businesses, order, setPanelData } = usePanel();
   const c = useColors();
 
   const doLocationSwitch = (biz: any) => {
@@ -49,6 +49,21 @@ export default function LocationPanel() {
           {isPopup && <Text style={[styles.headerBadge, { color: '#C0392B' }]}>POPUP</Text>}
           <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{activeLocation?.name ?? '—'}</Text>
           {popupDate && <Text style={[styles.headerDate, { color: c.muted }]}>{popupDate}</Text>}
+          {activeLocation?.shop_user_id && (
+            <TouchableOpacity
+              onPress={() => {
+                setPanelData({
+                  userId: activeLocation.shop_user_id,
+                  displayName: activeLocation.name,
+                  isShop: true,
+                });
+                showPanel('messageThread');
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chatLabel, { color: c.accent }]}>strawberry chat</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.headerSpacer} />
       </View>
@@ -135,4 +150,5 @@ const styles = StyleSheet.create({
   varietyRight: { alignItems: 'flex-end', gap: 4 },
   varietyPrice: { fontSize: 15, fontFamily: fonts.dmMono },
   varietyStock: { fontSize: 11, fontFamily: fonts.dmSans },
+  chatLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
 });

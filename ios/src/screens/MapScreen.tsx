@@ -9,7 +9,8 @@ import { usePanel } from '../context/PanelContext';
 import PanelNavigator from '../components/PanelNavigator';
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
-import { fetchBusinesses, updatePushToken } from '../lib/api';
+import { fetchBusinesses, fetchVarieties, updatePushToken, deleteAuthToken } from '../lib/api';
+import { STRAWBERRIES } from '../data/seed';
 import { useColors, fonts, SPACING } from '../theme';
 import { useApp } from '../../App';
 
@@ -110,7 +111,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const DETENTS = useMemo<[number, number, number]>(() => [COLLAPSED_HEIGHT / SCREEN_HEIGHT, 0.5, 1], [SCREEN_HEIGHT]);
-  const { setBusinesses, setActiveLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight, setPanelData } = usePanel();
+  const { setBusinesses, setActiveLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties } = usePanel();
   const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
@@ -184,7 +185,20 @@ export default function MapScreen() {
       .finally(() => setBizLoading(false));
   };
 
-  useEffect(() => { loadBusinesses(); }, []);
+  const loadVarietiesIfNeeded = () => {
+    if (varieties.length > 0) return;
+    fetchVarieties()
+      .then((vars: any[]) => {
+        const merged = vars.map((v: any) => {
+          const seed = STRAWBERRIES.find((s: any) => s.name === v.name);
+          return { ...(seed ?? {}), ...v, harvestDate: v.harvest_date ?? seed?.harvestDate };
+        });
+        setVarieties(merged);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); }, []);
 
   // Refresh businesses when app comes to foreground (popup status may have changed)
   useEffect(() => {
@@ -208,18 +222,7 @@ export default function MapScreen() {
   };
 
   const handleMarkerPress = (biz: any) => {
-    if (order.variety_id) {
-      Alert.alert(
-        'Switch location?',
-        'Your current order selection will be cleared.',
-        [
-          { text: 'Keep order', style: 'cancel' },
-          { text: 'Switch', style: 'destructive', onPress: () => doMarkerNav(biz) },
-        ]
-      );
-    } else {
-      doMarkerNav(biz);
-    }
+    doMarkerNav(biz);
   };
 
   const handlePartnerPress = (biz: any) => {
@@ -234,6 +237,19 @@ export default function MapScreen() {
     }, 400);
   };
 
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out?', 'You\'ll need to sign in again to place orders.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out', style: 'destructive', onPress: async () => {
+          await AsyncStorage.multiRemove(['user_email', 'user_db_id', 'verified', 'is_dj', 'fraise_chat_email', 'display_name', 'is_shop']);
+          await deleteAuthToken();
+          setOrder({ customer_email: '' });
+        },
+      },
+    ]);
+  };
 
   const handleLocateMe = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
@@ -455,7 +471,9 @@ export default function MapScreen() {
 
       <TouchableOpacity
         style={[styles.profileBtn, { backgroundColor: c.card, top: insets.top + 12 }]}
-        onPress={() => { jumpToPanel('terminal'); setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350); }}
+        onPress={() => { setPanelData({ resetOrder: true }); jumpToPanel('terminal'); setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350); }}
+        onLongPress={handleSignOut}
+        delayLongPress={600}
         activeOpacity={0.8}
       >
         <Text style={styles.fabIcon}>❋</Text>
@@ -463,10 +481,10 @@ export default function MapScreen() {
 
       {fabsVisible && (
         <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
-          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleShowAll} activeOpacity={0.8}>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleShowAll} onLongPress={() => { jumpToPanel('conversations'); setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350); }} delayLongPress={500} activeOpacity={0.8}>
             <Text style={styles.fabIcon}>🍓</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} onLongPress={goHome} delayLongPress={500} activeOpacity={0.8}>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} onLongPress={() => { setPanelData({ openOrder: true }); jumpToPanel('terminal'); }} delayLongPress={500} activeOpacity={0.8}>
             <Text style={styles.fabIcon}>↑</Text>
           </TouchableOpacity>
         </View>

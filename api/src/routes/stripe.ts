@@ -4,7 +4,7 @@ import { eq, sql, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -116,6 +116,19 @@ router.post('/webhook', async (req: Request, res: Response) => {
           .returning();
 
         logger.info(`Order ${newOrder.id} created + paid via payment_intent webhook`);
+
+        // Post order confirmation message from shop to customer (fire-and-forget)
+        Promise.all([
+          db.select({ id: users.id }).from(users).where(eq(users.email, customer_email)).limit(1),
+          db.select({ id: users.id }).from(users).where(and(eq(users.is_shop, true), eq(users.business_id, location_id))).limit(1),
+          db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, variety_id)).limit(1),
+          db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id)).limit(1),
+        ]).then(([[customerUser], [shopUser], [variety], [slot]]) => {
+          if (customerUser && shopUser && variety && slot) {
+            const body = `order confirmed — ${variety.name} · ${quantity > 1 ? `${quantity} boxes` : '1 box'} · pickup ${slot.time}`;
+            db.insert(messages).values({ sender_id: shopUser.id, recipient_id: customerUser.id, body }).catch(() => {});
+          }
+        }).catch(() => {});
 
         // Mint token if excess_amount_cents > 0
         const metadata = pi.metadata;

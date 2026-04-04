@@ -1,64 +1,50 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, StyleSheet, ActivityIndicator, LayoutAnimation, Platform, UIManager, Image } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import {
+  View, Text, TouchableOpacity, ScrollView,
+  RefreshControl, StyleSheet, ActivityIndicator, Image, FlatList,
+} from 'react-native';
+import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel, Variety } from '../../context/PanelContext';
 import { fetchVarieties } from '../../lib/api';
-import { useColors, fonts } from '../../theme';
-import { SPACING } from '../../theme';
+import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES } from '../../data/seed';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+const SHEET_NAME = 'main-sheet';
 
 function formatHarvestDate(iso: string): string {
   const d = new Date(iso);
-  const months = ['jan','fév','mar','avr','mai','juin','juil','août','sep','oct','nov','déc'];
+  const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-function freshnessLabel(level?: number): string {
-  if (!level) return 'Last chance';
-  if (level >= 0.8) return '旬';
-  if (level >= 0.5) return 'Good';
-  return 'Last chance';
-}
-
 export default function HomePanel() {
-  const { showPanel, setVarieties, setOrder, setActiveLocation, varieties, activeLocation, sheetHeight, businesses } = usePanel();
+  const { setVarieties, setActiveLocation, varieties, activeLocation, businesses, sheetHeight, setPanelData, jumpToPanel, order, setOrder } = usePanel();
+
+  const now = new Date();
+  const otherLocations = businesses.filter((b: any) => {
+    if (b.id === activeLocation?.id) return false;
+    if (b.type === 'collection') return true;
+    if (b.type === 'popup') {
+      if (!b.launched_at) return false;
+      const d = new Date(b.launched_at); d.setHours(23, 59, 59, 999);
+      return d >= now;
+    }
+    return false;
+  });
+
   const c = useColors();
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const isCollapsed = sheetHeight < 110;
   const hasFetched = useRef(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
-  const now = new Date();
-  const locations = businesses.filter((b: any) => {
-    if (b.type === 'collection') return true;
-    if (b.type === 'popup') {
-      if (!b.launched_at) return false;
-      // Keep popup if its day hasn't fully passed (allow until end of that day)
-      const d = new Date(b.launched_at);
-      d.setHours(23, 59, 59, 999);
-      return d >= now;
-    }
-    return false;
-  });
 
   const todayLabel = now.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
   const month = now.getMonth() + 1;
-  const seasonKanji = month >= 3 && month <= 5 ? '春'
-    : month >= 6 && month <= 8 ? '夏'
-    : month >= 9 && month <= 11 ? '秋'
-    : '冬';
-
-  useEffect(() => {
-    if (activeLocation) {
-      setExpandedId(activeLocation.id);
-    }
-  }, [activeLocation?.id]);
+  const season = month >= 3 && month <= 5 ? 'spring'
+    : month >= 6 && month <= 8 ? 'summer'
+    : month >= 9 && month <= 11 ? 'autumn'
+    : 'winter';
 
   const loadVarieties = async () => {
     if (hasFetched.current || varieties.length > 0) { setLoading(false); return; }
@@ -84,7 +70,7 @@ export default function HomePanel() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    hasFetched.current = true; // Prevent loadVarieties from short-circuiting
+    hasFetched.current = true;
     setFetchError(false);
     try {
       const vars: any[] = await fetchVarieties();
@@ -101,135 +87,173 @@ export default function HomePanel() {
     }
   };
 
-  const handleLocationToggle = (biz: any) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedId(prev => prev === biz.id ? null : biz.id);
+  const handleVarietyPress = (v: Variety) => {
+    setPanelData({ openOrder: true, preselectedVariety: { id: v.id, name: v.name, price_cents: v.price_cents } });
+    jumpToPanel('terminal');
+    setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
   };
 
-  const handleVarietyPress = (v: Variety, biz: any) => {
-    Haptics.selectionAsync();
-    setActiveLocation(biz);
-    setOrder({
-      variety_id: v.id,
-      variety_name: v.name,
-      price_cents: v.price_cents,
-      location_id: biz.id,
-      location_name: biz.name,
-    });
-    showPanel('chocolate');
-  };
+  const bizVarieties = activeLocation
+    ? varieties.filter((v: any) => (v.variety_type ?? 'strawberry') === 'strawberry')
+    : [];
 
-  const renderVarieties = (biz: any) => {
-    if (loading) return <ActivityIndicator color={c.accent} style={{ marginVertical: 24 }} />;
-    if (fetchError) return (
-      <TouchableOpacity onPress={loadVarieties} style={{ paddingVertical: 20, alignItems: 'center' }} activeOpacity={0.7}>
-        <Text style={[styles.emptyText, { color: c.muted }]}>Could not load. Tap to retry.</Text>
-      </TouchableOpacity>
-    );
-    // Filter by location if the API returns location-scoped varieties; fall back to all
-    const hasLocationData = varieties.some(v => v.location_id != null);
-    const bizVarieties = hasLocationData ? varieties.filter(v => v.location_id === biz.id) : varieties;
-    if (bizVarieties.length === 0) return (
-      <Text style={[styles.emptyText, { color: c.muted, paddingVertical: 20 }]}>Nothing ready today.</Text>
-    );
-    return bizVarieties.map((v, idx) => {
-      const freshColor = v.freshnessColor ?? c.accent;
-      const label = freshnessLabel(v.freshnessLevel);
-      const isSoldOut = v.stock_remaining <= 0;
-      const stockLow = !isSoldOut && v.stock_remaining <= 3;
-      return (
-        <TouchableOpacity
-          key={v.id}
-          style={[styles.varietyRow, { borderTopColor: c.border, borderTopWidth: idx === 0 ? 0 : StyleSheet.hairlineWidth, opacity: isSoldOut ? 0.5 : 1 }]}
-          onPress={isSoldOut ? undefined : () => handleVarietyPress(v, biz)}
-          activeOpacity={isSoldOut ? 1 : 0.75}
-        >
-          <View style={styles.rowMain}>
-            <Text style={[styles.varietyName, { color: c.text }]}>{v.name}</Text>
-            {!!v.description && (
-              <Text style={[styles.varietyDesc, { color: c.muted }]} numberOfLines={2}>{v.description}</Text>
-            )}
-            <View style={styles.meta}>
-              {v.farm && <Text style={[styles.farm, { color: c.muted }]}>{v.farm}</Text>}
-              <View style={[styles.freshDot, { backgroundColor: freshColor }]} />
-              <Text style={[styles.freshLabel, { color: freshColor }]}>{label}</Text>
-              {v.avg_rating != null && (v.rating_count ?? 0) > 0 && (
-                <>
-                  <Text style={[styles.freshLabel, { color: c.muted }]}>·</Text>
-                  <Text style={styles.ratingText}>★ {v.avg_rating.toFixed(1)}</Text>
-                </>
-              )}
-            </View>
-            {!!v.harvestDate && (
-              <Text style={[styles.harvestDate, { color: c.muted }]}>
-                Récolte {formatHarvestDate(v.harvestDate)}
-              </Text>
-            )}
-          </View>
-          {!!v.image_url && (
-            <Image source={{ uri: v.image_url }} style={[styles.varietyThumb, { backgroundColor: c.border }]} />
-          )}
-          <View style={styles.rowRight}>
-            <Text style={[styles.price, { color: isSoldOut ? c.muted : c.text }]}>CA${(v.price_cents / 100).toFixed(2)}</Text>
-            <Text style={[styles.stock, { color: isSoldOut ? '#FF3B30' : stockLow ? '#FF3B30' : c.muted }]}>
-              {isSoldOut ? 'Sold out' : stockLow ? 'Almost gone' : `${v.stock_remaining} left`}
-            </Text>
-          </View>
-        </TouchableOpacity>
-      );
-    });
-  };
+  const stripLabel = activeLocation ? activeLocation.name.toLowerCase() : 'maison fraise';
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={[styles.brandRow, { borderBottomColor: c.border }, !isCollapsed && styles.brandRowBorder]}>
-        <View style={styles.brandInner}>
-          <Text style={[styles.brandName, { color: c.text }]}>Maison Fraise</Text>
-          {!isCollapsed && <Text style={[styles.brandDate, { color: c.muted }]}>{todayLabel}</Text>}
-        </View>
-        {!isCollapsed && <Text style={[styles.seasonKanji, { color: c.border }]}>{seasonKanji}</Text>}
+
+      {/* Collapsed strip */}
+      <View style={styles.strip}>
+        <Text style={[styles.stripBrand, { color: c.text }]}>strawberry chat</Text>
       </View>
 
       {!isCollapsed && (
-        <ScrollView style={styles.list} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}>
-          {locations.length === 0 && (
-            <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
-          )}
-          {locations.map((biz: any) => {
-            const isExpanded = expandedId === biz.id;
-            const isPopup = biz.type === 'popup';
-            const popupDate = isPopup && biz.launched_at
-              ? (biz.hours ?? new Date(biz.launched_at).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }))
-              : null;
+        <ScrollView
+          style={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={c.accent} />}
+        >
+          {!activeLocation ? (
 
-            return (
-              <View key={biz.id} style={styles.locationSection}>
-                <TouchableOpacity
-                  style={[styles.locationRow, { borderBottomColor: c.border }]}
-                  onPress={() => handleLocationToggle(biz)}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.locationMain}>
-                    {isPopup && <Text style={[styles.popupBadge, { color: '#C0392B' }]}>POPUP</Text>}
-                    <Text style={[styles.locationName, { color: c.text }]}>{biz.name}</Text>
-                    {popupDate && <Text style={[styles.locationDate, { color: c.muted }]}>{popupDate}</Text>}
-                    {!!(biz as any).season_patron_handle && (
-                      <Text style={[styles.seasonPatronLine, { color: c.muted }]}>
-                        {`Season patron: @${(biz as any).season_patron_handle}`}
-                      </Text>
-                    )}
-                  </View>
-                </TouchableOpacity>
+            /* ── No location selected ── */
+            <View style={styles.emptyState}>
+              <Text style={[styles.emptyTitle, { color: c.text }]}>Maison Fraise</Text>
+              <Text style={[styles.emptyDate, { color: c.muted }]}>{todayLabel}</Text>
+              <Text style={[styles.emptySeason, { color: c.muted }]}>{season}</Text>
+              <Text style={[styles.emptyHint, { color: c.muted }]}>tap a location on the map</Text>
+            </View>
 
-                {isExpanded && (
-                  <View style={[styles.varietyBlock, { backgroundColor: c.card }]}>
-                    {renderVarieties(biz)}
-                  </View>
+          ) : (
+            <>
+              {/* ── Collaboration header ── */}
+              <View style={styles.collab}>
+                <Text style={[styles.collabLabel, { color: c.muted }]}>maison fraise × {activeLocation.name.toLowerCase()}</Text>
+                {activeLocation.neighbourhood && (
+                  <Text style={[styles.collabNeighbourhood, { color: c.muted }]}>{activeLocation.neighbourhood}</Text>
                 )}
               </View>
-            );
-          })}
-          <View style={{ height: 8 }} />
+
+              {/* ── Shop identity ── */}
+              <View style={styles.identityBlock}>
+                {activeLocation.type === 'popup' && (
+                  <Text style={[styles.badge, { color: '#C0392B' }]}>POPUP</Text>
+                )}
+                <Text style={[styles.shopName, { color: c.text }]}>{activeLocation.name}</Text>
+                {activeLocation.description && (
+                  <Text style={[styles.description, { color: c.muted }]}>{activeLocation.description}</Text>
+                )}
+                <View style={styles.shopMeta}>
+                  {activeLocation.instagram_handle && (
+                    <Text style={[styles.instagram, { color: c.muted }]}>@{activeLocation.instagram_handle}</Text>
+                  )}
+                  {order.order_id && order.location_id === activeLocation.id && (
+                    <Text style={[styles.orderPlaced, { color: c.accent }]}>order placed</Text>
+                  )}
+                </View>
+              </View>
+
+              {/* ── Location switcher ── */}
+              {otherLocations.length > 0 && (
+                <FlatList
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  data={otherLocations}
+                  keyExtractor={b => String(b.id)}
+                  contentContainerStyle={styles.switcherRow}
+                  renderItem={({ item: b }) => (
+                    <TouchableOpacity
+                      onPress={() => { setActiveLocation(b); setOrder({ location_id: b.id, location_name: b.name }); }}
+                      activeOpacity={0.7}
+                      style={[styles.switcherChip, { borderColor: c.border }]}
+                    >
+                      <Text style={[styles.switcherChipText, { color: c.muted }]}>{b.name}</Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+
+              {/* ── Today's varieties ── */}
+              <View style={styles.varietiesBlock}>
+                <Text style={[styles.dateLabel, { color: c.muted }]}>{todayLabel}</Text>
+
+                {loading ? (
+                  <ActivityIndicator color={c.accent} style={{ marginVertical: 32 }} />
+                ) : fetchError ? (
+                  <TouchableOpacity onPress={loadVarieties} activeOpacity={0.7} style={styles.retryRow}>
+                    <Text style={[styles.retryText, { color: c.muted }]}>could not load — tap to retry</Text>
+                  </TouchableOpacity>
+                ) : bizVarieties.length === 0 ? (
+                  <Text style={[styles.nothingText, { color: c.muted }]}>nothing ready today</Text>
+                ) : (
+                  bizVarieties.map((v, idx) => {
+                    const freshColor = v.freshnessColor ?? c.accent;
+                    const isSoldOut = v.stock_remaining <= 0;
+                    const stockLow = !isSoldOut && v.stock_remaining <= 3;
+                    return (
+                      <React.Fragment key={v.id}>
+                        {idx > 0 && <View style={[styles.varietyDivider, { backgroundColor: c.border }]} />}
+                        <TouchableOpacity
+                          style={[styles.varietyBlock, isSoldOut && { opacity: 0.35 }]}
+                          onPress={isSoldOut ? undefined : () => handleVarietyPress(v)}
+                          disabled={isSoldOut}
+                          activeOpacity={0.8}
+                        >
+                          {/* Top row: name + price */}
+                          <View style={styles.varietyTopRow}>
+                            <Text style={[styles.varietyName, { color: c.text }]}>{v.name}</Text>
+                            <Text style={[styles.varietyPrice, { color: isSoldOut ? c.muted : c.text }]}>
+                              CA${(v.price_cents / 100).toFixed(0)}
+                            </Text>
+                          </View>
+
+                          {/* Provenance row */}
+                          <View style={styles.provenanceRow}>
+                            {v.farm && (
+                              <Text style={[styles.farm, { color: c.muted }]}>{v.farm}</Text>
+                            )}
+                            {v.farm && v.harvestDate && (
+                              <Text style={[styles.provenanceDot, { color: c.border }]}>·</Text>
+                            )}
+                            {v.harvestDate && (
+                              <Text style={[styles.harvest, { color: c.muted }]}>récolte {formatHarvestDate(v.harvestDate)}</Text>
+                            )}
+                            {(v.farm || v.harvestDate) && (
+                              <Text style={[styles.provenanceDot, { color: c.border }]}>·</Text>
+                            )}
+                            <View style={[styles.freshDot, { backgroundColor: freshColor }]} />
+                            {v.avg_rating != null && (v.rating_count ?? 0) > 0 && (
+                              <>
+                                <Text style={[styles.provenanceDot, { color: c.border }]}>·</Text>
+                                <Text style={[styles.rating, { color: '#FFD700' }]}>★ {v.avg_rating.toFixed(1)}</Text>
+                              </>
+                            )}
+                          </View>
+
+                          {/* Description */}
+                          {v.description && (
+                            <Text style={[styles.varietyDesc, { color: c.muted }]}>{v.description}</Text>
+                          )}
+
+                          {/* Image + stock */}
+                          <View style={styles.varietyBottomRow}>
+                            <Text style={[styles.stock, { color: isSoldOut ? '#FF3B30' : stockLow ? '#FF3B30' : c.muted }]}>
+                              {isSoldOut ? 'sold out' : stockLow ? 'almost gone' : `${v.stock_remaining} left`}
+                            </Text>
+                            {v.image_url && (
+                              <Image source={{ uri: v.image_url }} style={[styles.thumb, { backgroundColor: c.border }]} />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </View>
+            </>
+          )}
+          <View style={{ height: 40 }} />
         </ScrollView>
       )}
     </View>
@@ -238,63 +262,57 @@ export default function HomePanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  brandRow: {
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-  },
-  brandRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  brandInner: { alignItems: 'center', justifyContent: 'center' },
-  brandName: {
-    fontSize: 20,
-    fontFamily: fonts.playfair,
-  },
-  brandDate: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 3 },
-  seasonKanji: { fontSize: 28, position: 'absolute', right: SPACING.md },
-  list: { flex: 1 },
-  locationSection: {
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.md,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    gap: 12,
-  },
-  locationMain: { flex: 1, gap: 3 },
-  popupBadge: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
-  locationName: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 1, textTransform: 'uppercase' },
-  locationDate: { fontSize: 12, fontFamily: fonts.dmSans },
-  varietyBlock: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 10,
-  },
-  varietyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    gap: 12,
-  },
-  rowMain: { flex: 1, gap: 6 },
-  varietyName: { fontSize: 17, fontFamily: fonts.playfair },
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  strip: { alignItems: 'center', paddingTop: 28, paddingBottom: 20 },
+  stripBrand: { fontSize: 13, fontFamily: fonts.playfair, letterSpacing: 0.3 },
+  scroll: { flex: 1 },
+
+  // Empty state
+  emptyState: { alignItems: 'center', paddingTop: SPACING.xl ?? 40, gap: 6 },
+  emptyTitle: { fontSize: 24, fontFamily: fonts.playfair },
+  emptyDate: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  emptySeason: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5, fontStyle: 'italic' },
+  emptyHint: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 20 },
+
+  // Collaboration header
+  collab: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, gap: 3 },
+  collabLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
+  collabNeighbourhood: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+
+  // Shop identity
+  identityBlock: { paddingHorizontal: SPACING.md, paddingTop: 10, paddingBottom: SPACING.md, gap: 8 },
+  badge: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+  shopName: { fontSize: 34, fontFamily: fonts.playfair, lineHeight: 40 },
+  description: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
+  shopMeta: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  instagram: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  orderPlaced: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+
+  // Location switcher
+  switcherRow: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: 8, flexDirection: 'row' },
+  switcherChip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  switcherChipText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
+
+  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: SPACING.md },
+
+  // Varieties
+  varietiesBlock: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, gap: 0 },
+  dateLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginBottom: SPACING.md },
+  varietyDivider: { height: StyleSheet.hairlineWidth, marginVertical: SPACING.md },
+  varietyBlock: { gap: 8 },
+  varietyTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  varietyName: { fontSize: 24, fontFamily: fonts.playfair, flex: 1 },
+  varietyPrice: { fontSize: 14, fontFamily: fonts.dmMono },
+  provenanceRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   farm: { fontSize: 11, fontFamily: fonts.dmMono },
+  harvest: { fontSize: 11, fontFamily: fonts.dmMono },
+  provenanceDot: { fontSize: 10, fontFamily: fonts.dmMono },
   freshDot: { width: 6, height: 6, borderRadius: 3 },
-  freshLabel: { fontSize: 11, fontFamily: fonts.dmMono },
-  varietyThumb: { width: 48, height: 48, borderRadius: 6 },
-  rowRight: { alignItems: 'flex-end', gap: 4 },
-  price: { fontSize: 15, fontFamily: fonts.dmMono },
+  rating: { fontSize: 10, fontFamily: fonts.dmMono },
+  varietyDesc: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
+  varietyBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 4 },
   stock: { fontSize: 11, fontFamily: fonts.dmSans },
-  emptyText: { fontSize: 15, fontFamily: fonts.dmSans, textAlign: 'center', fontStyle: 'italic' },
-  varietyDesc: { fontSize: 11, fontFamily: fonts.dmSans, lineHeight: 16, fontStyle: 'italic' },
-  harvestDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, fontStyle: 'italic' },
-  ratingText: { fontSize: 10, fontFamily: fonts.dmMono, color: '#FFD700' },
-  seasonPatronLine: { fontSize: 11, fontFamily: fonts.dmMono },
+  thumb: { width: 64, height: 64, borderRadius: 8 },
+  retryRow: { paddingVertical: 16 },
+  retryText: { fontSize: 12, fontFamily: fonts.dmSans, fontStyle: 'italic' },
+  nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
 });

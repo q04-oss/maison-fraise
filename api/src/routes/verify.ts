@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, users, legitimacyEvents } from '../db/schema';
 import { requireUser } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -66,7 +67,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ alias: currentUser.user_code, forward: appleEmail }),
-        }).catch(() => {}); // fire and forget — don't block verification on email routing
+        }).catch((err) => { logger.error('ImprovMX alias creation failed', err); });
       }
     }
 

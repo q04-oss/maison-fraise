@@ -16,9 +16,15 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.maisonfraise.app",
       "entitlements": {
-        "com.apple.developer.in-app-payments": ["merchant.com.maisonfraise.app"],
-        "com.apple.developer.applesignin": ["Default"],
-        "com.apple.developer.nfc.readersession.formats": ["NDEF"]
+        "com.apple.developer.in-app-payments": [
+          "merchant.com.maisonfraise.app"
+        ],
+        "com.apple.developer.applesignin": [
+          "Default"
+        ],
+        "com.apple.developer.nfc.readersession.formats": [
+          "NDEF"
+        ]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -60,7 +66,8 @@
           "isIosBackgroundLocationEnabled": true,
           "isAndroidBackgroundLocationEnabled": true
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

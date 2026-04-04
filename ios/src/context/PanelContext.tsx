@@ -5,13 +5,6 @@ export type PanelId =
   | 'home'
   | 'terminal'
   | 'location'
-  | 'gift-note'
-  | 'chocolate'
-  | 'finish'
-  | 'quantity'
-  | 'when'
-  | 'review'
-  | 'confirmation'
   | 'verified'
   | 'standingOrder'
   | 'partner-detail'
@@ -86,6 +79,7 @@ export interface Business {
   is_audition?: boolean;
   audition_status?: 'pending' | 'passed' | 'failed';
   placed_user_name?: string | null;
+  shop_user_id?: number | null;
   starts_at?: string;
   host_user_id?: number | null;
   checkin_token?: string | null;

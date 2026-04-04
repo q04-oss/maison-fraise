@@ -6,7 +6,7 @@ import { useColors, fonts, SPACING } from '../../theme';
 import { fetchConversations } from '../../lib/api';
 
 export default function ConversationsPanel() {
-  const { goHome, showPanel, setPanelData } = usePanel();
+  const { showPanel, setPanelData } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [conversations, setConversations] = useState<any[]>([]);
@@ -21,7 +21,13 @@ export default function ConversationsPanel() {
   useEffect(() => { load(); }, []);
 
   const openThread = (conv: any) => {
-    setPanelData({ userId: conv.other_user_id, displayName: conv.display_name, userCode: conv.user_code });
+    setPanelData({
+      userId: conv.other_user_id,
+      displayName: conv.display_name,
+      userCode: conv.user_code,
+      isShop: conv.is_shop ?? false,
+      businessId: conv.business_id ?? null,
+    });
     showPanel('messageThread');
   };
 
@@ -35,13 +41,8 @@ export default function ConversationsPanel() {
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={[styles.header, { borderBottomColor: c.border }]}>
-        <TouchableOpacity onPress={goHome} style={styles.backBtn} activeOpacity={0.7}>
-          <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]}>Messages</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <Text style={[styles.stripLabel, { color: c.muted }]}>strawberry chat</Text>
+
 
       {loading ? (
         <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
@@ -63,9 +64,14 @@ export default function ConversationsPanel() {
             >
               <View style={styles.rowMain}>
                 <View style={styles.rowTop}>
-                  <Text style={[styles.name, { color: c.text }]}>
-                    {item.display_name ?? item.user_code ?? 'Unknown'}
-                  </Text>
+                  <View style={styles.nameRow}>
+                    <Text style={[styles.name, { color: c.text }]}>
+                      {item.display_name ?? item.user_code ?? 'Unknown'}
+                    </Text>
+                    {item.is_shop && (
+                      <Text style={[styles.shopTag, { color: c.accent }]}>shop</Text>
+                    )}
+                  </View>
                   <Text style={[styles.time, { color: c.muted }]}>{formatTime(item.last_at)}</Text>
                 </View>
                 <View style={styles.rowBottom}>
@@ -89,22 +95,16 @@ export default function ConversationsPanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: SPACING.md, paddingTop: 18, paddingBottom: 18,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backBtn: { paddingVertical: 4 },
-  backBtnText: { fontSize: 28, lineHeight: 34 },
-  title: { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: fonts.playfair },
-  headerSpacer: { width: 28 },
+  stripLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1, paddingTop: 36, paddingBottom: 52, textAlign: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.md, gap: 8 },
   emptyText: { fontSize: 17, fontFamily: fonts.playfair },
   emptyHint: { fontSize: 13, fontFamily: fonts.dmSans, textAlign: 'center', lineHeight: 20 },
   row: { paddingHorizontal: SPACING.md, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   rowMain: { gap: 4 },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   name: { fontSize: 15, fontFamily: fonts.playfair },
+  shopTag: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1, textTransform: 'uppercase' },
   time: { fontSize: 11, fontFamily: fonts.dmMono },
   rowBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   preview: { fontSize: 13, fontFamily: fonts.dmSans, flex: 1 },

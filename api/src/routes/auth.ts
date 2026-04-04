@@ -126,8 +126,11 @@ router.post('/operator', async (req: Request, res: Response) => {
 // POST /api/auth/demo — demo login for Apple reviewers
 router.post('/demo', async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  const demoEmail = process.env.DEMO_EMAIL ?? 'demo@maison-fraise.com';
-  const demoPassword = process.env.DEMO_PASSWORD ?? 'demo1234';
+  const demoEmail = process.env.DEMO_EMAIL;
+  const demoPassword = process.env.DEMO_PASSWORD;
+  if (!demoEmail || !demoPassword) {
+    res.status(503).json({ error: 'demo_unavailable' }); return;
+  }
   if (email !== demoEmail || password !== demoPassword) {
     logger.warn('Demo login rejected', { receivedEmail: email, expectedEmail: demoEmail, passwordMatch: password === demoPassword });
     res.status(401).json({ error: 'invalid_credentials' }); return;
@@ -174,6 +177,9 @@ router.patch('/display-name', requireUser, async (req: Request, res: Response) =
   const userId = (req as any).userId as number;
   if (!display_name || !display_name.trim()) {
     res.status(400).json({ error: 'display_name is required' }); return;
+  }
+  if (display_name.trim().length > 60) {
+    res.status(400).json({ error: 'display_name too long' }); return;
   }
   try {
     await db.update(users).set({ display_name: display_name.trim() }).where(eq(users.id, userId));

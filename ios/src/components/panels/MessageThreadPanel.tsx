@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList,
-  TextInput, KeyboardAvoidingView, Platform, ActivityIndicator,
+  TextInput, Keyboard, ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,22 +10,31 @@ import { useColors, fonts, SPACING } from '../../theme';
 import { fetchThread, sendMessage } from '../../lib/api';
 
 export default function MessageThreadPanel() {
-  const { goBack, panelData } = usePanel();
+  const { goBack, panelData, setPanelData, jumpToPanel, businesses, setActiveLocation, setOrder } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [myId, setMyId] = useState<number | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const flatRef = useRef<FlatList>(null);
 
   const otherId: number = panelData?.userId;
+  const isShop: boolean = panelData?.isShop ?? false;
   const otherName: string = panelData?.displayName ?? panelData?.userCode ?? 'Unknown';
   const otherCode: string = panelData?.userCode ?? otherName;
 
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => { if (id) setMyId(parseInt(id, 10)); });
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', e => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
   }, []);
 
   const load = useCallback(() => {
@@ -52,19 +61,32 @@ export default function MessageThreadPanel() {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!text.trim() || !otherId || sending) return;
+    if (!text.trim() || sending) return;
+    if (!otherId) { setSendError('no recipient'); return; }
     const body = text.trim();
     setText('');
+    setSendError(null);
     setSending(true);
     try {
       const msg = await sendMessage(otherId, body);
       setMessages(prev => [...prev, msg]);
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100);
-    } catch {
+    } catch (e: any) {
       setText(body);
+      setSendError(e?.message ?? 'send failed');
     } finally {
       setSending(false);
     }
+  };
+
+  const handleOrder = () => {
+    const shopBusiness = businesses?.find((b: any) => b.shop_user_id === otherId);
+    if (shopBusiness) {
+      setActiveLocation(shopBusiness);
+      setOrder({ location_id: shopBusiness.id, location_name: shopBusiness.name });
+    }
+    setPanelData({ openOrder: true });
+    jumpToPanel('terminal');
   };
 
   const formatTime = (iso: string) => {
@@ -72,17 +94,22 @@ export default function MessageThreadPanel() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: c.panelBg }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
+    <View style={[styles.container, { backgroundColor: c.panelBg, paddingBottom: keyboardHeight }]}>
       <View style={[styles.header, { borderBottomColor: c.border }]}>
         <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]}>{otherName}</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerCenter}>
+          <Text style={[styles.title, { color: c.text }]}>{otherName}</Text>
+          {isShop && <Text style={[styles.shopLabel, { color: c.accent }]}>fraise.chat</Text>}
+        </View>
+        {isShop ? (
+          <TouchableOpacity onPress={handleOrder} style={styles.orderBtn} activeOpacity={0.7}>
+            <Text style={[styles.orderBtnText, { color: c.muted }]}>order →</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       {loading ? (
@@ -112,6 +139,9 @@ export default function MessageThreadPanel() {
         />
       )}
 
+      {sendError && (
+        <Text style={[styles.errorText, { color: c.muted, backgroundColor: c.panelBg }]}>{sendError}</Text>
+      )}
       <View style={[styles.composer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md, backgroundColor: c.panelBg }]}>
         <Text style={[styles.prompt, { color: c.accent }]}>{sending ? '·' : '>'}</Text>
         <TextInput
@@ -125,8 +155,16 @@ export default function MessageThreadPanel() {
           blurOnSubmit={false}
           multiline
         />
+        <TouchableOpacity
+          onPress={handleSend}
+          disabled={!text.trim() || sending}
+          style={styles.sendBtn}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.sendBtnText, { color: text.trim() && !sending ? c.accent : c.muted }]}>↑</Text>
+        </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -139,7 +177,9 @@ const styles = StyleSheet.create({
   },
   backBtn: { paddingVertical: 4 },
   backBtnText: { fontSize: 28, lineHeight: 34 },
-  title: { flex: 1, textAlign: 'center', fontSize: 17, fontFamily: fonts.playfair },
+  headerCenter: { flex: 1, alignItems: 'center', gap: 2 },
+  title: { textAlign: 'center', fontSize: 17, fontFamily: fonts.playfair },
+  shopLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1 },
   headerSpacer: { width: 28 },
   messageList: { paddingVertical: SPACING.sm },
   message: { paddingHorizontal: SPACING.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 5 },
@@ -157,4 +197,9 @@ const styles = StyleSheet.create({
     flex: 1, paddingVertical: 10,
     fontSize: 15, fontFamily: fonts.dmMono, maxHeight: 120,
   },
+  orderBtn: { paddingVertical: 4, paddingHorizontal: 4 },
+  orderBtnText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  sendBtn: { paddingBottom: 8, paddingHorizontal: 4 },
+  sendBtnText: { fontSize: 22, fontFamily: fonts.dmMono },
+  errorText: { fontSize: 11, fontFamily: fonts.dmMono, paddingHorizontal: SPACING.md, paddingVertical: 4 },
 });

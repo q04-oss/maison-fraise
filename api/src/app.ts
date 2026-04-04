@@ -50,6 +50,12 @@ app.use('/api', limiter);
 const authLimiter = rateLimit({ windowMs: 60_000, max: 30, standardHeaders: true, legacyHeaders: false });
 app.use('/api/auth', authLimiter);
 
+const operatorLimiter = rateLimit({ windowMs: 15 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.use('/api/auth/operator', operatorLimiter);
+
+const adminLimiter = rateLimit({ windowMs: 60_000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.use('/api/admin', adminLimiter);
+
 const aiLimiter = rateLimit({ windowMs: 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/gift-note', aiLimiter);
 app.use('/api/ask', aiLimiter);

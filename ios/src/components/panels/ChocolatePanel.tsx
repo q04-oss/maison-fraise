@@ -15,12 +15,12 @@ export default function ChocolatePanel() {
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
 
       {/* Collapsed strip label */}
-      <Text style={[styles.stripLabel, { color: c.muted }]}>choose your chocolate</Text>
-
-      {/* Floating back */}
-      <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
-        <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
-      </TouchableOpacity>
+      <View style={styles.strip}>
+        <TouchableOpacity onPress={goBack} activeOpacity={0.7}>
+          <Text style={[styles.backArrow, { color: c.accent }]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[styles.stripLabel, { color: c.muted }]}>chocolate</Text>
+      </View>
 
       <View style={styles.body}>
         {CHOCOLATES.map((choc, i) => {
@@ -38,9 +38,7 @@ export default function ChocolatePanel() {
                   <View style={styles.rowTop}>
                     <Text style={[styles.chocName, { color: c.text }]}>{choc.name}</Text>
                     {choc.tag && (
-                      <View style={[styles.tag, { backgroundColor: c.cardDark }]}>
-                        <Text style={[styles.tagText, { color: c.muted }]}>{choc.tag}</Text>
-                      </View>
+                      <Text style={[styles.tag, { color: c.muted }]}>{choc.tag}</Text>
                     )}
                   </View>
                   <Text style={[styles.chocSource, { color: c.muted }]}>{choc.source}</Text>
@@ -48,9 +46,7 @@ export default function ChocolatePanel() {
                     <Text style={[styles.chocDesc, { color: c.muted }]}>{choc.description} {choc.tagline}</Text>
                   )}
                 </View>
-                <View style={[styles.radio, { borderColor: isSelected ? c.accent : c.border }]}>
-                  {isSelected && <View style={[styles.radioDot, { backgroundColor: c.accent }]} />}
-                </View>
+                {isSelected && <View style={[styles.dot, { backgroundColor: c.accent }]} />}
               </TouchableOpacity>
             </React.Fragment>
           );
@@ -78,23 +74,21 @@ export default function ChocolatePanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  stripLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1, paddingTop: 20, paddingHorizontal: SPACING.md },
-  backBtn: { paddingHorizontal: SPACING.md, paddingVertical: 8 },
-  backBtnText: { fontSize: 28, lineHeight: 34 },
-  body: { flex: 1, paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
-  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
-  swatch: { width: 20, height: 20, borderRadius: 10, flexShrink: 0 },
-  rowText: { flex: 1, gap: 2 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  strip: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 20, paddingHorizontal: SPACING.md, paddingBottom: 8 },
+  backArrow: { fontSize: 22, lineHeight: 28 },
+  stripLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+  body: { flex: 1, paddingHorizontal: SPACING.md },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
+  swatch: { width: 8, height: 8, borderRadius: 4, flexShrink: 0, marginTop: 2 },
+  rowText: { flex: 1, gap: 3 },
+  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   chocName: { fontSize: 15, fontFamily: fonts.playfair },
-  chocSource: { fontSize: 12, fontFamily: fonts.dmSans },
-  tag: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  tagText: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1 },
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  radioDot: { width: 10, height: 10, borderRadius: 5 },
-  divider: { height: StyleSheet.hairlineWidth },
+  chocSource: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  tag: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1 },
   chocDesc: { fontSize: 12, fontFamily: fonts.dmSans, lineHeight: 18, marginTop: 2, fontStyle: 'italic' },
-  footer: { padding: SPACING.md, paddingTop: 12 },
+  dot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
+  divider: { height: StyleSheet.hairlineWidth },
+  footer: { paddingHorizontal: SPACING.md, paddingTop: 12 },
   cta: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   ctaDisabled: { opacity: 0.3 },
   ctaText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
