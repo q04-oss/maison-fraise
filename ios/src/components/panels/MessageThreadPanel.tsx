@@ -36,6 +36,14 @@ export default function MessageThreadPanel() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Poll every 5s to pick up read receipt updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (otherId) fetchThread(otherId).then(setMessages).catch(() => {});
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [otherId]);
+
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
@@ -92,9 +100,16 @@ export default function MessageThreadPanel() {
                   styles.bubbleText,
                   { color: isMine ? '#fff' : c.text },
                 ]}>{item.body}</Text>
-                <Text style={[styles.bubbleTime, { color: isMine ? 'rgba(255,255,255,0.55)' : c.muted }]}>
-                  {formatTime(item.created_at)}
-                </Text>
+                <View style={styles.bubbleMeta}>
+                  <Text style={[styles.bubbleTime, { color: isMine ? 'rgba(255,255,255,0.55)' : c.muted }]}>
+                    {formatTime(item.created_at)}
+                  </Text>
+                  {isMine && (
+                    <Text style={[styles.readReceipt, { color: item.read ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)' }]}>
+                      {item.read ? '✓✓' : '✓'}
+                    </Text>
+                  )}
+                </View>
               </View>
             );
           }}
@@ -146,7 +161,9 @@ const styles = StyleSheet.create({
   bubbleMine: { alignSelf: 'flex-end', backgroundColor: '#C9973A' },
   bubbleTheirs: { alignSelf: 'flex-start', backgroundColor: 'rgba(120,120,128,0.15)' },
   bubbleText: { fontSize: 15, fontFamily: fonts.dmSans, lineHeight: 21 },
-  bubbleTime: { fontSize: 10, fontFamily: fonts.dmMono, alignSelf: 'flex-end' },
+  bubbleMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+  bubbleTime: { fontSize: 10, fontFamily: fonts.dmMono },
+  readReceipt: { fontSize: 10, fontFamily: fonts.dmMono },
   composer: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: SPACING.md, paddingTop: SPACING.sm,
