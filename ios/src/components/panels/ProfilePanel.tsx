@@ -218,14 +218,20 @@ export default function ProfilePanel() {
         ) : (
           <>
             {lastOrder && (
-              <TouchableOpacity onPress={handleOrderAgain} activeOpacity={0.6} style={styles.reorderLine}>
-                <Text style={[styles.reorderText, { color: c.text }]}>
-                  {'↺  '}{lastOrder.variety_name ?? '—'}
-                  {'  ·  '}{CHOCOLATES.find(choc => choc.id === lastOrder.chocolate)?.name ?? lastOrder.chocolate ?? '—'}
+              <View style={styles.lastOrderBlock}>
+                <Text style={[styles.lastOrderDate, { color: c.muted }]}>
+                  {new Date(lastOrder.created_at ?? Date.now()).toLocaleDateString([], { month: 'long', day: 'numeric' })}
+                </Text>
+                <Text style={[styles.lastOrderName, { color: c.text }]}>{lastOrder.variety_name ?? '—'}</Text>
+                <Text style={[styles.lastOrderSub, { color: c.muted }]}>
+                  {CHOCOLATES.find(choc => choc.id === lastOrder.chocolate)?.name ?? lastOrder.chocolate ?? '—'}
                   {'  ·  '}{FINISHES.find(f => f.id === lastOrder.finish)?.name ?? lastOrder.finish ?? '—'}
                   {'  ·  '}{lastOrder.quantity}
                 </Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={handleOrderAgain} activeOpacity={0.6} style={styles.reorderLink}>
+                  <Text style={[styles.reorderLinkText, { color: c.accent }]}>Order again</Text>
+                </TouchableOpacity>
+              </View>
             )}
 
             {recentOrders.length > 1 && (
@@ -310,6 +316,10 @@ const styles = StyleSheet.create({
   orderMeta: { fontSize: 12, fontFamily: fonts.dmSans },
   verifyRow: { paddingHorizontal: SPACING.md, paddingVertical: 14 },
   verifyText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
-  reorderLine: { paddingVertical: 4, marginLeft: 4 },
-  reorderText: { fontSize: 13, fontFamily: fonts.dmMono },
+  lastOrderBlock: { gap: 4, marginLeft: 4 },
+  lastOrderDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, textTransform: 'uppercase' },
+  lastOrderName: { fontSize: 22, fontFamily: fonts.playfair },
+  lastOrderSub: { fontSize: 12, fontFamily: fonts.dmSans },
+  reorderLink: { paddingTop: 6 },
+  reorderLinkText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1, textTransform: 'uppercase' },
 });
