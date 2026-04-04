@@ -274,23 +274,27 @@ router.post('/offer/:offerId/accept', requireUser, async (req: any, res: Respons
       return;
     }
 
-    // Accept offer: update status, transfer token, record trade
-    await db
-      .update(tokenTradeOffers)
-      .set({ status: 'accepted' })
-      .where(eq(tokenTradeOffers.id, offerId));
+    // Accept offer atomically: guard against concurrent accepts with conditional WHERE
+    await db.transaction(async (tx) => {
+      const updated = await tx
+        .update(tokenTradeOffers)
+        .set({ status: 'accepted' })
+        .where(and(eq(tokenTradeOffers.id, offerId), eq(tokenTradeOffers.status, 'pending')))
+        .returning({ id: tokenTradeOffers.id });
+      if (updated.length === 0) throw Object.assign(new Error('Offer already accepted or declined'), { status: 409 });
 
-    await db
-      .update(tokens)
-      .set({ current_owner_id: userId })
-      .where(eq(tokens.id, offer.token_id));
+      await tx
+        .update(tokens)
+        .set({ current_owner_id: userId })
+        .where(eq(tokens.id, offer.token_id));
 
-    await db.insert(tokenTrades).values({
-      token_id: offer.token_id,
-      from_user_id: offer.from_user_id,
-      to_user_id: userId,
-      platform_cut_cents: 0,
-      note: offer.note,
+      await tx.insert(tokenTrades).values({
+        token_id: offer.token_id,
+        from_user_id: offer.from_user_id,
+        to_user_id: userId,
+        platform_cut_cents: 0,
+        note: offer.note,
+      });
     });
 
     // Notify sender
@@ -308,7 +312,8 @@ router.post('/offer/:offerId/accept', requireUser, async (req: any, res: Respons
     }
 
     res.json({ ok: true });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.status) { res.status(err.status).json({ error: err.message }); return; }
     res.status(500).json({ error: 'Internal server error' });
   }
 });

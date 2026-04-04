@@ -26,15 +26,15 @@ membershipsRouter.post('/payment-intent', requireUser, async (req: Request, res:
   }
 
   try {
-    // Check user doesn't already have an active membership
+    // Check user doesn't already have an active or pending membership
     const [existing] = await db
-      .select({ id: memberships.id })
+      .select({ id: memberships.id, status: memberships.status })
       .from(memberships)
-      .where(and(eq(memberships.user_id, userId), eq(memberships.status, 'active')))
+      .where(and(eq(memberships.user_id, userId), sql`status IN ('active', 'pending')`))
       .limit(1);
 
     if (existing) {
-      res.status(409).json({ error: 'already_active' });
+      res.status(409).json({ error: existing.status === 'active' ? 'already_active' : 'payment_in_progress' });
       return;
     }
 

@@ -82,7 +82,7 @@ router.post('/', async (req: Request, res: Response) => {
           variety_id: String(variety_id),
           time_slot_id: String(time_slot_id),
         },
-      }, { idempotencyKey: `order-${customer_email}-${variety_id}-${time_slot_id}` });
+      }, { idempotencyKey: `order-${customer_email}-${variety_id}-${time_slot_id}-${quantity}` });
       stripePaymentIntentId = paymentIntent.id;
       clientSecret = paymentIntent.client_secret!;
     }

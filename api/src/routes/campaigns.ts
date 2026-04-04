@@ -122,9 +122,15 @@ router.delete('/:id/signup', requireUser, async (req: Request, res: Response) =>
       return;
     }
 
-    await db.update(campaignSignups)
+    const cancelled = await db.update(campaignSignups)
       .set({ status: 'cancelled' })
-      .where(eq(campaignSignups.id, signup.id));
+      .where(and(eq(campaignSignups.id, signup.id), sql`${campaignSignups.status} != 'cancelled'`))
+      .returning({ id: campaignSignups.id });
+
+    if (cancelled.length === 0) {
+      res.status(409).json({ error: 'Signup already cancelled' });
+      return;
+    }
 
     if (!signup.waitlist) {
       await db.update(campaigns)

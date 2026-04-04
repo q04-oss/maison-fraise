@@ -110,7 +110,7 @@ export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<
           WHERE id = ${defaultVariety.id} AND stock_remaining >= 1
         `);
         const stockRows = (stockDeducted as any).rowCount ?? (stockDeducted as any).rowsAffected ?? 0;
-        if (stockRows === 0) return null;
+        if (stockRows === 0) throw Object.assign(new Error('out_of_stock'), { expected: true });
 
         return tx.insert(orders).values({
           variety_id: defaultVariety.id,
@@ -200,7 +200,7 @@ export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<
         WHERE id = ${variety_id} AND stock_remaining >= ${quantity}
       `);
       const stockRows = (stockDeducted as any).rowCount ?? (stockDeducted as any).rowsAffected ?? 0;
-      if (stockRows === 0) return null;
+      if (stockRows === 0) throw Object.assign(new Error('out_of_stock'), { expected: true });
 
       return tx.insert(orders).values({
         variety_id,
@@ -228,7 +228,7 @@ export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<
     }
 
     logger.info(`Auto-order triggered for user ${userId} via standing order ${standingOrder.id}`);
-  } catch (err) {
-    logger.error('checkAndTriggerAutoOrder error', err);
+  } catch (err: any) {
+    if (!err?.expected) logger.error('checkAndTriggerAutoOrder error', err);
   }
 }

@@ -84,36 +84,43 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const customer_email = pi.metadata.customer_email;
         const discount_applied = pi.metadata.discount_applied === 'true';
 
-        // Decrement stock
-        await db
-          .update(varieties)
-          .set({ stock_remaining: sql`stock_remaining - ${quantity}` })
-          .where(eq(varieties.id, variety_id));
-
         // Generate NFC token
         const nfc_token = crypto.randomBytes(4).toString('hex');
 
-        // Insert order
-        const [newOrder] = await db
-          .insert(orders)
-          .values({
-            variety_id,
-            location_id,
-            time_slot_id,
-            chocolate,
-            finish,
-            quantity,
-            is_gift,
-            total_cents: pi.amount,
-            stripe_payment_intent_id: pi.id,
-            payment_intent_id: pi.id,
-            status: 'paid',
-            customer_email,
-            gift_note,
-            nfc_token,
-            discount_applied,
-          })
-          .returning();
+        // Decrement stock (guarded) and insert order atomically
+        const newOrder = await db.transaction(async (tx) => {
+          const stockResult = await tx
+            .update(varieties)
+            .set({ stock_remaining: sql`${varieties.stock_remaining} - ${quantity}` })
+            .where(and(eq(varieties.id, variety_id), sql`${varieties.stock_remaining} >= ${quantity}`))
+            .returning({ stock_remaining: varieties.stock_remaining });
+          if (stockResult.length === 0) {
+            logger.error(`Webhook: insufficient stock for variety ${variety_id}, quantity ${quantity}`);
+            throw Object.assign(new Error('out_of_stock'), { status: 409 });
+          }
+
+          const [inserted] = await tx
+            .insert(orders)
+            .values({
+              variety_id,
+              location_id,
+              time_slot_id,
+              chocolate,
+              finish,
+              quantity,
+              is_gift,
+              total_cents: pi.amount,
+              stripe_payment_intent_id: pi.id,
+              payment_intent_id: pi.id,
+              status: 'paid',
+              customer_email,
+              gift_note,
+              nfc_token,
+              discount_applied,
+            })
+            .returning();
+          return inserted;
+        });
 
         logger.info(`Order ${newOrder.id} created + paid via payment_intent webhook`);
 
