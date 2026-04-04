@@ -1244,3 +1244,24 @@ export async function sendMessage(recipientId: number, body: string): Promise<an
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'send_failed'); }
   return r.json();
 }
+
+export async function acceptOffer(messageId: number, customerEmail: string, pushToken?: string): Promise<{ client_secret: string; payment_intent_id: string; total_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/offer/${messageId}/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ customer_email: customerEmail, push_token: pushToken }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'accept_failed'); }
+  return r.json();
+}
+
+export async function confirmOfferPayment(messageId: number): Promise<{ order_id: number; nfc_token: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/offer/${messageId}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'confirm_failed'); }
+  return r.json();
+}

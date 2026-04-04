@@ -1,17 +1,21 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, FlatList,
-  TextInput, Keyboard, ActivityIndicator,
+  TextInput, Keyboard, ActivityIndicator, Alert,
 } from 'react-native';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchThread, sendMessage } from '../../lib/api';
+import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment } from '../../lib/api';
+import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
   const { goBack, panelData, setPanelData, jumpToPanel, businesses, setActiveLocation, setOrder } = usePanel();
+  const { pushToken } = useApp();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<any[]>([]);
@@ -20,7 +24,9 @@ export default function MessageThreadPanel() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [myId, setMyId] = useState<number | null>(null);
+  const [myEmail, setMyEmail] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [acceptingOffer, setAcceptingOffer] = useState<number | null>(null);
   const flatRef = useRef<FlatList>(null);
 
   const otherId: number = panelData?.userId;
@@ -29,7 +35,12 @@ export default function MessageThreadPanel() {
   const otherCode: string = panelData?.userCode ?? otherName;
 
   useEffect(() => {
-    AsyncStorage.getItem('user_db_id').then(id => { if (id) setMyId(parseInt(id, 10)); });
+    AsyncStorage.multiGet(['user_db_id', 'user_email']).then(pairs => {
+      const id = pairs[0][1];
+      const email = pairs[1][1];
+      if (id) setMyId(parseInt(id, 10));
+      if (email) setMyEmail(email);
+    });
   }, []);
 
   useEffect(() => {
@@ -60,6 +71,35 @@ export default function MessageThreadPanel() {
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100);
     }
   }, [messages]);
+
+  const handleAcceptOffer = async (messageId: number) => {
+    if (!myEmail) { Alert.alert('Sign in required', 'Please sign in to place an order.'); return; }
+    setAcceptingOffer(messageId);
+    try {
+      const { client_secret, total_cents } = await acceptOffer(messageId, myEmail, pushToken ?? undefined);
+      await initPaymentSheet({
+        paymentIntentClientSecret: client_secret,
+        merchantDisplayName: 'Maison Fraise',
+        applePay: { merchantCountryCode: 'CA' },
+        style: 'alwaysLight',
+      });
+      const { error } = await presentPaymentSheet();
+      if (error) {
+        if (error.code !== 'Canceled') Alert.alert('Payment failed', error.message);
+        return;
+      }
+      const { order_id, nfc_token } = await confirmOfferPayment(messageId);
+      // Update the offer message locally to reflect paid status
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...m.metadata, status: 'paid', order_id, nfc_token } } : m
+      ));
+      load();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Something went wrong');
+    } finally {
+      setAcceptingOffer(null);
+    }
+  };
 
   const handleSend = async () => {
     if (!text.trim() || sending) return;
@@ -123,6 +163,59 @@ export default function MessageThreadPanel() {
           contentContainerStyle={styles.messageList}
           renderItem={({ item }) => {
             const isMine = item.sender_id === myId;
+
+            if (item.type === 'offer') {
+              const meta = item.metadata ?? {};
+              const isPaid = meta.status === 'paid';
+              const isAccepting = acceptingOffer === item.id;
+              const CHOC: Record<string, string> = { guanaja_70: 'guanaja 70%', caraibe_66: 'caraïbe 66%', jivara_40: 'jivara 40%', ivoire_blanc: 'ivoire blanc' };
+              const FIN: Record<string, string> = { plain: 'plain', fleur_de_sel: 'fleur de sel', or_fin: 'or fin' };
+              return (
+                <View style={[styles.offerCard, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <View style={styles.offerHeader}>
+                    <Text style={[styles.offerLabel, { color: c.accent }]}>offer</Text>
+                    <Text style={[styles.messageTime, { color: c.muted }]}>{formatTime(item.created_at)}</Text>
+                  </View>
+                  <Text style={[styles.offerVariety, { color: c.text }]}>{meta.variety_name}</Text>
+                  <Text style={[styles.offerDetail, { color: c.muted }]}>
+                    {[CHOC[meta.chocolate] ?? meta.chocolate, FIN[meta.finish] ?? meta.finish, `×${meta.quantity}`].join('  ·  ')}
+                  </Text>
+                  <Text style={[styles.offerDetail, { color: c.muted }]}>{meta.slot_date}  {meta.slot_time}</Text>
+                  <View style={styles.offerFooter}>
+                    <Text style={[styles.offerPrice, { color: c.text }]}>CA${((meta.total_cents ?? 0) / 100).toFixed(2)}</Text>
+                    {!isMine && !isPaid && (
+                      <TouchableOpacity
+                        style={[styles.offerBtn, { borderColor: c.accent }]}
+                        onPress={() => handleAcceptOffer(item.id)}
+                        disabled={isAccepting}
+                        activeOpacity={0.7}
+                      >
+                        {isAccepting
+                          ? <ActivityIndicator size="small" color={c.accent} />
+                          : <Text style={[styles.offerBtnText, { color: c.accent }]}>pay →</Text>
+                        }
+                      </TouchableOpacity>
+                    )}
+                    {isPaid && <Text style={[styles.offerBtnText, { color: c.muted }]}>paid ✓</Text>}
+                  </View>
+                </View>
+              );
+            }
+
+            if (item.type === 'order_confirm') {
+              const meta = item.metadata ?? {};
+              return (
+                <View style={[styles.confirmCard, { borderColor: c.border }]}>
+                  <Text style={[styles.offerLabel, { color: c.accent }]}>confirmed</Text>
+                  <Text style={[styles.confirmText, { color: c.text }]}>{meta.variety_name}</Text>
+                  <Text style={[styles.offerDetail, { color: c.muted }]}>{meta.slot_date}  ·  {meta.slot_time}</Text>
+                  {meta.nfc_token && (
+                    <Text style={[styles.offerDetail, { color: c.accent, letterSpacing: 2 }]}>{meta.nfc_token}</Text>
+                  )}
+                </View>
+              );
+            }
+
             return (
               <View style={[styles.message, { borderBottomColor: c.border }]}>
                 <View style={styles.messageMeta}>
@@ -203,4 +296,23 @@ const styles = StyleSheet.create({
   sendBtn: { paddingBottom: 8, paddingHorizontal: 4 },
   sendBtnText: { fontSize: 22, fontFamily: fonts.dmMono },
   errorText: { fontSize: 11, fontFamily: fonts.dmMono, paddingHorizontal: SPACING.md, paddingVertical: 4 },
+  offerCard: {
+    marginHorizontal: SPACING.md, marginVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 12,
+    padding: SPACING.md, gap: 6,
+  },
+  offerHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  offerLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase' },
+  offerVariety: { fontSize: 20, fontFamily: fonts.playfair },
+  offerDetail: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  offerFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  offerPrice: { fontSize: 15, fontFamily: fonts.dmMono },
+  offerBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
+  offerBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  confirmCard: {
+    marginHorizontal: SPACING.md, marginVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 12,
+    padding: SPACING.md, gap: 6,
+  },
+  confirmText: { fontSize: 17, fontFamily: fonts.playfair },
 });

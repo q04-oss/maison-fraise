@@ -641,6 +641,8 @@ export const messages = pgTable('messages', {
   body: text('body').notNull(),
   read: boolean('read').notNull().default(false),
   order_id: integer('order_id').references(() => orders.id),
+  type: text('type').notNull().default('text'), // 'text' | 'offer' | 'order_confirm'
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
   created_at: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ({
   idx_sender: index('messages_sender_idx').on(t.sender_id),
