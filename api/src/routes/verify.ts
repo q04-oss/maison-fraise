@@ -25,13 +25,21 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
 
     const now = new Date();
 
+    const [currentUser] = await db.select({ user_code: users.user_code }).from(users).where(eq(users.id, user_id));
+    const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
+
     await db.transaction(async (tx) => {
       await tx.update(orders)
         .set({ nfc_token_used: true, nfc_verified_at: now })
         .where(eq(orders.id, order.id));
 
       await tx.update(users)
-        .set({ verified: true, verified_at: now, verified_by: 'nfc' })
+        .set({
+          verified: true,
+          verified_at: now,
+          verified_by: 'nfc',
+          ...(fraiseChatEmail ? { fraise_chat_email: fraiseChatEmail } : {}),
+        })
         .where(eq(users.id, user_id));
 
       await tx.insert(legitimacyEvents).values({
@@ -41,7 +49,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       });
     });
 
-    res.json({ verified: true, user_id, unlocked: ['standing_orders', 'campaigns'] });
+    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'] });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

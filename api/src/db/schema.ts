@@ -146,6 +146,8 @@ export const users = pgTable('users', {
   email: text('email').notNull().unique(),
   display_name: text('display_name'),
   push_token: text('push_token'),
+  user_code: text('user_code').unique(),
+  fraise_chat_email: text('fraise_chat_email').unique(),
   verified: boolean('verified').notNull().default(false),
   verified_at: timestamp('verified_at'),
   verified_by: text('verified_by'),

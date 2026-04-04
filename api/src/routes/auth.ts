@@ -6,6 +6,25 @@ import { users } from '../db/schema';
 import { logger } from '../lib/logger';
 import { signToken, requireUser } from '../lib/auth';
 
+function generateUserCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
+async function uniqueUserCode(): Promise<string> {
+  let code = generateUserCode();
+  let attempts = 0;
+  while (attempts < 10) {
+    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.user_code, code));
+    if (!existing) return code;
+    code = generateUserCode();
+    attempts++;
+  }
+  return code;
+}
+
 const router = Router();
 
 async function handleAppleSignIn(req: Request, res: Response) {
@@ -45,11 +64,13 @@ async function handleAppleSignIn(req: Request, res: Response) {
       }
 
       // 3. Brand new user — create account
+      const userCode = await uniqueUserCode();
       const [created] = await db
         .insert(users)
         .values({
           email: appleEmail,
           apple_user_id: appleId,
+          user_code: userCode,
           ...(displayName ? { display_name: displayName } : {}),
         })
         .returning();
