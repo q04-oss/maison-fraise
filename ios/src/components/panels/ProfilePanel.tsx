@@ -84,6 +84,10 @@ export default function ProfilePanel() {
         await AsyncStorage.setItem('fraise_chat_email', result.fraise_chat_email);
         setFraiseChatEmail(result.fraise_chat_email);
       }
+      if (result.display_name) {
+        await AsyncStorage.setItem('display_name', result.display_name);
+        setDisplayName(result.display_name);
+      }
       const email = credential.email ?? result.email ?? null;
       if (email) {
         await AsyncStorage.setItem('user_email', email);
