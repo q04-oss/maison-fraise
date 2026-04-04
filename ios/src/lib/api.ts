@@ -1337,3 +1337,16 @@ export async function addJobStatement(applicationId: number, statement: string):
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'statement_failed'); }
 }
+
+export async function fetchMyJobHistory(): Promise<LedgerEntry[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/jobs/my-history`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchUserJobHistory(userId: number): Promise<LedgerEntry[]> {
+  const r = await fetch(`${BASE_URL}/api/jobs/history/${userId}`);
+  if (!r.ok) return [];
+  return r.json();
+}

@@ -363,4 +363,67 @@ router.get('/operator', requireUser, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/jobs/history/:userId — public hiring history for a user profile
+router.get('/history/:userId', async (req: Request, res: Response) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+
+  try {
+    const rows = await db
+      .select({
+        application_id: jobApplications.id,
+        job_title: jobPostings.title,
+        pay_cents: jobPostings.pay_cents,
+        pay_type: jobPostings.pay_type,
+        business_name: businesses.name,
+        business_id: jobPostings.business_id,
+        status: jobApplications.status,
+        employer_statement: jobLedgerEntries.employer_statement,
+        candidate_statement: jobLedgerEntries.candidate_statement,
+        applied_at: jobApplications.created_at,
+      })
+      .from(jobApplications)
+      .innerJoin(jobPostings, eq(jobApplications.job_id, jobPostings.id))
+      .innerJoin(businesses, eq(jobPostings.business_id, businesses.id))
+      .leftJoin(jobLedgerEntries, eq(jobLedgerEntries.application_id, jobApplications.id))
+      .where(eq(jobApplications.applicant_id, userId))
+      .orderBy(desc(jobApplications.created_at));
+
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/jobs/my-history — authenticated user's own hiring history
+router.get('/my-history', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+
+  try {
+    const rows = await db
+      .select({
+        application_id: jobApplications.id,
+        job_title: jobPostings.title,
+        pay_cents: jobPostings.pay_cents,
+        pay_type: jobPostings.pay_type,
+        business_name: businesses.name,
+        business_id: jobPostings.business_id,
+        status: jobApplications.status,
+        employer_statement: jobLedgerEntries.employer_statement,
+        candidate_statement: jobLedgerEntries.candidate_statement,
+        applied_at: jobApplications.created_at,
+      })
+      .from(jobApplications)
+      .innerJoin(jobPostings, eq(jobApplications.job_id, jobPostings.id))
+      .innerJoin(businesses, eq(jobPostings.business_id, businesses.id))
+      .leftJoin(jobLedgerEntries, eq(jobLedgerEntries.application_id, jobApplications.id))
+      .where(eq(jobApplications.applicant_id, userId))
+      .orderBy(desc(jobApplications.created_at));
+
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

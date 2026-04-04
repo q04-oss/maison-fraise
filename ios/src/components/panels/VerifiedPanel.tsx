@@ -1,10 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Clipboard } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Clipboard, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
+import { fetchMyJobHistory, LedgerEntry } from '../../lib/api';
+
+const STATUS_LABEL: Record<string, string> = {
+  applied: 'applied',
+  scheduled: 'interview scheduled',
+  hired: 'hired',
+  not_hired: 'not hired',
+  dismissed: 'dismissed',
+};
+const STATUS_COLOR: Record<string, string> = {
+  hired: '#4caf50',
+  not_hired: '#888',
+  dismissed: '#e57373',
+  scheduled: '#c9973a',
+  applied: '#888',
+};
 
 export default function VerifiedPanel() {
   const { goHome, showPanel } = usePanel();
@@ -12,9 +28,11 @@ export default function VerifiedPanel() {
   const insets = useSafeAreaInsets();
   const [fraiseChatEmail, setFraiseChatEmail] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [jobHistory, setJobHistory] = useState<LedgerEntry[]>([]);
 
   useEffect(() => {
     AsyncStorage.getItem('fraise_chat_email').then(v => { if (v) setFraiseChatEmail(v); });
+    fetchMyJobHistory().then(setJobHistory).catch(() => {});
   }, []);
 
   const handleCopyEmail = () => {
@@ -26,6 +44,7 @@ export default function VerifiedPanel() {
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+      <ScrollView contentContainerStyle={styles.scroll}>
       <View style={styles.body}>
         <View style={[styles.badge, { backgroundColor: c.card, borderColor: c.border }]}>
           <Text style={[styles.check, { color: c.accent }]}>✓</Text>
@@ -73,6 +92,40 @@ export default function VerifiedPanel() {
         </TouchableOpacity>
       </View>
 
+      {/* Hiring history */}
+      {jobHistory.length > 0 && (
+        <View style={[styles.historySection, { borderTopColor: c.border }]}>
+          <Text style={[styles.historyLabel, { color: c.muted }]}>hiring record</Text>
+          {jobHistory.map(entry => (
+            <View key={entry.application_id} style={[styles.historyEntry, { borderBottomColor: c.border }]}>
+              <View style={styles.historyRow}>
+                <Text style={[styles.historyBusiness, { color: c.text }]}>{(entry as any).business_name}</Text>
+                <Text style={[styles.historyStatus, { color: STATUS_COLOR[entry.status] ?? c.muted }]}>
+                  {STATUS_LABEL[entry.status] ?? entry.status}
+                </Text>
+              </View>
+              <Text style={[styles.historyRole, { color: c.muted }]}>
+                {entry.job_title}  ·  {entry.pay_type === 'hourly'
+                  ? `$${(entry.pay_cents / 100).toFixed(0)}/hr`
+                  : `$${(entry.pay_cents / 100).toLocaleString()}/yr`}
+              </Text>
+              {entry.employer_statement ? (
+                <View style={[styles.statementBox, { backgroundColor: c.card }]}>
+                  <Text style={[styles.statementLabel, { color: c.muted }]}>employer</Text>
+                  <Text style={[styles.statementText, { color: c.text }]}>{entry.employer_statement}</Text>
+                </View>
+              ) : null}
+              {entry.candidate_statement ? (
+                <View style={[styles.statementBox, { backgroundColor: c.card }]}>
+                  <Text style={[styles.statementLabel, { color: c.muted }]}>you</Text>
+                  <Text style={[styles.statementText, { color: c.text }]}>{entry.candidate_statement}</Text>
+                </View>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
         <TouchableOpacity
           style={[styles.doneBtn, { backgroundColor: c.text }]}
@@ -82,6 +135,7 @@ export default function VerifiedPanel() {
           <Text style={[styles.doneBtnText, { color: c.ctaText }]}>Done</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -117,4 +171,15 @@ const styles = StyleSheet.create({
   footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth },
   doneBtn: { borderRadius: 16, paddingVertical: 20, alignItems: 'center' },
   doneBtnText: { fontSize: 16, fontFamily: fonts.dmSans, fontWeight: '700' },
+  scroll: { flexGrow: 1 },
+  historySection: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth },
+  historyLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 12 },
+  historyEntry: { paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, gap: 4 },
+  historyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  historyBusiness: { fontSize: 15, fontFamily: fonts.playfair },
+  historyStatus: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  historyRole: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  statementBox: { marginTop: 6, borderRadius: 8, padding: 10, gap: 3 },
+  statementLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.2, textTransform: 'uppercase' },
+  statementText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20 },
 });
