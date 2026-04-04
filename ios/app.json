@@ -57,7 +57,13 @@
       "expo-font",
       "expo-apple-authentication",
       "expo-notifications",
-      "react-native-nfc-manager",
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Used to verify your identity at collection points.",
+          "includeNdefEntitlement": false
+        }
+      ],
       [
         "expo-location",
         {
