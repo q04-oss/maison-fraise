@@ -466,7 +466,7 @@ export default function MapScreen() {
           <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleShowAll} activeOpacity={0.8}>
             <Text style={styles.fabIcon}>🍓</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} activeOpacity={0.8}>
+          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} onLongPress={goHome} delayLongPress={500} activeOpacity={0.8}>
             <Text style={styles.fabIcon}>↑</Text>
           </TouchableOpacity>
         </View>
