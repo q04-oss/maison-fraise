@@ -23,7 +23,7 @@
           "Default"
         ],
         "com.apple.developer.nfc.readersession.formats": [
-          "NDEF"
+          "TAG"
         ]
       },
       "infoPlist": {

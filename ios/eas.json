@@ -14,7 +14,6 @@
     "production": {
       "autoIncrement": true,
       "channel": "production",
-      "image": "macos-sonoma-14.6-xcode-16.2",
       "env": {
         "EXPO_PUBLIC_REVIEW_PIN": "4567",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51RcAlhKvPGIzTFOS9MjkghFT8B5Y2e4JSbEhP6DOV7EU1Pe47JS4X1Jslm6fukkyp8DYIgtJjJ5zLUZkbrnNBaJX00RINxJvdT",
