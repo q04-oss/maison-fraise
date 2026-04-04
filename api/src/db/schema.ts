@@ -662,6 +662,44 @@ export const beacons = pgTable('beacons', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+export const jobPostings = pgTable('job_postings', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  pay_cents: integer('pay_cents').notNull(),
+  pay_type: text('pay_type').notNull().default('hourly'), // 'hourly' | 'salary'
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const jobApplications = pgTable('job_applications', {
+  id: serial('id').primaryKey(),
+  job_id: integer('job_id').notNull().references(() => jobPostings.id),
+  applicant_id: integer('applicant_id').notNull().references(() => users.id),
+  status: text('status').notNull().default('applied'), // 'applied' | 'scheduled' | 'hired' | 'not_hired' | 'dismissed'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  uniq_application: unique().on(t.job_id, t.applicant_id),
+}));
+
+export const jobInterviews = pgTable('job_interviews', {
+  id: serial('id').primaryKey(),
+  application_id: integer('application_id').notNull().references(() => jobApplications.id),
+  scheduled_at: timestamp('scheduled_at').notNull(),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const jobLedgerEntries = pgTable('job_ledger_entries', {
+  id: serial('id').primaryKey(),
+  application_id: integer('application_id').notNull().references(() => jobApplications.id).unique(),
+  employer_statement: text('employer_statement'),
+  candidate_statement: text('candidate_statement'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 // ─── Location funding (chocolate shop / house_chocolate) ──────────────────────
 
 export const locationFunding = pgTable('location_funding', {

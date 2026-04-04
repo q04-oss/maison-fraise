@@ -13,7 +13,8 @@ export type PanelId =
   | 'receipt'
   | 'verifyNFC'
   | 'conversations'
-  | 'messageThread';
+  | 'messageThread'
+  | 'jobDetail';
 
 export interface OrderState {
   variety_id: number | null;

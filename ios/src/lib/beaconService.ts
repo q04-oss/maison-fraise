@@ -48,7 +48,6 @@ export async function loadAndMonitorBeacons() {
       if (onNearbyShop) {
         onNearbyShop(shopUser.id, match.business_name, match.business_id);
       } else {
-        // App is in background — send local notification
         await Notifications.scheduleNotificationAsync({
           content: {
             title: match.business_name,

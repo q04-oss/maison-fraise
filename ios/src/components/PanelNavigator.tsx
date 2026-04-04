@@ -15,6 +15,7 @@ import ReceiptPanel from './panels/ReceiptPanel';
 import VerifyNFCPanel from './panels/VerifyNFCPanel';
 import ConversationsPanel from './panels/ConversationsPanel';
 import MessageThreadPanel from './panels/MessageThreadPanel';
+import JobDetailPanel from './panels/JobDetailPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -29,11 +30,12 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'verifyNFC': VerifyNFCPanel,
   'conversations': ConversationsPanel,
   'messageThread': MessageThreadPanel,
+  'jobDetail': JobDetailPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
   'verified', 'standingOrder', 'partner-detail', 'order-history',
-  'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread',
+  'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'jobDetail',
 ]);
 
 export default function PanelNavigator() {

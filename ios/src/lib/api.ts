@@ -1280,3 +1280,60 @@ export async function confirmOfferPayment(messageId: number): Promise<{ order_id
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'confirm_failed'); }
   return r.json();
 }
+
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+export interface JobPosting {
+  id: number;
+  title: string;
+  description: string | null;
+  pay_cents: number;
+  pay_type: 'hourly' | 'salary';
+  business_id: number;
+  business_name: string | null;
+}
+
+export interface LedgerEntry {
+  application_id: number;
+  job_title: string;
+  pay_cents: number;
+  pay_type: string;
+  applicant_name: string | null;
+  applicant_code: string | null;
+  status: string;
+  employer_statement: string | null;
+  candidate_statement: string | null;
+  applied_at: string;
+}
+
+export async function fetchNearbyJobs(businessId: number): Promise<JobPosting[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/jobs/nearby?business_id=${businessId}`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function applyForJob(jobId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/jobs/${jobId}/apply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'apply_failed'); }
+}
+
+export async function fetchBusinessLedger(businessId: number): Promise<LedgerEntry[]> {
+  const r = await fetch(`${BASE_URL}/api/jobs/ledger/${businessId}`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function addJobStatement(applicationId: number, statement: string): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/jobs/applications/${applicationId}/statement`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ statement }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'statement_failed'); }
+}

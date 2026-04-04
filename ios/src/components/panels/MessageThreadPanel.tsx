@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment } from '../../lib/api';
+import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearbyJobs, applyForJob, JobPosting } from '../../lib/api';
 import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
@@ -31,8 +31,13 @@ export default function MessageThreadPanel() {
 
   const otherId: number = panelData?.userId;
   const isShop: boolean = panelData?.isShop ?? false;
+  const businessId: number | null = panelData?.businessId ?? null;
   const otherName: string = panelData?.displayName ?? panelData?.userCode ?? 'Unknown';
   const otherCode: string = panelData?.userCode ?? otherName;
+
+  const [jobs, setJobs] = useState<JobPosting[]>([]);
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<number>>(new Set());
+  const [applyingJobId, setApplyingJobId] = useState<number | null>(null);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_db_id', 'user_email']).then(pairs => {
@@ -57,6 +62,12 @@ export default function MessageThreadPanel() {
   }, [otherId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (isShop && businessId) {
+      fetchNearbyJobs(businessId).then(setJobs).catch(() => {});
+    }
+  }, [isShop, businessId]);
 
   // Poll every 5s to pick up read receipt updates
   useEffect(() => {
@@ -120,6 +131,22 @@ export default function MessageThreadPanel() {
     }
   };
 
+  const handleApplyJob = async (jobId: number) => {
+    setApplyingJobId(jobId);
+    try {
+      await applyForJob(jobId);
+      setAppliedJobIds(prev => new Set(prev).add(jobId));
+    } catch (e: any) {
+      if (e.message === 'Already applied') {
+        setAppliedJobIds(prev => new Set(prev).add(jobId));
+      } else {
+        Alert.alert('could not apply', e.message ?? 'try again');
+      }
+    } finally {
+      setApplyingJobId(null);
+    }
+  };
+
   const handleOrder = () => {
     const shopBusiness = businesses?.find((b: any) => b.shop_user_id === otherId);
     if (shopBusiness) {
@@ -161,6 +188,40 @@ export default function MessageThreadPanel() {
           data={messages}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.messageList}
+          ListHeaderComponent={jobs.length > 0 ? (
+            <View>
+              {jobs.map(job => {
+                const applied = appliedJobIds.has(job.id);
+                const applying = applyingJobId === job.id;
+                const payLabel = job.pay_type === 'hourly'
+                  ? `$${(job.pay_cents / 100).toFixed(0)}/hr`
+                  : `$${(job.pay_cents / 100).toLocaleString()}/yr`;
+                return (
+                  <View key={job.id} style={[styles.jobCard, { borderColor: c.border, backgroundColor: c.card }]}>
+                    <Text style={[styles.jobLabel, { color: c.accent }]}>position available</Text>
+                    <Text style={[styles.jobTitle, { color: c.text }]}>{job.title}</Text>
+                    <Text style={[styles.jobPay, { color: c.accent }]}>{payLabel}</Text>
+                    {job.description ? (
+                      <Text style={[styles.jobDesc, { color: c.muted }]}>{job.description}</Text>
+                    ) : null}
+                    <TouchableOpacity
+                      onPress={() => handleApplyJob(job.id)}
+                      disabled={applied || applying}
+                      style={[styles.jobApplyBtn, { borderColor: applied ? c.border : c.accent }]}
+                      activeOpacity={0.7}
+                    >
+                      {applying
+                        ? <ActivityIndicator size="small" color={c.accent} />
+                        : <Text style={[styles.jobApplyText, { color: applied ? c.muted : c.accent }]}>
+                            {applied ? 'applied ✓' : 'apply →'}
+                          </Text>
+                      }
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          ) : null}
           renderItem={({ item }) => {
             const isMine = item.sender_id === myId;
 
@@ -315,4 +376,15 @@ const styles = StyleSheet.create({
     padding: SPACING.md, gap: 6,
   },
   confirmText: { fontSize: 17, fontFamily: fonts.playfair },
+  jobCard: {
+    marginHorizontal: SPACING.md, marginTop: SPACING.md, marginBottom: 4,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 12,
+    padding: SPACING.md, gap: 5,
+  },
+  jobLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase' },
+  jobTitle: { fontSize: 20, fontFamily: fonts.playfair },
+  jobPay: { fontSize: 14, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  jobDesc: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20 },
+  jobApplyBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start', marginTop: 4 },
+  jobApplyText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 });
