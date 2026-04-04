@@ -641,11 +641,26 @@ export const messages = pgTable('messages', {
   body: text('body').notNull(),
   read: boolean('read').notNull().default(false),
   order_id: integer('order_id').references(() => orders.id),
+  type: text('type').notNull().default('text'), // 'text' | 'offer' | 'order_confirm'
+  metadata: jsonb('metadata').$type<Record<string, any> | null>(),
   created_at: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ({
   idx_sender: index('messages_sender_idx').on(t.sender_id),
   idx_recipient: index('messages_recipient_idx').on(t.recipient_id),
 }));
+
+// ─── BLE Beacons ─────────────────────────────────────────────────────────────
+
+export const beacons = pgTable('beacons', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  uuid: text('uuid').notNull(),
+  major: integer('major').notNull().default(1),
+  minor: integer('minor').notNull().default(1),
+  name: text('name'),
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
 
 // ─── Location funding (chocolate shop / house_chocolate) ──────────────────────
 

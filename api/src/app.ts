@@ -34,6 +34,7 @@ import patronagesRouter from './routes/patronages';
 import greenhousesRouter from './routes/greenhouses';
 import businessLocationsRouter from './routes/business-locations';
 import messagesRouter from './routes/messages';
+import beaconsRouter from './routes/beacons';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -106,6 +107,7 @@ app.use('/api/patronages', patronagesRouter);
 app.use('/api/greenhouses', greenhousesRouter);
 app.use('/api/business-locations', businessLocationsRouter);
 app.use('/api/messages', messagesRouter);
+app.use('/api/beacons', beaconsRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

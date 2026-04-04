@@ -434,6 +434,31 @@ router.get('/nfc-pending', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/recent-customers — customers who have ordered, for offer targeting
+router.get('/recent-customers', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.execute<{ user_id: number; display_name: string | null; user_code: string | null; email: string; order_count: number; last_ordered_at: string }>(sql`
+      SELECT
+        u.id AS user_id,
+        u.display_name,
+        u.user_code,
+        u.email,
+        COUNT(o.id)::int AS order_count,
+        MAX(o.created_at) AS last_ordered_at
+      FROM orders o
+      JOIN users u ON u.email = o.customer_email
+      WHERE o.status IN ('paid','preparing','ready','collected')
+      GROUP BY u.id, u.display_name, u.user_code, u.email
+      ORDER BY MAX(o.created_at) DESC
+      LIMIT 100
+    `);
+    const result = (rows as any).rows ?? rows;
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/admin/locations
 router.post('/locations', async (req: Request, res: Response) => {
   const { name, address } = req.body;

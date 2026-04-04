@@ -9,6 +9,8 @@ import { usePanel } from '../context/PanelContext';
 import PanelNavigator from '../components/PanelNavigator';
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
+import BeaconNudge from '../components/BeaconNudge';
+import { loadAndMonitorBeacons } from '../lib/beaconService';
 import { fetchBusinesses, fetchVarieties, updatePushToken, deleteAuthToken } from '../lib/api';
 import { STRAWBERRIES } from '../data/seed';
 import { useColors, fonts, SPACING } from '../theme';
@@ -198,7 +200,7 @@ export default function MapScreen() {
       .catch(() => {});
   };
 
-  useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); }, []);
+  useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); loadAndMonitorBeacons(); }, []);
 
   // Refresh businesses when app comes to foreground (popup status may have changed)
   useEffect(() => {
@@ -321,6 +323,7 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <OfflineBanner />
+      <BeaconNudge />
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
