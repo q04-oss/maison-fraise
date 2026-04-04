@@ -47,7 +47,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
 // Panels that should always expand the sheet to full height
 const FULL_HEIGHT_PANELS = new Set([
   'chocolate', 'finish', 'quantity', 'gift-note', 'when', 'review', 'confirmation', 'verified', 'standingOrder',
-  'partner-detail', 'order-history', 'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'profile',
+  'partner-detail', 'order-history', 'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread',
 ]);
 
 // Panels that expand to medium height
