@@ -17,14 +17,16 @@
       "bundleIdentifier": "com.maisonfraise.app",
       "entitlements": {
         "com.apple.developer.in-app-payments": ["merchant.com.maisonfraise.app"],
-        "com.apple.developer.applesignin": ["Default"]
+        "com.apple.developer.applesignin": ["Default"],
+        "com.apple.developer.nfc.readersession.formats": ["NDEF"]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "Camera access is not used by this app.",
         "NSUserNotificationUsageDescription": "We'll notify you when your order is ready for collection.",
-"NSLocationWhenInUseUsageDescription": "We use your location to show collection points near you.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you when you're near a collection point so you can tap your box."
+        "NSLocationWhenInUseUsageDescription": "We use your location to show collection points near you.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you when you're near a collection point so you can tap your box.",
+        "NFCReaderUsageDescription": "Used to verify your identity at collection points."
       }
     },
     "android": {
@@ -49,6 +51,7 @@
       "expo-font",
       "expo-apple-authentication",
       "expo-notifications",
+      "react-native-nfc-manager",
       [
         "expo-location",
         {
