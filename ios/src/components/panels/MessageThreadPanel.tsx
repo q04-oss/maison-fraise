@@ -117,27 +117,18 @@ export default function MessageThreadPanel() {
       )}
 
       <View style={[styles.composer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md, backgroundColor: c.panelBg }]}>
+        <Text style={[styles.prompt, { color: c.accent }]}>{sending ? '·' : '>'}</Text>
         <TextInput
-          style={[styles.input, { backgroundColor: c.card, color: c.text, borderColor: c.border }]}
-          placeholder="Message"
+          style={[styles.input, { color: c.text }]}
+          placeholder="..."
           placeholderTextColor={c.muted}
           value={text}
           onChangeText={setText}
           onSubmitEditing={handleSend}
           returnKeyType="send"
+          blurOnSubmit={false}
           multiline
         />
-        <TouchableOpacity
-          style={[styles.sendBtn, { backgroundColor: text.trim() ? c.accent : c.card, borderColor: c.border }]}
-          onPress={handleSend}
-          activeOpacity={0.8}
-          disabled={!text.trim() || sending}
-        >
-          {sending
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={[styles.sendBtnText, { color: text.trim() ? '#fff' : c.muted }]}>↑</Text>
-          }
-        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -167,17 +158,11 @@ const styles = StyleSheet.create({
   composer: {
     flexDirection: 'row', alignItems: 'flex-end',
     paddingHorizontal: SPACING.md, paddingTop: SPACING.sm,
-    borderTopWidth: StyleSheet.hairlineWidth, gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth, gap: 8,
   },
+  prompt: { fontSize: 15, fontFamily: fonts.dmMono, paddingBottom: 11 },
   input: {
-    flex: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
-    fontSize: 15, fontFamily: fonts.dmSans, maxHeight: 120,
-    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1, paddingVertical: 10,
+    fontSize: 15, fontFamily: fonts.dmMono, maxHeight: 120,
   },
-  sendBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  sendBtnText: { fontSize: 18, lineHeight: 22 },
 });
