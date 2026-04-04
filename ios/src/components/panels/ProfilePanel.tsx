@@ -218,19 +218,21 @@ export default function ProfilePanel() {
         ) : (
           <>
             {lastOrder && (
-              <View style={styles.lastOrderBlock}>
-                <Text style={[styles.lastOrderDate, { color: c.muted }]}>
-                  {new Date(lastOrder.created_at ?? Date.now()).toLocaleDateString([], { month: 'long', day: 'numeric' })}
-                </Text>
+              <View style={[styles.lastOrderBlock, { borderColor: c.border }]}>
+                <View style={styles.lastOrderTop}>
+                  <Text style={[styles.lastOrderDate, { color: c.muted }]}>
+                    {new Date(lastOrder.created_at ?? Date.now()).toLocaleDateString([], { month: 'long', day: 'numeric' })}
+                  </Text>
+                  <TouchableOpacity onPress={handleOrderAgain} activeOpacity={0.6}>
+                    <Text style={[styles.reorderLinkText, { color: c.accent }]}>Order again</Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={[styles.lastOrderName, { color: c.text }]}>{lastOrder.variety_name ?? '—'}</Text>
                 <Text style={[styles.lastOrderSub, { color: c.muted }]}>
                   {CHOCOLATES.find(choc => choc.id === lastOrder.chocolate)?.name ?? lastOrder.chocolate ?? '—'}
                   {'  ·  '}{FINISHES.find(f => f.id === lastOrder.finish)?.name ?? lastOrder.finish ?? '—'}
                   {'  ·  '}{lastOrder.quantity}
                 </Text>
-                <TouchableOpacity onPress={handleOrderAgain} activeOpacity={0.6} style={styles.reorderLink}>
-                  <Text style={[styles.reorderLinkText, { color: c.accent }]}>Order again</Text>
-                </TouchableOpacity>
               </View>
             )}
 
@@ -316,10 +318,10 @@ const styles = StyleSheet.create({
   orderMeta: { fontSize: 12, fontFamily: fonts.dmSans },
   verifyRow: { paddingHorizontal: SPACING.md, paddingVertical: 14 },
   verifyText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
-  lastOrderBlock: { gap: 4, marginLeft: 4 },
+  lastOrderBlock: { gap: 6, paddingVertical: SPACING.md, paddingHorizontal: SPACING.md, marginHorizontal: -SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth },
+  lastOrderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   lastOrderDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, textTransform: 'uppercase' },
-  lastOrderName: { fontSize: 22, fontFamily: fonts.playfair },
+  lastOrderName: { fontSize: 26, fontFamily: fonts.playfair },
   lastOrderSub: { fontSize: 12, fontFamily: fonts.dmSans },
-  reorderLink: { paddingTop: 6 },
   reorderLinkText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1, textTransform: 'uppercase' },
 });
