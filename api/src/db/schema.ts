@@ -623,6 +623,20 @@ export const greenhouseFunding = pgTable('greenhouse_funding', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Messaging ────────────────────────────────────────────────────────────────
+
+export const messages = pgTable('messages', {
+  id: serial('id').primaryKey(),
+  sender_id: integer('sender_id').notNull().references(() => users.id),
+  recipient_id: integer('recipient_id').notNull().references(() => users.id),
+  body: text('body').notNull(),
+  read: boolean('read').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  idx_sender: index('messages_sender_idx').on(t.sender_id),
+  idx_recipient: index('messages_recipient_idx').on(t.recipient_id),
+}));
+
 // ─── Location funding (chocolate shop / house_chocolate) ──────────────────────
 
 export const locationFunding = pgTable('location_funding', {

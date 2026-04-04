@@ -18,7 +18,9 @@ export type PanelId =
   | 'order-history'
   | 'search'
   | 'receipt'
-  | 'verifyNFC';
+  | 'verifyNFC'
+  | 'conversations'
+  | 'messageThread';
 
 export interface OrderState {
   variety_id: number | null;

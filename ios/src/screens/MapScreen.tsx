@@ -110,7 +110,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const DETENTS = useMemo<[number, number, number]>(() => [COLLAPSED_HEIGHT / SCREEN_HEIGHT, 0.5, 1], [SCREEN_HEIGHT]);
-  const { setBusinesses, setActiveLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight } = usePanel();
+  const { setBusinesses, setActiveLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight, setPanelData } = usePanel();
   const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
@@ -154,6 +154,16 @@ export default function MapScreen() {
     if (pendingScreen === 'NFCVerify') {
       clearPendingScreen();
       showPanel('verifyNFC');
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
+    if (pendingScreen === 'messages') {
+      clearPendingScreen();
+      if (pendingData?.user_id) {
+        setPanelData({ userId: pendingData.user_id });
+        showPanel('messageThread');
+      } else {
+        showPanel('conversations');
+      }
       setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
     }
   }, [pendingScreen, businesses]);

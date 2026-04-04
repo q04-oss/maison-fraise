@@ -1201,3 +1201,30 @@ export async function fundChocolateLocation(
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'fund_failed'); }
   return r.json();
 }
+
+// ─── Messages ─────────────────────────────────────────────────────────────────
+
+export async function fetchConversations(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/conversations`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchThread(userId: number): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/${userId}`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function sendMessage(recipientId: number, body: string): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ recipient_id: recipientId, body }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'send_failed'); }
+  return r.json();
+}

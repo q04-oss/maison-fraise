@@ -19,6 +19,8 @@ import OrderHistoryPanel from './panels/OrderHistoryPanel';
 import SearchPanel from './panels/SearchPanel';
 import ReceiptPanel from './panels/ReceiptPanel';
 import VerifyNFCPanel from './panels/VerifyNFCPanel';
+import ConversationsPanel from './panels/ConversationsPanel';
+import MessageThreadPanel from './panels/MessageThreadPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -38,12 +40,14 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'search': SearchPanel,
   'receipt': ReceiptPanel,
   'verifyNFC': VerifyNFCPanel,
+  'conversations': ConversationsPanel,
+  'messageThread': MessageThreadPanel,
 };
 
 // Panels that should always expand the sheet to full height
 const FULL_HEIGHT_PANELS = new Set([
   'chocolate', 'finish', 'quantity', 'gift-note', 'when', 'review', 'confirmation', 'verified', 'standingOrder',
-  'partner-detail', 'order-history', 'search', 'receipt', 'verifyNFC',
+  'partner-detail', 'order-history', 'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread',
 ]);
 
 // Panels that expand to medium height

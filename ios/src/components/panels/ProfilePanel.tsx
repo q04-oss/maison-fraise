@@ -16,7 +16,7 @@ import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
 
 export default function ProfilePanel() {
-  const { goHome, jumpToPanel, setOrder, setActiveLocation, varieties, businesses } = usePanel();
+  const { goHome, jumpToPanel, showPanel, setOrder, setActiveLocation, varieties, businesses } = usePanel();
   const { pushToken } = useApp();
   const c = useColors();
   const [userEmail, setUserEmail] = useState<string | null>(null);
@@ -246,6 +246,22 @@ export default function ProfilePanel() {
                     </React.Fragment>
                   ))}
                 </View>
+              </View>
+            )}
+
+            {isVerified && userDbId && (
+              <View style={styles.section}>
+                <Text style={[styles.sectionLabel, { color: c.muted }]}>MESSAGES</Text>
+                <TouchableOpacity
+                  style={[styles.card, { backgroundColor: c.card }]}
+                  onPress={() => showPanel('conversations')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.orderAgainRow}>
+                    <Text style={[styles.orderAgainName, { color: c.text }]}>Conversations</Text>
+                    <Text style={[styles.chevron, { color: c.accent }]}>→</Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             )}
 

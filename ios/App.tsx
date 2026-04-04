@@ -70,6 +70,11 @@ export default function App() {
       if (screen === 'profile') {
         setPendingScreen('profile');
       }
+      if (screen === 'messages') {
+        const userId = response.notification.request.content.data?.user_id;
+        setPendingScreen('messages');
+        setPendingData(userId ? { user_id: userId } : null);
+      }
     });
     return () => sub.remove();
   }, []);
