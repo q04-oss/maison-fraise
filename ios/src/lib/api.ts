@@ -1245,6 +1245,21 @@ export async function sendMessage(recipientId: number, body: string): Promise<an
   return r.json();
 }
 
+// ─── Beacons ──────────────────────────────────────────────────────────────────
+
+export async function fetchBeacons(): Promise<Array<{ uuid: string; major: number; minor: number; business_id: number; business_name: string }>> {
+  const r = await fetch(`${BASE_URL}/api/beacons`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchBeaconShopUser(businessId: number): Promise<{ id: number; display_name: string | null; user_code: string | null } | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/beacons/shop/${businessId}`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
 export async function acceptOffer(messageId: number, customerEmail: string, pushToken?: string): Promise<{ client_secret: string; payment_intent_id: string; total_cents: number }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/messages/offer/${messageId}/accept`, {
