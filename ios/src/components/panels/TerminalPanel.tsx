@@ -48,7 +48,7 @@ export default function TerminalPanel() {
   const [showIdVerify, setShowIdVerify] = useState(false);
   const [idVerifyLoading, setIdVerifyLoading] = useState(false);
   const [idVerifyAttested, setIdVerifyAttested] = useState(false);
-  const nameInputRef = useRef<TextInput>(null);
+const nameInputRef = useRef<TextInput>(null);
 
   // Inline order state
   const [orderOpen, setOrderOpen] = useState(false);
@@ -794,17 +794,8 @@ export default function TerminalPanel() {
               </View>
             )}
 
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity
-              style={styles.orderToggle}
-              onPress={() => showPanel('portal')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.label, { color: c.muted }]}>PORTAL</Text>
-              <Text style={[styles.label, { color: c.accent }]}>→</Text>
-            </TouchableOpacity>
 
-            </>
+</>
             )}
           </>
         ) : (

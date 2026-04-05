@@ -25,6 +25,14 @@ function reviewHeaders(): Record<string, string> {
   return { 'X-Review-Mode': process.env.EXPO_PUBLIC_REVIEW_PIN ?? '' };
 }
 
+export async function fetchMe(): Promise<{ portal_opted_in: boolean } | null> {
+  const auth = await authHeader();
+  if (!auth['Authorization']) return null;
+  const r = await fetch(`${BASE_URL}/api/users/me`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
 export async function fetchVarieties() {
   const res = await fetch(`${BASE_URL}/api/varieties`);
   if (!res.ok) throw new Error('Failed to fetch varieties');

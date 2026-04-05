@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import * as Haptics from 'expo-haptics';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState } from 'react-native';
 import MapView, { Callout, Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -121,6 +122,20 @@ export default function MapScreen() {
   const [bizLoading, setBizLoading] = useState(true);
   const mapRef = useRef<MapView>(null);
   const userCoords = useRef<{ latitude: number; longitude: number } | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [portalOptedIn, setPortalOptedIn] = useState(false);
+
+  // Strawberry FAB three-tier long-press refs
+  const strawberryHapticLevel = useRef<0 | 1 | 2>(0);
+  const strawberryTimer1 = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const strawberryTimer2 = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.multiGet(['verified', 'portal_opted_in']).then(([v, p]) => {
+      if (v[1] === 'true') setIsVerified(true);
+      if (p[1] === 'true') setPortalOptedIn(true);
+    });
+  }, []);
 
   useEffect(() => {
     if (!pushToken) return;
@@ -234,10 +249,16 @@ export default function MapScreen() {
 
   useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); loadAndMonitorBeacons(); }, []);
 
-  // Refresh businesses when app comes to foreground (popup status may have changed)
+  // Refresh businesses + portal flag when app comes to foreground
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') loadBusinesses();
+      if (state === 'active') {
+        loadBusinesses();
+        AsyncStorage.multiGet(['verified', 'portal_opted_in']).then(([v, p]) => {
+          if (v[1] === 'true') setIsVerified(true);
+          if (p[1] === 'true') setPortalOptedIn(true);
+        });
+      }
     });
     return () => sub.remove();
   }, []);
@@ -335,6 +356,37 @@ export default function MapScreen() {
         animated: true,
       }
     );
+  };
+
+  const strawberryPressIn = useCallback(() => {
+    strawberryHapticLevel.current = 0;
+    strawberryTimer1.current = setTimeout(() => {
+      strawberryHapticLevel.current = 1;
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (isVerified && portalOptedIn) {
+        strawberryTimer2.current = setTimeout(() => {
+          strawberryHapticLevel.current = 2;
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        }, 700);
+      }
+    }, 500);
+  }, [isVerified, portalOptedIn]);
+
+  // strawberryPressOut is intentionally not memoized — handleShowAll captures validBusinesses
+  // which changes each render, so we just re-create this on every render.
+  const strawberryPressOut = () => {
+    if (strawberryTimer1.current) { clearTimeout(strawberryTimer1.current); strawberryTimer1.current = null; }
+    if (strawberryTimer2.current) { clearTimeout(strawberryTimer2.current); strawberryTimer2.current = null; }
+    const level = strawberryHapticLevel.current;
+    if (level === 0) {
+      handleShowAll();
+    } else if (level === 1) {
+      jumpToPanel('conversations');
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
+    } else {
+      showPanel('portal');
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
   };
 
   const isLive = (b: any): boolean => {
@@ -529,7 +581,12 @@ export default function MapScreen() {
 
       {fabsVisible && (
         <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
-          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleShowAll} onLongPress={() => { jumpToPanel('conversations'); setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350); }} delayLongPress={500} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: c.card }]}
+            onPressIn={strawberryPressIn}
+            onPressOut={strawberryPressOut}
+            activeOpacity={0.8}
+          >
             <Text style={styles.fabIcon}>🍓</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} onLongPress={() => { setPanelData({ openOrder: true }); jumpToPanel('terminal'); }} delayLongPress={500} activeOpacity={0.8}>
