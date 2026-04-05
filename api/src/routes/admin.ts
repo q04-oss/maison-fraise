@@ -2932,4 +2932,23 @@ router.patch('/card-prints/:id/status', requirePin, async (req: Request, res: Re
   }
 });
 
+// POST /api/admin/market-dates — create a market date
+router.post('/market-dates', requirePin, async (req: Request, res: Response) => {
+  const { name, location, address, starts_at, ends_at, notes } = req.body;
+  if (!name?.trim() || !location?.trim() || !address?.trim() || !starts_at || !ends_at) {
+    res.status(400).json({ error: 'name, location, address, starts_at, ends_at required' }); return;
+  }
+  try {
+    const [row] = await db.execute(sql`
+      INSERT INTO market_dates (name, location, address, starts_at, ends_at, notes, status)
+      VALUES (${name.trim()}, ${location.trim()}, ${address.trim()}, ${starts_at}, ${ends_at}, ${notes?.trim() ?? null}, 'scheduled')
+      RETURNING *
+    `);
+    res.status(201).json(row);
+  } catch (err) {
+    logger.error('[admin] POST /market-dates', err);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;

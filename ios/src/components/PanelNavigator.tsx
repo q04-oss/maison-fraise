@@ -37,6 +37,7 @@ import VentureManagePanel from './panels/VentureManagePanel';
 import DorotkaProfilePanel from './panels/DorotkaProfilePanel';
 import VentureEarningsPanel from './panels/VentureEarningsPanel';
 import VendorStallPanel from './panels/VendorStallPanel';
+import MarketAdminPanel from './panels/MarketAdminPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -73,6 +74,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'dorotka-profile': DorotkaProfilePanel,
   'venture-earnings': VentureEarningsPanel,
   'vendor-stall': VendorStallPanel,
+  'market-admin': MarketAdminPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -90,6 +92,7 @@ const FULL_HEIGHT_PANELS = new Set([
   'dorotka-profile',
   'venture-earnings',
   'vendor-stall',
+  'market-admin',
 ]);
 
 export default function PanelNavigator() {

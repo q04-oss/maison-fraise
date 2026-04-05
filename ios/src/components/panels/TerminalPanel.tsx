@@ -599,6 +599,12 @@ const nameInputRef = useRef<TextInput>(null);
                 <Text style={[styles.label, { color: c.accent }]}>→</Text>
               </TouchableOpacity>
             )}
+            {isShop && (
+              <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market-admin')} activeOpacity={0.7}>
+                <Text style={[styles.label, { color: c.muted }]}>MARKET ADMIN</Text>
+                <Text style={[styles.label, { color: c.accent }]}>→</Text>
+              </TouchableOpacity>
+            )}
 
             {/* ORDER section */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />

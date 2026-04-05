@@ -1510,6 +1510,19 @@ export async function collectMarketOrder(orderId: number): Promise<void> {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'collect_failed'); }
 }
 
+export async function createMarketDate(
+  adminPin: string,
+  data: { name: string; location: string; address: string; starts_at: string; ends_at: string; notes?: string },
+): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/admin/market-dates`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': adminPin },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
 export async function fetchMyMarketOrders(): Promise<any[]> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/market/my-orders`, { headers: auth });

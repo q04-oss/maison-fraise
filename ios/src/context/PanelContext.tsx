@@ -35,7 +35,8 @@ export type PanelId =
   | 'venture-manage'
   | 'dorotka-profile'
   | 'venture-earnings'
-  | 'vendor-stall';
+  | 'vendor-stall'
+  | 'market-admin';
 
 export interface OrderState {
   variety_id: number | null;
