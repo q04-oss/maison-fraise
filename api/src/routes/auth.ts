@@ -27,6 +27,8 @@ async function uniqueUserCode(): Promise<string> {
 
 // Self-healing: ensure columns added in later migrations exist
 db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dorotka boolean NOT NULL DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_connect_account_id text`).catch(() => {});
+db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_connect_onboarded boolean NOT NULL DEFAULT false`).catch(() => {});
 
 const router = Router();
 
