@@ -19,6 +19,7 @@ import {
   offerTokenTrade,
   offerContentTokenTrade,
   requestContentTokenPrint,
+  giftContentToken,
 } from '../../lib/api';
 import { fonts, SPACING, useColors } from '../../theme';
 import { composeTokenName, ARCHETYPE_COLORS, RARITY_LABELS } from '../../lib/tokenAlgorithm';
@@ -40,6 +41,13 @@ export default function TokenDetailPanel() {
   const [offering, setOffering] = useState(false);
   const [offerSent, setOfferSent] = useState(false);
   const [offerError, setOfferError] = useState('');
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [giftContacts, setGiftContacts] = useState<any[]>([]);
+  const [giftContactsLoading, setGiftContactsLoading] = useState(false);
+  const [selectedGiftContact, setSelectedGiftContact] = useState<any>(null);
+  const [gifting, setGifting] = useState(false);
+  const [giftSent, setGiftSent] = useState(false);
+  const [giftError, setGiftError] = useState('');
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printAddress, setPrintAddress] = useState({ name: '', line1: '', city: '', province: '', postal_code: '', country: 'CA' });
   const [printing, setPrinting] = useState(false);
@@ -85,6 +93,36 @@ export default function TokenDetailPanel() {
       setOfferError(e?.message ?? 'failed to send offer');
     }
     setOffering(false);
+  };
+
+  const handleOpenGift = async () => {
+    setShowGiftModal(true);
+    setSelectedGiftContact(null);
+    setGiftSent(false);
+    setGiftError('');
+    setGiftContactsLoading(true);
+    fetchContacts()
+      .then(setGiftContacts)
+      .catch(() => {})
+      .finally(() => setGiftContactsLoading(false));
+  };
+
+  const handleSendGift = async () => {
+    if (!selectedGiftContact || !token) return;
+    setGifting(true);
+    setGiftError('');
+    try {
+      await giftContentToken(token.id, selectedGiftContact.id);
+      setGiftSent(true);
+      setToken((prev: any) => prev ? { ...prev, current_owner_id: selectedGiftContact.id } : prev);
+    } catch (e: any) {
+      const msg = e.message === 'not_a_contact' ? 'This person is not in your contact book.'
+        : e.message === 'not_your_token' ? 'You no longer own this card.'
+        : 'Could not gift card. Try again.';
+      setGiftError(msg);
+    } finally {
+      setGifting(false);
+    }
   };
 
   const handleRequestPrint = async () => {
@@ -228,6 +266,15 @@ export default function TokenDetailPanel() {
             >
               <Text style={[styles.tradeBtnText, { color: c.accent }]}>offer to trade</Text>
             </TouchableOpacity>
+            {isCard && (
+              <TouchableOpacity
+                style={[styles.tradeBtn, { borderColor: c.muted, marginTop: 10 }]}
+                onPress={handleOpenGift}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.tradeBtnText, { color: c.muted }]}>gift to contact</Text>
+              </TouchableOpacity>
+            )}
             {isCard && !token.print_status && (
               <TouchableOpacity
                 style={[styles.tradeBtn, { borderColor: c.muted, marginTop: 10 }]}
@@ -328,6 +375,83 @@ export default function TokenDetailPanel() {
                   </TouchableOpacity>
                 </View>
               )}
+            </>
+          )}
+        </View>
+      </Modal>
+
+      {/* Gift modal */}
+      <Modal
+        visible={showGiftModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowGiftModal(false)}
+      >
+        <View style={[styles.modal, { backgroundColor: c.panelBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
+            <Text style={[styles.modalTitle, { color: c.text }]}>gift to</Text>
+            <TouchableOpacity onPress={() => setShowGiftModal(false)} activeOpacity={0.7}>
+              <Text style={[styles.modalClose, { color: c.muted }]}>×</Text>
+            </TouchableOpacity>
+          </View>
+
+          {giftSent ? (
+            <View style={styles.modalCenter}>
+              <Text style={[styles.offerSuccess, { color: c.text }]}>
+                gifted to @{selectedGiftContact?.display_name ?? 'contact'}
+              </Text>
+              <TouchableOpacity
+                style={[styles.tradeBtn, { borderColor: c.border, marginTop: 20 }]}
+                onPress={() => setShowGiftModal(false)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.tradeBtnText, { color: c.muted }]}>done</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {giftContactsLoading ? (
+                <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
+              ) : giftContacts.length === 0 ? (
+                <Text style={[styles.modalEmpty, { color: c.muted }]}>no contacts yet</Text>
+              ) : (
+                <FlatList
+                  data={giftContacts}
+                  keyExtractor={c => String(c.id)}
+                  renderItem={({ item: contact }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.contactRow,
+                        { borderBottomColor: c.border },
+                        selectedGiftContact?.id === contact.id && { backgroundColor: c.card },
+                      ]}
+                      onPress={() => setSelectedGiftContact(contact)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.contactName, { color: c.text }]}>
+                        @{contact.display_name ?? 'unknown'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                />
+              )}
+              {giftError ? (
+                <Text style={[styles.offerError, { color: c.muted }]}>{giftError}</Text>
+              ) : null}
+              <TouchableOpacity
+                style={[
+                  styles.tradeBtn,
+                  { borderColor: c.accent, margin: SPACING.md },
+                  (!selectedGiftContact || gifting) && { opacity: 0.4 },
+                ]}
+                onPress={handleSendGift}
+                disabled={!selectedGiftContact || gifting}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.tradeBtnText, { color: c.accent }]}>
+                  {gifting ? 'gifting…' : 'confirm gift'}
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </View>

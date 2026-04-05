@@ -1678,6 +1678,7 @@ export async function fetchCreatorEarnings(): Promise<{
 }
 
 
+<<<<<<< HEAD
 export async function fetchAdminVarieties(): Promise<any[]> {
   const r = await fetch(`${BASE_URL}/api/admin/varieties`);
   if (!r.ok) throw new Error('failed_to_fetch_varieties');
@@ -1731,4 +1732,14 @@ export async function requestEarningsPayout(): Promise<{ ok: boolean; request: a
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'payout_failed'); }
   return r.json();
+}
+
+export async function giftContentToken(tokenId: number, toUserId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/${tokenId}/gift`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to_user_id: toUserId }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gift_failed'); }
 }
