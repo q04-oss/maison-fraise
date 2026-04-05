@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { eq, and, or, asc, desc } from 'drizzle-orm';
+import { eq, and, or, sql, asc, desc } from 'drizzle-orm';
 import { db } from '../db';
 import {
   contentTokens,
@@ -380,12 +380,11 @@ router.post('/:id/gift', requireUser, async (req: any, res: Response) => {
       .select({ display_name: users.display_name })
       .from(users).where(eq(users.id, req.userId));
     if (recipient?.push_token) {
-      sendPushNotification(
-        recipient.push_token,
-        'you received a card',
-        `${giver?.display_name ?? 'someone'} gifted you a content token`,
-        { screen: 'tokens' },
-      ).catch(() => {});
+      sendPushNotification(recipient.push_token, {
+        title: 'you received a card',
+        body: `${giver?.display_name ?? 'someone'} gifted you a content token`,
+        data: { screen: 'tokens' },
+      }).catch(() => {});
     }
 
     res.json({ ok: true });
