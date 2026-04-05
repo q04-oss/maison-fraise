@@ -1677,3 +1677,13 @@ export async function fetchCreatorEarnings(): Promise<{
   return r.json();
 }
 
+
+export async function giftContentToken(tokenId: number, toUserId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/${tokenId}/gift`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to_user_id: toUserId }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gift_failed'); }
+}

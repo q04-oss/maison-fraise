@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { eq, and, asc, desc } from 'drizzle-orm';
+import { eq, and, or, asc, desc } from 'drizzle-orm';
 import { db } from '../db';
 import {
   contentTokens,
   contentTokenTrades,
   contentTokenTradeOffers,
+  nfcConnections,
   users,
   portalContent,
 } from '../db/schema';
@@ -316,6 +317,78 @@ router.post('/:id/print', requireUser, async (req: any, res: Response) => {
     }
 
     res.json({ ok: true, print_status: 'requested' });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/content-tokens/:id/gift — immediately transfer token to a contact
+router.post('/:id/gift', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { to_user_id } = req.body;
+  if (!to_user_id || typeof to_user_id !== 'number') {
+    res.status(400).json({ error: 'to_user_id required' });
+    return;
+  }
+  if (to_user_id === req.userId) { res.status(400).json({ error: 'cannot_gift_to_self' }); return; }
+
+  try {
+    // Verify recipient is a contact (NFC connection exists)
+    const [connection] = await db
+      .select({ id: nfcConnections.id })
+      .from(nfcConnections)
+      .where(or(
+        and(eq(nfcConnections.user_a, req.userId), eq(nfcConnections.user_b, to_user_id)),
+        and(eq(nfcConnections.user_a, to_user_id), eq(nfcConnections.user_b, req.userId)),
+      ))
+      .limit(1);
+
+    if (!connection) { res.status(403).json({ error: 'not_a_contact' }); return; }
+
+    // Transfer ownership atomically — WHERE enforces current ownership
+    const [updated] = await db
+      .update(contentTokens)
+      .set({ current_owner_id: to_user_id })
+      .where(and(
+        eq(contentTokens.id, id),
+        eq(contentTokens.current_owner_id, req.userId),
+      ))
+      .returning({ id: contentTokens.id });
+
+    if (!updated) {
+      const [token] = await db.select({ current_owner_id: contentTokens.current_owner_id })
+        .from(contentTokens).where(eq(contentTokens.id, id));
+      if (!token) { res.status(404).json({ error: 'not_found' }); return; }
+      res.status(403).json({ error: 'not_your_token' }); return;
+    }
+
+    // Record in trade history with a note marking it as a gift
+    await db.insert(contentTokenTrades).values({
+      token_id: id,
+      from_user_id: req.userId,
+      to_user_id,
+      note: 'gift',
+    });
+
+    // Push notification to recipient
+    const [recipient] = await db
+      .select({ push_token: users.push_token, display_name: users.display_name })
+      .from(users).where(eq(users.id, to_user_id));
+    const [giver] = await db
+      .select({ display_name: users.display_name })
+      .from(users).where(eq(users.id, req.userId));
+    if (recipient?.push_token) {
+      sendPushNotification(
+        recipient.push_token,
+        'you received a card',
+        `${giver?.display_name ?? 'someone'} gifted you a content token`,
+        { screen: 'tokens' },
+      ).catch(() => {});
+    }
+
+    res.json({ ok: true });
   } catch {
     res.status(500).json({ error: 'internal_error' });
   }
