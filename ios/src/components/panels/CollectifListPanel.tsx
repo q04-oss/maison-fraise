@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchCollectifs } from '../../lib/api';
+import { fetchCollectifs, fetchCollectifsByBusiness } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 
 function fmtCAD(cents: number) {
@@ -19,11 +19,14 @@ function daysLeft(deadline: string) {
 }
 
 export default function CollectifListPanel() {
-  const { goBack, showPanel } = usePanel();
+  const { goBack, showPanel, panelData } = usePanel();
   const c = useColors();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isVerified, setIsVerified] = useState(false);
+
+  const businessName: string | null = panelData?.businessName ?? null;
+  const isPopup: boolean = panelData?.isPopup ?? false;
 
   useEffect(() => {
     AsyncStorage.getItem('verified').then(v => setIsVerified(v === 'true'));
@@ -31,11 +34,14 @@ export default function CollectifListPanel() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetchCollectifs()
+    const fetcher = businessName
+      ? fetchCollectifsByBusiness(businessName)
+      : fetchCollectifs();
+    fetcher
       .then(setItems)
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [businessName]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -43,7 +49,7 @@ export default function CollectifListPanel() {
     const progress = item.target_quantity > 0
       ? Math.min(1, item.current_quantity / item.target_quantity)
       : 0;
-    const isPopup = item.collectif_type === 'popup';
+    const isPopupType = item.collectif_type === 'popup';
     return (
       <TouchableOpacity
         style={[styles.row, { borderBottomColor: c.border }]}
@@ -53,16 +59,16 @@ export default function CollectifListPanel() {
         <View style={styles.rowTop}>
           <Text style={[styles.itemTitle, { color: c.text }]} numberOfLines={1}>{item.title}</Text>
           <Text style={[styles.itemPrice, { color: c.text }]}>
-            {isPopup ? fmtCAD(item.price_cents) : `${item.proposed_discount_pct}% off`}
+            {isPopupType ? fmtCAD(item.price_cents) : `${item.proposed_discount_pct}% off`}
           </Text>
         </View>
 
         <Text style={[styles.meta, { color: c.muted }]}>
           {[
             item.business_name,
-            isPopup && item.proposed_venue ? item.proposed_venue : null,
+            isPopupType && item.proposed_venue ? item.proposed_venue : null,
           ].filter(Boolean).join('  ·  ')}
-          {isPopup ? '  ·  popup' : ''}
+          {isPopupType ? '  ·  popup' : ''}
         </Text>
 
         <View style={[styles.progressTrack, { backgroundColor: c.border }]}>
@@ -71,7 +77,7 @@ export default function CollectifListPanel() {
 
         <View style={styles.rowBottom}>
           <Text style={[styles.meta, { color: c.muted }]}>
-            {isPopup
+            {isPopupType
               ? `${item.current_quantity} / ${item.target_quantity} attending`
               : `${item.current_quantity} / ${item.target_quantity}  ·  ${fmtCAD(item.price_cents)}/unit`
             }
@@ -82,6 +88,10 @@ export default function CollectifListPanel() {
     );
   };
 
+  const headerTitle = businessName
+    ? businessName.toLowerCase()
+    : 'collectifs';
+
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={[styles.header, { borderBottomColor: c.border }]}>
@@ -89,11 +99,17 @@ export default function CollectifListPanel() {
           <Text style={[styles.backArrow, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={[styles.title, { color: c.text }]}>collectifs</Text>
+          <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{headerTitle}</Text>
+          {businessName && (
+            <Text style={[styles.subtitle, { color: c.muted }]}>collectifs</Text>
+          )}
         </View>
         {isVerified ? (
           <TouchableOpacity
-            onPress={() => showPanel('collectif-create')}
+            onPress={() => showPanel('collectif-create', {
+              businessName: businessName ?? undefined,
+              isPopup: isPopup || undefined,
+            })}
             style={styles.headerAction}
             activeOpacity={0.7}
           >
@@ -134,6 +150,7 @@ const styles = StyleSheet.create({
   backArrow: { fontSize: 28, lineHeight: 34 },
   headerCenter: { flex: 1, alignItems: 'center' },
   title: { fontSize: 20, fontFamily: fonts.playfair, textAlign: 'center' },
+  subtitle: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginTop: 2 },
   headerAction: { width: 60, alignItems: 'flex-end' },
   headerActionText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   headerSpacer: { width: 60 },

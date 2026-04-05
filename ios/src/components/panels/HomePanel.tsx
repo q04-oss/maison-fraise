@@ -178,7 +178,10 @@ export default function HomePanel() {
               {/* ── Collectifs ── */}
               <TouchableOpacity
                 style={[styles.viewEventRow, { borderBottomColor: c.border }]}
-                onPress={() => showPanel('collectif-list')}
+                onPress={() => showPanel('collectif-list', {
+                  businessName: activeLocation.name,
+                  isPopup: activeLocation.type === 'popup',
+                })}
                 activeOpacity={0.75}
               >
                 <Text style={[styles.viewEventText, { color: c.muted }]}>collectifs →</Text>

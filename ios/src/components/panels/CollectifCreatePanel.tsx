@@ -11,14 +11,16 @@ import { useColors, fonts, SPACING } from '../../theme';
 type CollectifType = 'product' | 'popup';
 
 export default function CollectifCreatePanel() {
-  const { goBack, showPanel } = usePanel();
+  const { goBack, showPanel, panelData } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
-  const [collectifType, setCollectifType] = useState<CollectifType>('product');
+  const [collectifType, setCollectifType] = useState<CollectifType>(
+    panelData?.isPopup ? 'popup' : 'product'
+  );
 
   // Shared fields
-  const [businessName, setBusinessName] = useState('');
+  const [businessName, setBusinessName] = useState(panelData?.businessName ?? '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [targetStr, setTargetStr] = useState('');
@@ -205,7 +207,7 @@ export default function CollectifCreatePanel() {
           label="DESCRIPTION (OPTIONAL)"
           value={description}
           onChange={setDescription}
-          placeholder={isPopup ? 'Describe the event concept, vibe, what you'd like…' : 'What you're asking for, any specific details…'}
+          placeholder={isPopup ? "Describe the event concept, vibe, what you'd like…" : "What you're asking for, any specific details…"}
           multiline
         />
 
