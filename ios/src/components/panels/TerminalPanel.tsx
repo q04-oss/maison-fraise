@@ -451,7 +451,7 @@ export default function TerminalPanel() {
                             setShowIdVerify(false);
                           } catch (e: any) {
                             const msg = e.message === 'user_not_found' ? 'Member not found.'
-                              : e.message === 'user_must_be_nfc_verified_first' ? 'Member must collect an order first.'
+                              : e.message === 'user_must_be_nfc_verified_first' ? 'Member must have collected an order in person first.'
                               : 'Could not start verification.';
                             Alert.alert('Error', msg);
                           } finally {
@@ -511,9 +511,7 @@ export default function TerminalPanel() {
                 <TouchableOpacity onPress={() => showPanel('conversations')} activeOpacity={0.7}>
                   <Text style={[styles.chatEmail, { color: c.muted }]}>{fraiseChatEmail}</Text>
                 </TouchableOpacity>
-              ) : isVerified ? null : (
-                <Text style={[styles.chatEmail, { color: c.muted }]}>collect in person to verify</Text>
-              )}
+              ) : null}
             </View>
 
             {/* ORDER section */}
