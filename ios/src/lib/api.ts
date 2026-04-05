@@ -1011,6 +1011,13 @@ export async function fetchMyPortalAccess(): Promise<any[]> {
   return r.json();
 }
 
+export async function fetchMyPortalContent(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portal/my-content`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
 export async function uploadToCloudinary(base64: string, type: 'image' | 'video'): Promise<string> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/upload`, {

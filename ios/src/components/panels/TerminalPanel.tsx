@@ -712,6 +712,15 @@ export default function TerminalPanel() {
               </View>
             )}
 
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity
+              style={styles.orderToggle}
+              onPress={() => showPanel('portal')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.label, { color: c.muted }]}>PORTAL</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
 
             </>
             )}

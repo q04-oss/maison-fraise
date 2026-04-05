@@ -20,7 +20,8 @@ export type PanelId =
   | 'collectif-detail'
   | 'collectif-create'
   | 'market'
-  | 'market-stall';
+  | 'market-stall'
+  | 'portal';
 
 export interface OrderState {
   variety_id: number | null;

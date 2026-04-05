@@ -136,6 +136,21 @@ router.post('/request-access/:ownerId', requireUser, async (req: Request, res: R
   }
 });
 
+// GET /api/portal/my-content — own content (no access check required)
+router.get('/my-content', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  try {
+    const content = await db
+      .select()
+      .from(portalContent)
+      .where(eq(portalContent.user_id, userId))
+      .orderBy(desc(portalContent.created_at));
+    res.json(content);
+  } catch (err) {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 // GET /api/portal/:userId/content
 router.get('/:userId/content', requireUser, async (req: Request, res: Response) => {
   const buyerId: number = (req as any).userId;
