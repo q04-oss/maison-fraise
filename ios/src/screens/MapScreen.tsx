@@ -130,12 +130,14 @@ export default function MapScreen() {
   const strawberryTimer1 = useRef<ReturnType<typeof setTimeout> | null>(null);
   const strawberryTimer2 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  const syncVerifiedState = useCallback(() => {
     AsyncStorage.multiGet(['verified', 'portal_opted_in']).then(([v, p]) => {
       if (v[1] === 'true') setIsVerified(true);
       if (p[1] === 'true') setPortalOptedIn(true);
     });
   }, []);
+
+  useEffect(() => { syncVerifiedState(); }, []);
 
   useEffect(() => {
     if (!pushToken) return;
@@ -252,16 +254,10 @@ export default function MapScreen() {
   // Refresh businesses + portal flag when app comes to foreground
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
-        loadBusinesses();
-        AsyncStorage.multiGet(['verified', 'portal_opted_in']).then(([v, p]) => {
-          if (v[1] === 'true') setIsVerified(true);
-          if (p[1] === 'true') setPortalOptedIn(true);
-        });
-      }
+      if (state === 'active') { loadBusinesses(); syncVerifiedState(); }
     });
     return () => sub.remove();
-  }, []);
+  }, [syncVerifiedState]);
 
   const doMarkerNav = (biz: any) => {
     setActiveLocation(biz);
@@ -367,6 +363,7 @@ export default function MapScreen() {
         strawberryTimer2.current = setTimeout(() => {
           strawberryHapticLevel.current = 2;
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+          setTimeout(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy), 100);
         }, 700);
       }
     }, 500);
