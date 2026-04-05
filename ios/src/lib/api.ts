@@ -1510,3 +1510,103 @@ export async function fetchProximityContext(businessId: number): Promise<{ hasVi
   if (!r.ok) return { hasVisited: false, proximityMessage: null };
   return r.json();
 }
+
+// ─── Content tokens ────────────────────────────────────────────────────────────
+
+export async function fetchMyContentTokens(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/mine`, { headers: auth });
+  if (!r.ok) throw new Error('failed_to_fetch_content_tokens');
+  return r.json();
+}
+
+export async function fetchContentToken(id: number): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/content-tokens/${id}`);
+  if (!r.ok) throw new Error('failed_to_fetch_content_token');
+  return r.json();
+}
+
+export async function fetchMyContentTokenOffers(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/offers/mine`, { headers: auth });
+  if (!r.ok) throw new Error('failed_to_fetch_offers');
+  return r.json();
+}
+
+export async function offerContentTokenTrade(
+  tokenId: number,
+  toUserId: number,
+  note?: string,
+): Promise<{ offer_id: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/offer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ token_id: tokenId, to_user_id: toUserId, note }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'offer_failed'); }
+  return r.json();
+}
+
+export async function acceptContentTokenOffer(offerId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/offer/${offerId}/accept`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'accept_failed'); }
+}
+
+export async function declineContentTokenOffer(offerId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/offer/${offerId}/decline`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'decline_failed'); }
+}
+
+export async function requestContentTokenPrint(
+  tokenId: number,
+  shippingAddress: {
+    name: string;
+    line1: string;
+    line2?: string;
+    city: string;
+    province: string;
+    postal_code: string;
+    country: string;
+  },
+): Promise<{ ok: boolean; print_status: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/content-tokens/${tokenId}/print`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ shipping_address: shippingAddress }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'print_request_failed'); }
+  return r.json();
+}
+
+// ─── Tournaments ────────────────────────────────────────────────────────────────
+
+export async function fetchTournaments(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/tournaments`);
+  if (!r.ok) throw new Error('failed_to_fetch_tournaments');
+  return r.json();
+}
+
+export async function fetchTournament(id: number): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/tournaments/${id}`);
+  if (!r.ok) throw new Error('failed_to_fetch_tournament');
+  return r.json();
+}
+
+export async function enterTournament(
+  id: number,
+): Promise<{ entry_id: number; client_secret: string; amount_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${id}/enter`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'enter_failed'); }
+  return r.json();
+}

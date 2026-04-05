@@ -75,6 +75,20 @@ export default function App() {
         setPendingScreen('messages');
         setPendingData(userId ? { user_id: userId } : null);
       }
+      if (screen === 'tokens') {
+        const tokenId = response.notification.request.content.data?.token_id;
+        setPendingScreen('tokens');
+        setPendingData(tokenId ? { token_id: tokenId } : null);
+      }
+      if (screen === 'token-offer') {
+        setPendingScreen('token-offer');
+        setPendingData(null);
+      }
+      if (screen === 'tournaments') {
+        const tournamentId = response.notification.request.content.data?.tournament_id;
+        setPendingScreen('tournaments');
+        setPendingData(tournamentId ? { tournament_id: tournamentId } : null);
+      }
     });
     return () => sub.remove();
   }, []);

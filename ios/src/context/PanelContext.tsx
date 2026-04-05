@@ -21,7 +21,11 @@ export type PanelId =
   | 'collectif-create'
   | 'market'
   | 'market-stall'
-  | 'portal';
+  | 'portal'
+  | 'tokens'
+  | 'token-detail'
+  | 'tournaments'
+  | 'tournament-detail';
 
 export interface OrderState {
   variety_id: number | null;

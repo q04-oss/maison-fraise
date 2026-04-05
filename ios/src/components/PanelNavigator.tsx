@@ -23,6 +23,10 @@ import CollectifCreatePanel from './panels/CollectifCreatePanel';
 import MarketPanel from './panels/MarketPanel';
 import MarketStallPanel from './panels/MarketStallPanel';
 import PortalPanel from './panels/PortalPanel';
+import TokensPanel from './panels/TokensPanel';
+import TokenDetailPanel from './panels/TokenDetailPanel';
+import TournamentsPanel from './panels/TournamentsPanel';
+import TournamentDetailPanel from './panels/TournamentDetailPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -45,13 +49,17 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'market': MarketPanel,
   'market-stall': MarketStallPanel,
   'portal': PortalPanel,
+  'tokens': TokensPanel,
+  'token-detail': TokenDetailPanel,
+  'tournaments': TournamentsPanel,
+  'tournament-detail': TournamentDetailPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
   'verified', 'standingOrder', 'partner-detail', 'order-history',
   'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'jobDetail',
   'popup-detail', 'collectif-list', 'collectif-detail', 'collectif-create',
-  'market', 'market-stall', 'portal',
+  'market', 'market-stall', 'portal', 'tokens', 'token-detail', 'tournaments', 'tournament-detail',
 ]);
 
 export default function PanelNavigator() {

@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, gt, desc, asc, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { explicitPortals, portalAccess, portalContent, portalConsents, users, memberships } from '../db/schema';
+import { explicitPortals, portalAccess, portalContent, portalConsents, users, memberships, contentTokens } from '../db/schema';
 import { requireVerifiedUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
 import { calculateCut, isIdentityActive, VERIFICATION_FEE_CENTS, VERIFICATION_RENEWAL_CENTS } from '../lib/portal';
 import { sendPushNotification } from '../lib/push';
+import { computeTokenVisuals, computeContentTokenMechanic, contentTokenExcessForRarity } from '../lib/tokenAlgorithm';
 
 const router = Router();
 
@@ -523,6 +524,9 @@ router.post('/:userId/upload', requireVerifiedUser, async (req: Request, res: Re
       })
       .returning();
 
+    // Mint a content token for this post (fire-and-forget, never blocks the response)
+    mintContentToken(row.id, requestingUserId).catch(() => {});
+
     res.status(201).json(row);
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
@@ -617,5 +621,66 @@ router.post('/renew-verification', requireVerifiedUser, async (req: Request, res
     res.status(500).json({ error: 'internal_error' });
   }
 });
+
+// ─── Content token minting ────────────────────────────────────────────────────
+// Called async after a portal post is inserted. Never throws — errors are swallowed
+// so the upload response is never affected.
+
+async function mintContentToken(postId: number, creatorUserId: number): Promise<void> {
+  // Idempotency: the portal_post_id column is UNIQUE — if a token already exists
+  // for this post (e.g. webhook retry), skip silently.
+  const [existing] = await db
+    .select({ id: contentTokens.id })
+    .from(contentTokens)
+    .where(eq(contentTokens.portal_post_id, postId));
+  if (existing) return;
+
+  // Atomic token_number: use a transaction with a count query inside it so no
+  // two concurrent mints for the same creator can claim the same number.
+  let tokenNumber = 0;
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: contentTokens.id })
+      .from(contentTokens)
+      .where(eq(contentTokens.creator_user_id, creatorUserId))
+      .for('update'); // row-level lock on all existing rows for this creator
+    tokenNumber = rows.length + 1;
+
+    const mechanic = computeContentTokenMechanic(postId, tokenNumber);
+    const excessCents = contentTokenExcessForRarity(mechanic.rarity);
+    const visuals = computeTokenVisuals(postId, excessCents);
+
+    await tx.insert(contentTokens).values({
+      portal_post_id: postId,
+      creator_user_id: creatorUserId,
+      current_owner_id: creatorUserId,
+      token_number: tokenNumber,
+      visual_size: visuals.size,
+      visual_color: visuals.color,
+      visual_seeds: visuals.seeds,
+      visual_irregularity: visuals.irregularity,
+      mechanic_archetype: mechanic.archetype,
+      mechanic_power: mechanic.power,
+      mechanic_rarity: mechanic.rarity,
+      mechanic_effect: mechanic.effect,
+    });
+  });
+
+  // Push notification to creator
+  const [creator] = await db
+    .select({ push_token: users.push_token })
+    .from(users)
+    .where(eq(users.id, creatorUserId));
+
+  if (creator?.push_token) {
+    sendPushNotification(creator.push_token, {
+      title: `Card #${tokenNumber} minted`,
+      body: mechanic.rarity === 'legendary'
+        ? `Your post minted a legendary ${mechanic.archetype} card — power ${mechanic.power}.`
+        : `Your post minted a ${mechanic.rarity} ${mechanic.archetype} card.`,
+      data: { screen: 'tokens' },
+    }).catch(() => {});
+  }
+}
 
 export default router;

@@ -30,7 +30,18 @@ router.get('/mine', requireUser, async (req: any, res: Response) => {
           .from(tokenTrades)
           .where(eq(tokenTrades.token_id, token.id))
           .orderBy(asc(tokenTrades.traded_at));
-        return { ...token, trade_history: trades };
+
+        const [originalOwner] = await db
+          .select({ display_name: users.display_name, email: users.email })
+          .from(users)
+          .where(eq(users.id, token.original_owner_id));
+
+        return {
+          ...token,
+          original_owner_display_name:
+            originalOwner?.display_name ?? originalOwner?.email?.split('@')[0] ?? 'unknown',
+          trade_history: trades,
+        };
       })
     );
 

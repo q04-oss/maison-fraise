@@ -782,3 +782,82 @@ export const collectifCommitments = pgTable('collectif_commitments', {
   status: text('status').notNull().default('pending'), // pending | captured | refunded
   committed_at: timestamp('committed_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ─── Content tokens (minted from portal posts) ────────────────────────────────
+// Each verified creator post mints one content token. Visuals are seeded from
+// the post ID; mechanics are auto-generated deterministically. Rarity is based
+// on the token's sequential number within the creator's portfolio.
+
+export const contentTokens = pgTable('content_tokens', {
+  id: serial('id').primaryKey(),
+  portal_post_id: integer('portal_post_id').notNull().references(() => portalContent.id).unique(),
+  creator_user_id: integer('creator_user_id').notNull().references(() => users.id),
+  current_owner_id: integer('current_owner_id').notNull().references(() => users.id),
+  token_number: integer('token_number').notNull(), // sequential per creator
+  // Visual properties (same fields as order tokens, computed at mint time)
+  visual_size: integer('visual_size').notNull(),
+  visual_color: text('visual_color').notNull(),
+  visual_seeds: integer('visual_seeds').notNull(),
+  visual_irregularity: integer('visual_irregularity').notNull(),
+  // Card game mechanic (deterministic, computed at mint time)
+  mechanic_archetype: text('mechanic_archetype').notNull(), // 'allure'|'power'|'grace'|'shadow'|'fire'
+  mechanic_power: integer('mechanic_power').notNull(),       // 1–100
+  mechanic_rarity: text('mechanic_rarity').notNull(),        // 'common'|'rare'|'legendary'
+  mechanic_effect: text('mechanic_effect').notNull(),        // short text description
+  // Physical card fulfillment (null = not requested)
+  print_status: text('print_status'),       // null | 'requested' | 'printing' | 'shipped'
+  shipping_address: text('shipping_address'), // JSON string when requested
+  print_requested_at: timestamp('print_requested_at'),
+  minted_at: timestamp('minted_at').notNull().defaultNow(),
+});
+
+export const contentTokenTrades = pgTable('content_token_trades', {
+  id: serial('id').primaryKey(),
+  token_id: integer('token_id').notNull().references(() => contentTokens.id),
+  from_user_id: integer('from_user_id').notNull().references(() => users.id),
+  to_user_id: integer('to_user_id').notNull().references(() => users.id),
+  traded_at: timestamp('traded_at').notNull().defaultNow(),
+  note: text('note'),
+});
+
+export const contentTokenTradeOffers = pgTable('content_token_trade_offers', {
+  id: serial('id').primaryKey(),
+  token_id: integer('token_id').notNull().references(() => contentTokens.id),
+  from_user_id: integer('from_user_id').notNull().references(() => users.id),
+  to_user_id: integer('to_user_id').notNull().references(() => users.id),
+  note: text('note'),
+  status: text('status').notNull().default('pending'), // 'pending'|'accepted'|'declined'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ─── Tournaments ──────────────────────────────────────────────────────────────
+// In-person card game competitions. Entry fees pool into the prize pot.
+// Platform takes a cut (platform_cut_bps basis points) on payout.
+
+export const tournaments = pgTable('tournaments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  entry_fee_cents: integer('entry_fee_cents').notNull(),
+  prize_pool_cents: integer('prize_pool_cents').notNull().default(0),
+  platform_cut_bps: integer('platform_cut_bps').notNull().default(1000), // 10%
+  status: text('status').notNull().default('open'), // 'open'|'in_progress'|'closed'|'paid_out'
+  max_entries: integer('max_entries'),
+  starts_at: timestamp('starts_at'),
+  ends_at: timestamp('ends_at'),
+  created_by: integer('created_by').notNull().references(() => users.id),
+  winner_user_id: integer('winner_user_id').references(() => users.id),
+  winner_payout_cents: integer('winner_payout_cents'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const tournamentEntries = pgTable('tournament_entries', {
+  id: serial('id').primaryKey(),
+  tournament_id: integer('tournament_id').notNull().references(() => tournaments.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
+  stripe_client_secret: text('stripe_client_secret'),
+  amount_cents: integer('amount_cents').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending'|'paid'
+  entered_at: timestamp('entered_at').notNull().defaultNow(),
+});

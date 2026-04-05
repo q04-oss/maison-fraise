@@ -38,6 +38,8 @@ import beaconsRouter from './routes/beacons';
 import jobsRouter from './routes/jobs';
 import collectifsRouter from './routes/collectifs';
 import marketRouter from './routes/market';
+import contentTokensRouter from './routes/content-tokens';
+import tournamentsRouter from './routes/tournaments';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -114,6 +116,8 @@ app.use('/api/beacons', beaconsRouter);
 app.use('/api/jobs', jobsRouter);
 app.use('/api/collectifs', collectifsRouter);
 app.use('/api/market', marketRouter);
+app.use('/api/content-tokens', contentTokensRouter);
+app.use('/api/tournaments', tournamentsRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

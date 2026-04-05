@@ -75,6 +75,60 @@ function interpolateColor(t: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+// ─── Content token mechanic ───────────────────────────────────────────────────
+// Fully deterministic — same post ID always produces the same card.
+// Rarity is based on the creator's sequential token_number (first posts = legendary).
+
+export type Archetype = 'allure' | 'power' | 'grace' | 'shadow' | 'fire';
+export type Rarity = 'common' | 'rare' | 'legendary';
+
+export interface ContentTokenMechanic {
+  archetype: Archetype;
+  power: number;    // 1–100
+  rarity: Rarity;
+  effect: string;
+}
+
+const EFFECTS: Record<Archetype, string[]> = {
+  allure:  ['draw 2 cards', 'steal opponent\'s top card', 'power +20 this turn'],
+  power:   ['deal 30 damage', 'double next attack', 'immunity this round'],
+  grace:   ['heal 25 HP', 'nullify next attack', 'restore a discarded card'],
+  shadow:  ['opponent discards a card', 'power −15 to opponent', 'skip opponent\'s next turn'],
+  fire:    ['deal 50 damage', 'burn: −10 HP/turn for 3 turns', 'destroy a trap card'],
+};
+
+const ARCHETYPES: Archetype[] = ['allure', 'power', 'grace', 'shadow', 'fire'];
+
+export function computeContentTokenMechanic(
+  postId: number,
+  tokenNumber: number,
+): ContentTokenMechanic {
+  const rand = seededRandom(postId);
+
+  const archetype = ARCHETYPES[Math.floor(rand() * ARCHETYPES.length)];
+  const power = Math.round(1 + rand() * 99);
+  const effects = EFFECTS[archetype];
+  const effect = effects[Math.floor(rand() * effects.length)];
+
+  const rarity: Rarity =
+    tokenNumber <= 3  ? 'legendary' :
+    tokenNumber <= 15 ? 'rare'      :
+                        'common';
+
+  return { archetype, power, rarity, effect };
+}
+
+// Map rarity to a synthetic excessCents so computeTokenVisuals produces the right colour
+const RARITY_EXCESS: Record<Rarity, number> = {
+  common:    0,
+  rare:      5000_00,  // ~$5,000 → mid-red
+  legendary: 100_000_00, // ~$100,000 → near-black blue max
+};
+
+export function contentTokenExcessForRarity(rarity: Rarity): number {
+  return RARITY_EXCESS[rarity];
+}
+
 export async function getNextTokenNumber(
   varietyId: number,
   db: any,

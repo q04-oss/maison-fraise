@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -757,6 +757,56 @@ router.post('/webhook', async (req: Request, res: Response) => {
             }).catch(() => {});
           }
           logger.info(`Verification renewed for user ${userId}`);
+        }
+      } else if (type === 'tournament_entry') {
+        const tournamentId = parseInt(pi.metadata?.tournament_id ?? '', 10);
+        const userId = parseInt(pi.metadata?.user_id ?? '', 10);
+        if (!isNaN(tournamentId) && !isNaN(userId)) {
+          // Idempotent: only mark paid and accumulate pool if the entry is still pending.
+          // If already paid (webhook retry), both updates are skipped.
+          const updated = await db
+            .update(tournamentEntries)
+            .set({ status: 'paid' })
+            .where(
+              and(
+                eq(tournamentEntries.stripe_payment_intent_id, pi.id),
+                eq(tournamentEntries.status, 'pending'),
+              ),
+            )
+            .returning({ id: tournamentEntries.id });
+
+          if (updated.length === 0) {
+            // Already processed — skip prize pool update to prevent double-counting
+            res.json({ received: true });
+            return;
+          }
+
+          // Accumulate prize pool only on first successful mark
+          await db
+            .update(tournaments)
+            .set({ prize_pool_cents: sql`prize_pool_cents + ${pi.amount}` })
+            .where(eq(tournaments.id, tournamentId));
+
+          const [user] = await db
+            .select({ push_token: users.push_token })
+            .from(users)
+            .where(eq(users.id, userId))
+            .limit(1);
+
+          const [tournament] = await db
+            .select({ name: tournaments.name })
+            .from(tournaments)
+            .where(eq(tournaments.id, tournamentId))
+            .limit(1);
+
+          if (user?.push_token) {
+            sendPushNotification(user.push_token, {
+              title: 'Tournament entry confirmed',
+              body: `You're entered in ${tournament?.name ?? 'the tournament'}. See you at the table.`,
+              data: { screen: 'tournaments', tournament_id: tournamentId },
+            }).catch(() => {});
+          }
+          logger.info(`Tournament entry paid: tournament ${tournamentId}, user ${userId}`);
         }
       }
     }

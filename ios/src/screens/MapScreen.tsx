@@ -178,6 +178,29 @@ export default function MapScreen() {
       }
       setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
     }
+    if (pendingScreen === 'tokens') {
+      clearPendingScreen();
+      if (pendingData?.token_id) {
+        showPanel('token-detail', { tokenId: pendingData.token_id });
+      } else {
+        showPanel('tokens');
+      }
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
+    if (pendingScreen === 'token-offer') {
+      clearPendingScreen();
+      showPanel('tokens');
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
+    if (pendingScreen === 'tournaments') {
+      clearPendingScreen();
+      if (pendingData?.tournament_id) {
+        showPanel('tournament-detail', { tournamentId: pendingData.tournament_id });
+      } else {
+        showPanel('tournaments');
+      }
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
   }, [pendingScreen, businesses]);
 
   const loadBusinesses = () => {

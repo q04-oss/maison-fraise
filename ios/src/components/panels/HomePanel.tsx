@@ -150,6 +150,18 @@ export default function HomePanel() {
               >
                 <Text style={[styles.collectifLinkText, { color: c.muted }]}>order history →</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showPanel('tokens')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>tokens →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showPanel('tournaments')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>tournaments →</Text>
+              </TouchableOpacity>
             </View>
 
           ) : (

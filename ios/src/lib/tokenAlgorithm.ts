@@ -1,3 +1,29 @@
+// ─── Content token mechanic (mirrors server — reference only, iOS renders from DB) ──
+
+export type Archetype = 'allure' | 'power' | 'grace' | 'shadow' | 'fire';
+export type Rarity = 'common' | 'rare' | 'legendary';
+
+export interface ContentTokenMechanic {
+  archetype: Archetype;
+  power: number;
+  rarity: Rarity;
+  effect: string;
+}
+
+export const ARCHETYPE_COLORS: Record<Archetype, string> = {
+  allure:  '#C2185B',
+  power:   '#B71C1C',
+  grace:   '#7B1FA2',
+  shadow:  '#212121',
+  fire:    '#E64A19',
+};
+
+export const RARITY_LABELS: Record<Rarity, string> = {
+  common:    'common',
+  rare:      'rare',
+  legendary: 'legendary',
+};
+
 export function composeTokenName(params: {
   token_type?: string;
   location_type?: string | null;
