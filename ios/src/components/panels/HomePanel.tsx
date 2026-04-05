@@ -138,6 +138,12 @@ export default function HomePanel() {
               >
                 <Text style={[styles.collectifLinkText, { color: c.accent }]}>collectifs →</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => showPanel('order-history')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>order history →</Text>
+              </TouchableOpacity>
             </View>
 
           ) : (
@@ -168,6 +174,15 @@ export default function HomePanel() {
                   <Text style={[styles.viewEventText, { color: c.accent }]}>View event, RSVP →</Text>
                 </TouchableOpacity>
               )}
+
+              {/* ── Collectifs ── */}
+              <TouchableOpacity
+                style={[styles.viewEventRow, { borderBottomColor: c.border }]}
+                onPress={() => showPanel('collectif-list')}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.viewEventText, { color: c.muted }]}>collectifs →</Text>
+              </TouchableOpacity>
 
               {/* ── Shop identity ── */}
               {(activeLocation.description || activeLocation.instagram_handle) && (

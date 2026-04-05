@@ -148,6 +148,18 @@ export default function PopupDetailPanel() {
 
   const renderCta = () => {
     if (loading) return <ActivityIndicator color={c.accent} />;
+    if (!userDbId) {
+      return (
+        <View style={{ alignItems: 'center', gap: 8 }}>
+          <Text style={[styles.ctaText, { color: c.muted, fontSize: 13, fontWeight: 'normal', fontStyle: 'italic' }]}>
+            Sign in to RSVP for this event.
+          </Text>
+          <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
+            <Text style={[styles.ctaText, { color: c.accent, fontSize: 12, fontWeight: 'normal' }]}>get verified →</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
     if (live && hasRsvp) {
       return (
         <TouchableOpacity

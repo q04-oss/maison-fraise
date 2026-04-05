@@ -247,6 +247,9 @@ export default function CollectifDetailPanel() {
       {!isVerified && isOpen && (
         <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom + 16 }]}>
           <Text style={[styles.gateNote, { color: c.muted }]}>Verified members can commit to collectifs.</Text>
+          <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
+            <Text style={[styles.verifyLink, { color: c.accent }]}>get verified →</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -291,6 +294,7 @@ const styles = StyleSheet.create({
   commitBtnText: { fontFamily: fonts.dmSans, fontSize: 16, fontWeight: '700' },
   withdrawLink: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5 },
   gateNote: { fontFamily: fonts.dmSans, fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
+  verifyLink: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5 },
   crossSurface: {
     flexDirection: 'row', alignItems: 'center',
     borderWidth: StyleSheet.hairlineWidth, borderRadius: 14,

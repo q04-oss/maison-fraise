@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Linking, Platform, Alert,
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
-import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip } from '../../lib/api';
+import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip, fetchNearbyJobs, JobPosting } from '../../lib/api';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
@@ -23,7 +23,7 @@ function formatContact(contact: string): { label: string; url: string } {
 }
 
 export default function PartnerDetailPanel() {
-  const { goBack, activeLocation } = usePanel();
+  const { goBack, activeLocation, showPanel, setPanelData } = usePanel();
   const c = useColors();
   const [portraits, setPortraits] = useState<{ id: number; url: string; season: string; subject_name?: string }[]>([]);
   const [visitCount, setVisitCount] = useState<number | null>(null);
@@ -31,6 +31,7 @@ export default function PartnerDetailPanel() {
   const [refreshing, setRefreshing] = useState(false);
   const [tipping, setTipping] = useState(false);
   const [tipAmount, setTipAmount] = useState<number | null>(null);
+  const [jobs, setJobs] = useState<JobPosting[]>([]);
 
   const biz = activeLocation;
 
@@ -39,9 +40,11 @@ export default function PartnerDetailPanel() {
     Promise.all([
       fetchBusinessPortraits(biz.id).catch(() => []),
       fetchBusinessVisitCount(biz.id).catch(() => null),
-    ]).then(([p, v]) => {
+      fetchNearbyJobs(biz.id).catch(() => []),
+    ]).then(([p, v, j]) => {
       setPortraits(p as any[]);
       setVisitCount(v ? (v as any).visit_count : null);
+      setJobs((j as JobPosting[]).filter(job => job.active));
     }).finally(() => { setLoading(false); if (isRefresh) setRefreshing(false); });
   };
 
@@ -224,6 +227,31 @@ export default function PartnerDetailPanel() {
           </View>
         </View>
 
+        {/* Jobs */}
+        {jobs.length > 0 && (
+          <View style={[styles.jobsSection, { borderBottomColor: c.border }]}>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>OPEN POSITIONS</Text>
+            {jobs.map(job => (
+              <TouchableOpacity
+                key={job.id}
+                style={[styles.jobRow, { borderBottomColor: c.border }]}
+                onPress={() => { setPanelData({ job, businessName: biz!.name }); showPanel('jobDetail'); }}
+                activeOpacity={0.75}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.jobTitle, { color: c.text }]}>{job.title}</Text>
+                  <Text style={[styles.jobPay, { color: c.muted }]}>
+                    {job.pay_type === 'hourly'
+                      ? `$${(job.pay_cents / 100).toFixed(0)} / hr`
+                      : `$${(job.pay_cents / 100).toLocaleString()} / yr`}
+                  </Text>
+                </View>
+                <Text style={[styles.jobArrow, { color: c.accent }]}>→</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {/* Commission a campaign CTA */}
         <TouchableOpacity
           style={[styles.commissionCard, { borderColor: c.border }]}
@@ -360,6 +388,23 @@ const styles = StyleSheet.create({
   linkBtnText: { fontSize: 12, fontFamily: fonts.dmMono },
 
   sectionLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+
+  jobsSection: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 4,
+  },
+  jobRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  jobTitle: { fontSize: 15, fontFamily: fonts.playfair },
+  jobPay: { fontSize: 11, fontFamily: fonts.dmMono, marginTop: 2 },
+  jobArrow: { fontSize: 16 },
 
   commissionCard: {
     marginHorizontal: SPACING.md,
