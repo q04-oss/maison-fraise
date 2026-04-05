@@ -132,13 +132,6 @@ export default function HomePanel() {
               <Text style={[styles.emptySeason, { color: c.muted }]}>{season}</Text>
               <Text style={[styles.emptyHint, { color: c.muted }]}>tap a location on the map</Text>
               <TouchableOpacity
-                onPress={() => showPanel('collectif-list')}
-                activeOpacity={0.7}
-                style={styles.collectifLink}
-              >
-                <Text style={[styles.collectifLinkText, { color: c.accent }]}>collectifs →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 onPress={() => showPanel('market')}
                 activeOpacity={0.7}
               >
@@ -178,15 +171,6 @@ export default function HomePanel() {
                         : todayLabel,
                     ].filter(Boolean).join('  ·  ')}
                   </Text>
-                  <TouchableOpacity
-                    onPress={() => showPanel('collectif-list', {
-                      businessName: activeLocation.name,
-                      isPopup: activeLocation.type === 'popup',
-                    })}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.locationMetaText, { color: c.muted }]}>collectifs →</Text>
-                  </TouchableOpacity>
                 </View>
                 {order.order_id && order.location_id === activeLocation.id && (
                   <Text style={[styles.orderPlaced, { color: c.accent }]}>order placed</Text>

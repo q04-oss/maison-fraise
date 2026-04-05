@@ -276,6 +276,18 @@ export default function MapScreen() {
     doMarkerNav(biz);
   };
 
+  const handleMarkerLongPress = (biz: any) => {
+    goHome();
+    setPanelData({
+      collectifType: biz.type === 'popup' ? 'popup' : 'product',
+      businessName: biz.name,
+      proposedVenue: biz.name,
+      proposedDate: biz.type === 'popup' && biz.starts_at ? biz.starts_at.slice(0, 10) : '',
+    });
+    showPanel('collectif-create');
+    setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+  };
+
   const handlePartnerPress = (biz: any) => {
     setActiveLocation(biz);
     showPanel('partner-detail');
@@ -442,6 +454,7 @@ export default function MapScreen() {
             key={`col-${b.id}`}
             coordinate={{ latitude: b.lat, longitude: b.lng }}
             onPress={() => handleMarkerPress(b)}
+            onLongPress={() => handleMarkerLongPress(b)}
           >
             <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]}>
               <View style={styles.pinCollectionDot} />
@@ -468,6 +481,7 @@ export default function MapScreen() {
               coordinate={{ latitude: b.lat, longitude: b.lng }}
               tracksViewChanges={live}
               onPress={() => handlePopupPress(b)}
+              onLongPress={() => handleMarkerLongPress(b)}
             >
               {live
                 ? <LivePopupPin color="#C0392B" />
@@ -500,6 +514,7 @@ export default function MapScreen() {
             key={`biz-${b.id}`}
             coordinate={{ latitude: b.lat, longitude: b.lng }}
             onPress={() => handlePartnerPress(b)}
+            onLongPress={() => handleMarkerLongPress(b)}
             tracksViewChanges={false}
           >
             <View style={[styles.pinPartner, { borderColor: c.markerBg }]}>
