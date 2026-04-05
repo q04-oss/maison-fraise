@@ -72,7 +72,11 @@ export default function PortalPanel() {
       const content = await fetchPortalContent(viewOwnerId);
       setViewContent(content);
     } catch (e: any) {
-      Alert.alert('Access required', 'You need an active subscription to view this portal.');
+      if (e.message === 'identity_verification_required') {
+        Alert.alert('ID verification required', 'Visit a shop to verify your identity before viewing portal content.');
+      } else {
+        Alert.alert('Access required', 'You need an active subscription to view this portal.');
+      }
       goBack();
     } finally {
       setLoading(false);

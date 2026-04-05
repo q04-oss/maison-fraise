@@ -113,6 +113,18 @@ router.post('/request-access/:ownerId', requireVerifiedUser, async (req: Request
       return;
     }
 
+    // Require government ID verification to subscribe
+    const [buyer] = await db
+      .select({ identity_verified: users.identity_verified })
+      .from(users)
+      .where(eq(users.id, buyerId))
+      .limit(1);
+
+    if (!buyer?.identity_verified) {
+      res.status(403).json({ error: 'identity_verification_required' });
+      return;
+    }
+
     // Look up buyer's active membership for amount
     const [buyerMembership] = await db
       .select({ amount_cents: memberships.amount_cents })
@@ -265,6 +277,18 @@ router.get('/:userId/content', requireVerifiedUser, async (req: Request, res: Re
   }
 
   try {
+    // Require government ID verification to view content
+    const [buyer] = await db
+      .select({ identity_verified: users.identity_verified })
+      .from(users)
+      .where(eq(users.id, buyerId))
+      .limit(1);
+
+    if (!buyer?.identity_verified) {
+      res.status(403).json({ error: 'identity_verification_required' });
+      return;
+    }
+
     const now = new Date();
     const [access] = await db
       .select({ id: portalAccess.id })
@@ -310,18 +334,6 @@ router.post('/:userId/upload', requireVerifiedUser, async (req: Request, res: Re
     return;
   }
 
-  // Require government ID verification to post content
-  const [creator] = await db
-    .select({ identity_verified: users.identity_verified })
-    .from(users)
-    .where(eq(users.id, requestingUserId))
-    .limit(1);
-
-  if (!creator?.identity_verified) {
-    res.status(403).json({ error: 'identity_verification_required' });
-    return;
-  }
-
   const { media_url, type, caption } = req.body;
 
   if (!media_url || !type || !['photo', 'video'].includes(type)) {
@@ -330,6 +342,18 @@ router.post('/:userId/upload', requireVerifiedUser, async (req: Request, res: Re
   }
 
   try {
+    // Require government ID verification to post content
+    const [creator] = await db
+      .select({ identity_verified: users.identity_verified })
+      .from(users)
+      .where(eq(users.id, requestingUserId))
+      .limit(1);
+
+    if (!creator?.identity_verified) {
+      res.status(403).json({ error: 'identity_verification_required' });
+      return;
+    }
+
     const [row] = await db
       .insert(portalContent)
       .values({

@@ -976,7 +976,7 @@ export async function requestPortalAccess(
 export async function fetchPortalContent(userId: number): Promise<any[]> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/portal/${userId}/content`, { headers: auth });
-  if (!r.ok) return [];
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'fetch_failed'); }
   return r.json();
 }
 
