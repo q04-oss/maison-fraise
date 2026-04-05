@@ -390,9 +390,9 @@ router.post('/webhook', async (req: Request, res: Response) => {
           checkAndTriggerAutoOrder(toUserId, db).catch(() => {});
         }
       } else if (type === 'patronage_claim') {
-        const patronageId = parseInt(pi.metadata.patronage_id);
-        const userId = parseInt(pi.metadata.user_id);
-        const years = parseInt(pi.metadata.years);
+        const patronageId = parseInt(pi.metadata.patronage_id, 10);
+        const userId = parseInt(pi.metadata.user_id, 10);
+        const years = parseInt(pi.metadata.years, 10);
         const locationName = pi.metadata.location_name;
 
         // Update patronage: mark claimed
@@ -475,9 +475,9 @@ router.post('/webhook', async (req: Request, res: Response) => {
         // Check if fund now covers membership — trigger auto-order if so
         checkAndTriggerAutoOrder(ownerId, db).catch(() => {});
       } else if (type === 'greenhouse_fund') {
-        const greenhouseId = parseInt(pi.metadata.greenhouse_id);
-        const userId = parseInt(pi.metadata.user_id);
-        const years = parseInt(pi.metadata.years);
+        const greenhouseId = parseInt(pi.metadata.greenhouse_id, 10);
+        const userId = parseInt(pi.metadata.user_id, 10);
+        const years = parseInt(pi.metadata.years, 10);
         const greenhouseName = pi.metadata.greenhouse_name;
         const greenhouseLocation = pi.metadata.greenhouse_location ?? '';
 
@@ -534,8 +534,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
         logger.info(`Greenhouse ${greenhouseId} funded by user ${userId} for ${years} year(s)`);
       } else if (type === 'location_fund') {
-        const businessId = parseInt(pi.metadata.business_id);
-        const userId = parseInt(pi.metadata.user_id);
+        const businessId = parseInt(pi.metadata.business_id, 10);
+        const userId = parseInt(pi.metadata.user_id, 10);
         const businessName = pi.metadata.business_name;
 
         const termEndsAt = new Date();

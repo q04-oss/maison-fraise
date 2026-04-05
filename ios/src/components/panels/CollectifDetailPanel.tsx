@@ -32,7 +32,7 @@ export default function CollectifDetailPanel() {
   const c = useColors();
   const insets = useSafeAreaInsets();
 
-  const collectifId: number = panelData?.collectifId;
+  const collectifId: number | null = panelData?.collectifId ?? null;
 
   const [collectif, setCollectif] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -42,6 +42,7 @@ export default function CollectifDetailPanel() {
   const [userId, setUserId] = useState<number | null>(null);
 
   useEffect(() => {
+    if (!collectifId) { setLoading(false); return; }
     Promise.all([
       AsyncStorage.getItem('verified'),
       AsyncStorage.getItem('user_db_id'),
