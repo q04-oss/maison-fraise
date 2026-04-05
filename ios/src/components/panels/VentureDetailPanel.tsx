@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchVenture, joinVenture, postVentureUpdate } from '../../lib/api';
+import { fetchVenture, joinVenture, leaveVenture, postVentureUpdate } from '../../lib/api';
 import { fonts, SPACING, useColors } from '../../theme';
 
 export default function VentureDetailPanel() {
-  const { goBack, panelData } = usePanel();
+  const { goBack, panelData, showPanel } = usePanel();
   const c = useColors();
   const ventureId = panelData?.ventureId as number;
 
@@ -23,6 +23,7 @@ export default function VentureDetailPanel() {
   const [loading, setLoading] = useState(true);
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [postBody, setPostBody] = useState('');
   const [posting, setPosting] = useState(false);
 
@@ -41,6 +42,8 @@ export default function VentureDetailPanel() {
   useEffect(() => { load(); }, [load]);
 
   const isMember = venture?.members?.some((m: any) => m.user_id === myUserId);
+  const myRole = venture?.members?.find((m: any) => m.user_id === myUserId)?.role ?? null;
+  const isOwner = myRole === 'owner';
   const isDorotka = venture?.ceo_type === 'dorotka';
 
   const handleJoin = async () => {
@@ -56,6 +59,25 @@ export default function VentureDetailPanel() {
     } finally {
       setJoining(false);
     }
+  };
+
+  const handleLeave = async () => {
+    Alert.alert('Leave venture', 'Are you sure you want to leave this venture?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave', style: 'destructive', onPress: async () => {
+          setLeaving(true);
+          try {
+            await leaveVenture(ventureId);
+            goBack();
+          } catch (e: any) {
+            Alert.alert('Error', 'Could not leave venture.');
+          } finally {
+            setLeaving(false);
+          }
+        },
+      },
+    ]);
   };
 
   const handlePost = async () => {
@@ -111,7 +133,17 @@ export default function VentureDetailPanel() {
         <View style={styles.headerCenter}>
           <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{venture.name}</Text>
         </View>
-        <View style={styles.headerSpacer} />
+        {isOwner ? (
+          <TouchableOpacity
+            onPress={() => showPanel('venture-manage', { ventureId, venture })}
+            activeOpacity={0.7}
+            style={styles.manageBtn}
+          >
+            <Text style={[styles.manageBtnText, { color: c.accent }]}>manage</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
@@ -159,6 +191,18 @@ export default function VentureDetailPanel() {
             >
               <Text style={[styles.joinBtnText, { color: c.background }]}>
                 {joining ? 'joining…' : 'join venture'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {isMember && !isOwner && (
+            <TouchableOpacity
+              style={[styles.leaveBtn, { borderColor: c.border }, leaving && { opacity: 0.5 }]}
+              onPress={handleLeave}
+              disabled={leaving}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.joinBtnText, { color: c.muted }]}>
+                {leaving ? 'leaving…' : 'leave venture'}
               </Text>
             </TouchableOpacity>
           )}
@@ -249,7 +293,10 @@ const styles = StyleSheet.create({
   memberName: { fontSize: 14, fontFamily: fonts.dmSans },
   memberRole: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
   joinBtn: { height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  leaveBtn: { height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4, borderWidth: StyleSheet.hairlineWidth },
   joinBtnText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  manageBtn: { paddingVertical: 4 },
+  manageBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   postInput: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,

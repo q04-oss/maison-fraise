@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { eq, and, desc, asc } from 'drizzle-orm';
+import { eq, and, desc, asc, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { ventures, ventureMembers, ventureRevenueSplits, venturePosts, users } from '../db/schema';
 import { requireUser } from '../lib/auth';
@@ -221,4 +221,110 @@ router.post('/:id/posts', requireUser, async (req: any, res: Response) => {
   }
 });
 
+// POST /api/ventures/:id/leave
+router.post('/:id/leave', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  try {
+    const [membership] = await db
+      .select()
+      .from(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, req.userId)));
+    if (!membership) { res.status(404).json({ error: 'not_a_member' }); return; }
+    if (membership.role === 'owner') { res.status(409).json({ error: 'owner_cannot_leave' }); return; }
+
+    await db
+      .delete(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, req.userId)));
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// PATCH /api/ventures/:id/close — owner closes a venture
+router.patch('/:id/close', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  try {
+    const [venture] = await db.select().from(ventures).where(eq(ventures.id, id));
+    if (!venture) { res.status(404).json({ error: 'not_found' }); return; }
+    if (venture.created_by !== req.userId) { res.status(403).json({ error: 'not_your_venture' }); return; }
+
+    await db.update(ventures).set({ status: 'closed' }).where(eq(ventures.id, id));
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// DELETE /api/ventures/:id/members/:userId — owner removes a member
+router.delete('/:id/members/:userId', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  const targetId = parseInt(req.params.userId, 10);
+  if (isNaN(id) || isNaN(targetId)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  if (targetId === req.userId) { res.status(400).json({ error: 'cannot_remove_yourself' }); return; }
+
+  try {
+    const [venture] = await db.select({ created_by: ventures.created_by }).from(ventures).where(eq(ventures.id, id));
+    if (!venture) { res.status(404).json({ error: 'not_found' }); return; }
+    if (venture.created_by !== req.userId) { res.status(403).json({ error: 'not_your_venture' }); return; }
+
+    const [target] = await db
+      .select()
+      .from(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, targetId)));
+    if (!target) { res.status(404).json({ error: 'member_not_found' }); return; }
+    if (target.role === 'owner') { res.status(409).json({ error: 'cannot_remove_owner' }); return; }
+
+    await db
+      .delete(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, targetId)));
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// PATCH /api/ventures/:id/members/:userId — owner changes a member's role
+router.patch('/:id/members/:userId', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  const targetId = parseInt(req.params.userId, 10);
+  if (isNaN(id) || isNaN(targetId)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { role } = req.body;
+  const VALID_ROLES = ['worker', 'contractor'];
+  if (!role || !VALID_ROLES.includes(role)) {
+    res.status(400).json({ error: 'role must be worker or contractor' });
+    return;
+  }
+
+  try {
+    const [venture] = await db.select({ created_by: ventures.created_by }).from(ventures).where(eq(ventures.id, id));
+    if (!venture) { res.status(404).json({ error: 'not_found' }); return; }
+    if (venture.created_by !== req.userId) { res.status(403).json({ error: 'not_your_venture' }); return; }
+
+    const [target] = await db
+      .select()
+      .from(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, targetId)));
+    if (!target) { res.status(404).json({ error: 'member_not_found' }); return; }
+    if (target.role === 'owner') { res.status(409).json({ error: 'cannot_change_owner_role' }); return; }
+
+    await db
+      .update(ventureMembers)
+      .set({ role })
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, targetId)));
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 export default router;
+

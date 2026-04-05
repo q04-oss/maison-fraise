@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and, lte, sum, gte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments, contentTokens } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments, contentTokens, venturePosts } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -1195,21 +1195,26 @@ router.get('/talent', async (_req: Request, res: Response) => {
 
 // POST /api/admin/contracts — send contract offer to a user
 router.post('/contracts', async (req: Request, res: Response) => {
-  const { business_id, user_id, starts_at, ends_at, note } = req.body;
-  if (!business_id || !user_id || !starts_at || !ends_at) {
-    res.status(400).json({ error: 'business_id, user_id, starts_at, ends_at are required' });
+  const { business_id, user_id, starts_at, ends_at, note, venture_id } = req.body;
+  if (!business_id || !user_id || !starts_at) {
+    res.status(400).json({ error: 'business_id, user_id, starts_at are required' });
     return;
   }
   try {
     const [business] = await db.select().from(businesses).where(eq(businesses.id, business_id));
     if (!business) { res.status(404).json({ error: 'Business not found' }); return; }
 
+    // Default contract duration: 2 months from starts_at
+    const start = new Date(starts_at);
+    const end = ends_at ? new Date(ends_at) : new Date(new Date(starts_at).setMonth(start.getMonth() + 2));
+
     const [contract] = await db.insert(employmentContracts).values({
       business_id,
       user_id,
-      starts_at: new Date(starts_at),
-      ends_at: new Date(ends_at),
+      starts_at: start,
+      ends_at: end,
       note: note ?? null,
+      venture_id: venture_id ?? null,
       status: 'pending',
     }).returning();
 
@@ -2459,6 +2464,28 @@ router.post('/migrate-ventures', async (_req: Request, res: Response) => {
     `);
 
     res.json({ ok: true, message: 'Ventures migration complete' });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/ventures/:id/posts/dorotka — post an update as Dorotka
+router.post('/ventures/:id/posts/dorotka', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid venture id' }); return; }
+  const { body } = req.body;
+  if (!body?.trim()) { res.status(400).json({ error: 'body is required' }); return; }
+
+  try {
+    const [dorotka] = await db.select({ id: users.id }).from(users).where(eq(users.is_dorotka, true));
+    if (!dorotka) { res.status(503).json({ error: 'dorotka_not_seeded' }); return; }
+
+    const [post] = await db
+      .insert(venturePosts)
+      .values({ venture_id: id, author_user_id: dorotka.id, body: body.trim() })
+      .returning();
+
+    res.status(201).json(post);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

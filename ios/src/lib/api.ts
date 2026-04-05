@@ -1797,3 +1797,40 @@ export async function postVentureUpdate(id: number, body: string): Promise<any> 
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'post_failed'); }
   return r.json();
 }
+
+export async function leaveVenture(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${id}/leave`, {
+    method: 'POST',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'leave_failed'); }
+}
+
+export async function closeVenture(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${id}/close`, {
+    method: 'PATCH',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'close_failed'); }
+}
+
+export async function removeVentureMember(ventureId: number, userId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${ventureId}/members/${userId}`, {
+    method: 'DELETE',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'remove_failed'); }
+}
+
+export async function changeVentureMemberRole(ventureId: number, userId: number, role: 'worker' | 'contractor'): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${ventureId}/members/${userId}`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'role_change_failed'); }
+}
