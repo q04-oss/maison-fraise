@@ -156,15 +156,26 @@ export default function HomePanel() {
             <>
               {/* ── Location meta ── */}
               <View style={styles.locationMeta}>
-                <Text style={[styles.locationMetaText, { color: c.muted }]} numberOfLines={1}>
-                  {[
-                    activeLocation.type === 'popup' ? 'popup' : null,
-                    activeLocation.address ?? activeLocation.neighbourhood ?? null,
-                    activeLocation.type === 'popup' && activeLocation.launched_at
-                      ? (activeLocation.hours ?? new Date(activeLocation.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
-                      : todayLabel,
-                  ].filter(Boolean).join('  ·  ')}
-                </Text>
+                <View style={styles.locationMetaRow}>
+                  <Text style={[styles.locationMetaText, { color: c.muted, flex: 1 }]} numberOfLines={1}>
+                    {[
+                      activeLocation.type === 'popup' ? 'popup' : null,
+                      activeLocation.address ?? activeLocation.neighbourhood ?? null,
+                      activeLocation.type === 'popup' && activeLocation.launched_at
+                        ? (activeLocation.hours ?? new Date(activeLocation.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
+                        : todayLabel,
+                    ].filter(Boolean).join('  ·  ')}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => showPanel('collectif-list', {
+                      businessName: activeLocation.name,
+                      isPopup: activeLocation.type === 'popup',
+                    })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.locationMetaText, { color: c.muted }]}>collectifs →</Text>
+                  </TouchableOpacity>
+                </View>
                 {order.order_id && order.location_id === activeLocation.id && (
                   <Text style={[styles.orderPlaced, { color: c.accent }]}>order placed</Text>
                 )}
@@ -180,18 +191,6 @@ export default function HomePanel() {
                   <Text style={[styles.viewEventText, { color: c.accent }]}>View event, RSVP →</Text>
                 </TouchableOpacity>
               )}
-
-              {/* ── Collectifs ── */}
-              <TouchableOpacity
-                style={[styles.viewEventRow, { borderBottomColor: c.border }]}
-                onPress={() => showPanel('collectif-list', {
-                  businessName: activeLocation.name,
-                  isPopup: activeLocation.type === 'popup',
-                })}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.viewEventText, { color: c.muted }]}>collectifs →</Text>
-              </TouchableOpacity>
 
               {/* ── Shop identity ── */}
               {(activeLocation.description || activeLocation.instagram_handle) && (
@@ -326,6 +325,7 @@ const styles = StyleSheet.create({
 
   // Location meta
   locationMeta: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 4, gap: 4 },
+  locationMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   locationMetaText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   orderPlaced: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
 
