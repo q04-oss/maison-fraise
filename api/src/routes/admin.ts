@@ -2404,6 +2404,66 @@ router.post('/migrate/locations', async (_req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/migrate-ventures — create ventures tables and seed Dorotka
+router.post('/migrate-ventures', async (_req: Request, res: Response) => {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ventures (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        description text,
+        ceo_type text NOT NULL DEFAULT 'human',
+        ceo_user_id integer REFERENCES users(id),
+        created_by integer NOT NULL REFERENCES users(id),
+        status text NOT NULL DEFAULT 'active',
+        fraise_cut_bps integer NOT NULL DEFAULT 500,
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS venture_members (
+        id serial PRIMARY KEY,
+        venture_id integer NOT NULL REFERENCES ventures(id),
+        user_id integer NOT NULL REFERENCES users(id),
+        role text NOT NULL DEFAULT 'worker',
+        joined_at timestamp NOT NULL DEFAULT now(),
+        UNIQUE(venture_id, user_id)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS venture_revenue_splits (
+        id serial PRIMARY KEY,
+        venture_id integer NOT NULL REFERENCES ventures(id),
+        user_id integer NOT NULL REFERENCES users(id),
+        share_bps integer NOT NULL,
+        UNIQUE(venture_id, user_id)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS venture_posts (
+        id serial PRIMARY KEY,
+        venture_id integer NOT NULL REFERENCES ventures(id),
+        author_user_id integer NOT NULL REFERENCES users(id),
+        body text NOT NULL,
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS venture_id integer REFERENCES ventures(id)`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dorotka boolean NOT NULL DEFAULT false`);
+
+    // Seed Dorotka as a system user if she doesn't already exist
+    await db.execute(sql`
+      INSERT INTO users (email, display_name, is_dorotka)
+      SELECT 'dorotka@fraise.market', 'Dorotka', true
+      WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'dorotka@fraise.market')
+    `);
+
+    res.json({ ok: true, message: 'Ventures migration complete' });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // PATCH /api/admin/varieties/:id/sort-order — update variety sort order
 router.patch('/varieties/:id/sort-order', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);

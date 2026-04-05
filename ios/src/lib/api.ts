@@ -1742,3 +1742,58 @@ export async function giftContentToken(tokenId: number, toUserId: number): Promi
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gift_failed'); }
 }
+
+export async function fetchVentures(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/ventures`);
+  if (!r.ok) throw new Error('failed_to_fetch_ventures');
+  return r.json();
+}
+
+export async function fetchMyVentures(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/mine`, { headers: auth });
+  if (!r.ok) throw new Error('failed_to_fetch_ventures');
+  return r.json();
+}
+
+export async function fetchVenture(id: number): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/ventures/${id}`);
+  if (!r.ok) throw new Error('failed_to_fetch_venture');
+  return r.json();
+}
+
+export async function createVenture(body: {
+  name: string;
+  description?: string;
+  ceo_type: 'human' | 'dorotka';
+  revenue_splits?: { user_id: number; share_bps: number }[];
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function joinVenture(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${id}/join`, {
+    method: 'POST',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'join_failed'); }
+}
+
+export async function postVentureUpdate(id: number, body: string): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${id}/posts`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'post_failed'); }
+  return r.json();
+}

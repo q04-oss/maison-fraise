@@ -173,6 +173,7 @@ export const users = pgTable('users', {
   banned: boolean('banned').notNull().default(false),
   ban_reason: text('ban_reason'),
   is_shop: boolean('is_shop').notNull().default(false),
+  is_dorotka: boolean('is_dorotka').notNull().default(false),
   business_id: integer('business_id').references(() => businesses.id),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
@@ -363,6 +364,7 @@ export const employmentContracts = pgTable('employment_contracts', {
   ends_at: timestamp('ends_at').notNull(),
   status: text('status').notNull().default('pending'), // 'pending' | 'active' | 'completed' | 'declined'
   note: text('note'),
+  venture_id: integer('venture_id'), // nullable FK added after ventures table exists
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -918,4 +920,47 @@ export const creatorPayoutRequests = pgTable('creator_payout_requests', {
   status: text('status').notNull().default('pending'), // 'pending' | 'paid'
   created_at: timestamp('created_at').notNull().defaultNow(),
   paid_at: timestamp('paid_at'),
+});
+
+// ─── Ventures ─────────────────────────────────────────────────────────────────
+// Persistent work projects. ceo_type 'dorotka' = AI-led worker co-op,
+// 'human' = conventional human-led org. Both coexist on the platform.
+
+export const ventures = pgTable('ventures', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  ceo_type: text('ceo_type').notNull().default('human'), // 'human' | 'dorotka'
+  ceo_user_id: integer('ceo_user_id').references(() => users.id), // null when ceo_type = 'dorotka'
+  created_by: integer('created_by').notNull().references(() => users.id),
+  status: text('status').notNull().default('active'), // 'active' | 'closed'
+  fraise_cut_bps: integer('fraise_cut_bps').notNull().default(500), // 5%
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const ventureMembers = pgTable('venture_members', {
+  id: serial('id').primaryKey(),
+  venture_id: integer('venture_id').notNull().references(() => ventures.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  role: text('role').notNull().default('worker'), // 'owner' | 'worker' | 'contractor'
+  joined_at: timestamp('joined_at').notNull().defaultNow(),
+}, (t) => ({
+  uniq_member: unique().on(t.venture_id, t.user_id),
+}));
+
+export const ventureRevenueSplits = pgTable('venture_revenue_splits', {
+  id: serial('id').primaryKey(),
+  venture_id: integer('venture_id').notNull().references(() => ventures.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  share_bps: integer('share_bps').notNull(), // basis points of revenue after fraise cut
+}, (t) => ({
+  uniq_split: unique().on(t.venture_id, t.user_id),
+}));
+
+export const venturePosts = pgTable('venture_posts', {
+  id: serial('id').primaryKey(),
+  venture_id: integer('venture_id').notNull().references(() => ventures.id),
+  author_user_id: integer('author_user_id').notNull().references(() => users.id),
+  body: text('body').notNull(),
+  created_at: timestamp('created_at').notNull().defaultNow(),
 });

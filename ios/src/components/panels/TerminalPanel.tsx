@@ -524,6 +524,13 @@ const nameInputRef = useRef<TextInput>(null);
               ) : null}
             </View>
 
+            {/* VENTURES */}
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('ventures')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>VENTURES</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+
             {/* ORDER section */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />
             <View style={styles.orderToggle}>
