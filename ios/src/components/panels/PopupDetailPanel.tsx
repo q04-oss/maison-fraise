@@ -295,6 +295,23 @@ export default function PopupDetailPanel() {
           </TouchableOpacity>
         )}
 
+        {/* Cross-surface: venture link */}
+        {!!biz.venture_id && (
+          <TouchableOpacity
+            style={[styles.collectifBanner, { borderColor: c.border }]}
+            onPress={() => showPanel('venture-detail', { ventureId: biz.venture_id })}
+            activeOpacity={0.75}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.collectifBannerLabel, { color: c.muted }]}>VENTURE</Text>
+              <Text style={[styles.collectifBannerText, { color: c.text }]}>
+                this location runs a venture
+              </Text>
+            </View>
+            <Text style={{ fontSize: 18, color: c.accent }}>→</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={{ height: 120 }} />
       </ScrollView>
 

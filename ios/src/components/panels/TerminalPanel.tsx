@@ -15,7 +15,7 @@ import {
   fetchOrdersByEmail, fetchTimeSlots,
   demoLogin, updateDisplayName,
   createOrder, confirmOrder, operatorLogin,
-  startIdentityVerification,
+  startIdentityVerification, fetchMyVentures,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES, getDateOptions } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -48,6 +48,7 @@ export default function TerminalPanel() {
   const [showIdVerify, setShowIdVerify] = useState(false);
   const [idVerifyLoading, setIdVerifyLoading] = useState(false);
   const [idVerifyAttested, setIdVerifyAttested] = useState(false);
+  const [myVentures, setMyVentures] = useState<any[]>([]);
 const nameInputRef = useRef<TextInput>(null);
 
   // Inline order state
@@ -150,6 +151,7 @@ const nameInputRef = useRef<TextInput>(null);
             setRecentOrders(paid.slice(0, 5));
           })
           .catch(() => {});
+        fetchMyVentures().then(setMyVentures).catch(() => {});
       }
     }).finally(() => setLoading(false));
   }, []);
@@ -530,6 +532,19 @@ const nameInputRef = useRef<TextInput>(null);
               <Text style={[styles.label, { color: c.muted }]}>VENTURES</Text>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
+            {myVentures.length > 0 && myVentures.map((v: any) => (
+              <TouchableOpacity
+                key={v.id}
+                style={styles.myVentureRow}
+                onPress={() => showPanel('venture-detail', { ventureId: v.id })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.myVentureName, { color: c.text }]} numberOfLines={1}>{v.name}</Text>
+                {v.ceo_type === 'dorotka' && (
+                  <Text style={[styles.myVentureTag, { color: c.accent, borderColor: c.accent }]}>D</Text>
+                )}
+              </TouchableOpacity>
+            ))}
 
             {/* ORDER section */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -928,6 +943,9 @@ const styles = StyleSheet.create({
   operatorBlock: { paddingTop: 4, paddingBottom: SPACING.md, gap: 6, alignItems: 'center' },
   operatorTag: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase', paddingTop: 8 },
   inboxBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, width: '100%' },
+  myVentureRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingLeft: 12 },
+  myVentureName: { fontSize: 13, fontFamily: fonts.dmSans, flex: 1 },
+  myVentureTag: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1, borderWidth: 1, borderRadius: 3, paddingHorizontal: 4, paddingVertical: 1 },
   operatorInput: { width: '100%', height: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 16, fontSize: 22, fontFamily: fonts.dmMono, textAlign: 'center', letterSpacing: 4 },
   operatorSubmit: { width: '100%', height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 });

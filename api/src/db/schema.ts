@@ -213,6 +213,7 @@ export const businesses = pgTable('businesses', {
   founding_term_ends_at: timestamp('founding_term_ends_at'),
   inaugurated_at: timestamp('inaugurated_at'),
   approved_by_admin: boolean('approved_by_admin').notNull().default(false),
+  venture_id: integer('venture_id'), // associated venture (optional)
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

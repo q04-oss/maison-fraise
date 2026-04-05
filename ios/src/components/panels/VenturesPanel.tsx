@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -26,10 +26,14 @@ export default function VenturesPanel() {
 
   useEffect(() => { load(); }, [load]);
 
-  const renderItem = ({ item }: { item: any }) => {
+  const dorotkaVentures = ventures.filter(v => v.ceo_type === 'dorotka');
+  const humanVentures = ventures.filter(v => v.ceo_type !== 'dorotka');
+
+  const renderRow = (item: any) => {
     const isDorotka = item.ceo_type === 'dorotka';
     return (
       <TouchableOpacity
+        key={item.id}
         style={[styles.row, { borderBottomColor: c.border }]}
         onPress={() => showPanel('venture-detail', { ventureId: item.id })}
         activeOpacity={0.7}
@@ -78,13 +82,36 @@ export default function VenturesPanel() {
       ) : ventures.length === 0 ? (
         <Text style={[styles.empty, { color: c.muted }]}>no ventures yet</Text>
       ) : (
-        <FlatList
-          data={ventures}
-          keyExtractor={(v) => String(v.id)}
-          renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          {/* Dorotka section */}
+          {dorotkaVentures.length > 0 && (
+            <>
+              <TouchableOpacity
+                style={[styles.sectionHeader, { borderBottomColor: c.border }]}
+                onPress={() => showPanel('dorotka-profile')}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.dorotkaLabel, { borderColor: c.accent }]}>
+                  <Text style={[styles.dorotkaLabelText, { color: c.accent }]}>DOROTKA</Text>
+                </View>
+                <Text style={[styles.sectionLink, { color: c.accent }]}>about dorotka →</Text>
+              </TouchableOpacity>
+              {dorotkaVentures.map(renderRow)}
+            </>
+          )}
+
+          {/* Human section */}
+          {humanVentures.length > 0 && (
+            <>
+              {dorotkaVentures.length > 0 && (
+                <View style={[styles.sectionHeader, { borderBottomColor: c.border }]}>
+                  <Text style={[styles.humanLabel, { color: c.muted }]}>HUMAN-LED</Text>
+                </View>
+              )}
+              {humanVentures.map(renderRow)}
+            </>
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -114,6 +141,18 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingHorizontal: SPACING.md,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  dorotkaLabel: { borderWidth: 1, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  dorotkaLabelText: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5 },
+  sectionLink: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  humanLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase' },
   row: {
     paddingHorizontal: SPACING.md,
     paddingVertical: 16,

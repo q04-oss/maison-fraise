@@ -32,7 +32,8 @@ export type PanelId =
   | 'ventures'
   | 'venture-detail'
   | 'venture-create'
-  | 'venture-manage';
+  | 'venture-manage'
+  | 'dorotka-profile';
 
 export interface OrderState {
   variety_id: number | null;
@@ -104,6 +105,7 @@ export interface Business {
   checkin_token?: string | null;
   contact?: string | null;
   hours?: string | null;
+  venture_id?: number | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;

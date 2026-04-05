@@ -1834,3 +1834,16 @@ export async function changeVentureMemberRole(ventureId: number, userId: number,
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'role_change_failed'); }
 }
+
+export async function fetchVentureContracts(ventureId: number): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ventures/${ventureId}/contracts`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchDorotkaVentures(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/ventures/dorotka`);
+  if (!r.ok) return [];
+  return r.json();
+}

@@ -64,6 +64,14 @@ export default function LocationPanel() {
               <Text style={[styles.chatLabel, { color: c.accent }]}>strawberry chat</Text>
             </TouchableOpacity>
           )}
+          {activeLocation?.venture_id && (
+            <TouchableOpacity
+              onPress={() => showPanel('venture-detail', { ventureId: activeLocation.venture_id })}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.chatLabel, { color: c.accent }]}>venture →</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.headerSpacer} />
       </View>

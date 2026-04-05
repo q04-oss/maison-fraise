@@ -2455,6 +2455,7 @@ router.post('/migrate-ventures', async (_req: Request, res: Response) => {
     `);
     await db.execute(sql`ALTER TABLE employment_contracts ADD COLUMN IF NOT EXISTS venture_id integer REFERENCES ventures(id)`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dorotka boolean NOT NULL DEFAULT false`);
+    await db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS venture_id integer REFERENCES ventures(id)`);
 
     // Seed Dorotka as a system user if she doesn't already exist
     await db.execute(sql`

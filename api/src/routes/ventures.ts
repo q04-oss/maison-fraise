@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
-import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { db } from '../db';
-import { ventures, ventureMembers, ventureRevenueSplits, venturePosts, users } from '../db/schema';
+import { ventures, ventureMembers, ventureRevenueSplits, venturePosts, users, employmentContracts, businesses } from '../db/schema';
 import { requireUser } from '../lib/auth';
 
 const router = Router();
@@ -23,8 +23,14 @@ async function enrichVenture(venture: any) {
     .orderBy(asc(ventureMembers.joined_at));
 
   const splits = await db
-    .select()
+    .select({
+      user_id: ventureRevenueSplits.user_id,
+      share_bps: ventureRevenueSplits.share_bps,
+      display_name: users.display_name,
+      email: users.email,
+    })
     .from(ventureRevenueSplits)
+    .leftJoin(users, eq(users.id, ventureRevenueSplits.user_id))
     .where(eq(ventureRevenueSplits.venture_id, venture.id));
 
   const posts = await db
@@ -59,7 +65,10 @@ async function enrichVenture(venture: any) {
       ...m,
       display_name: m.display_name ?? m.email?.split('@')[0] ?? 'unknown',
     })),
-    revenue_splits: splits,
+    revenue_splits: splits.map(s => ({
+      ...s,
+      display_name: s.display_name ?? s.email?.split('@')[0] ?? 'unknown',
+    })),
     posts: posts.map(p => ({
       ...p,
       display_name: p.display_name ?? p.email?.split('@')[0] ?? 'unknown',
@@ -102,6 +111,21 @@ router.get('/mine', requireUser, async (req: any, res: Response) => {
 
     const mine = rows.filter(v => ids.includes(v.id));
     res.json(mine);
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// GET /api/ventures/dorotka — enriched dorotka-led ventures with recent posts
+router.get('/dorotka', async (_req, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(ventures)
+      .where(and(eq(ventures.status, 'active'), eq(ventures.ceo_type, 'dorotka')))
+      .orderBy(desc(ventures.created_at));
+    const enriched = await Promise.all(rows.map(enrichVenture));
+    res.json(enriched);
   } catch {
     res.status(500).json({ error: 'internal_error' });
   }
@@ -321,6 +345,45 @@ router.patch('/:id/members/:userId', requireUser, async (req: any, res: Response
       .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, targetId)));
 
     res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// GET /api/ventures/:id/contracts — employment contracts linked to this venture (members only)
+router.get('/:id/contracts', requireUser, async (req: any, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  try {
+    const [membership] = await db
+      .select()
+      .from(ventureMembers)
+      .where(and(eq(ventureMembers.venture_id, id), eq(ventureMembers.user_id, req.userId)));
+    if (!membership) { res.status(403).json({ error: 'not_a_member' }); return; }
+
+    const contracts = await db
+      .select({
+        id: employmentContracts.id,
+        user_id: employmentContracts.user_id,
+        business_id: employmentContracts.business_id,
+        starts_at: employmentContracts.starts_at,
+        ends_at: employmentContracts.ends_at,
+        status: employmentContracts.status,
+        note: employmentContracts.note,
+        display_name: users.display_name,
+        email: users.email,
+        business_name: businesses.name,
+      })
+      .from(employmentContracts)
+      .leftJoin(users, eq(users.id, employmentContracts.user_id))
+      .leftJoin(businesses, eq(businesses.id, employmentContracts.business_id))
+      .where(eq(employmentContracts.venture_id, id))
+      .orderBy(desc(employmentContracts.starts_at));
+
+    res.json(contracts.map(c => ({
+      ...c,
+      display_name: c.display_name ?? c.email?.split('@')[0] ?? 'unknown',
+    })));
   } catch {
     res.status(500).json({ error: 'internal_error' });
   }

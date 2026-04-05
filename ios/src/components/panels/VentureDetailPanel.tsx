@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchVenture, joinVenture, leaveVenture, postVentureUpdate } from '../../lib/api';
+import { fetchVenture, joinVenture, leaveVenture, postVentureUpdate, fetchVentureContracts } from '../../lib/api';
 import { fonts, SPACING, useColors } from '../../theme';
 
 export default function VentureDetailPanel() {
@@ -26,6 +26,7 @@ export default function VentureDetailPanel() {
   const [leaving, setLeaving] = useState(false);
   const [postBody, setPostBody] = useState('');
   const [posting, setPosting] = useState(false);
+  const [contracts, setContracts] = useState<any[]>([]);
 
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(v => { if (v) setMyUserId(parseInt(v, 10)); });
@@ -40,6 +41,11 @@ export default function VentureDetailPanel() {
   }, [ventureId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!ventureId || !myUserId) return;
+    fetchVentureContracts(ventureId).then(setContracts).catch(() => {});
+  }, [ventureId, myUserId]);
 
   const isMember = venture?.members?.some((m: any) => m.user_id === myUserId);
   const myRole = venture?.members?.find((m: any) => m.user_id === myUserId)?.role ?? null;
@@ -208,6 +214,46 @@ export default function VentureDetailPanel() {
           )}
         </View>
 
+        {/* Revenue splits (members only) */}
+        {isMember && venture.revenue_splits?.length > 0 && (
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>REVENUE SPLITS</Text>
+            <View style={[styles.splitRow, { borderBottomColor: c.border }]}>
+              <Text style={[styles.splitName, { color: c.muted }]}>fraise</Text>
+              <Text style={[styles.splitPct, { color: c.muted }]}>{(venture.fraise_cut_bps / 100).toFixed(0)}%</Text>
+            </View>
+            {venture.revenue_splits.map((s: any) => (
+              <View key={s.user_id} style={[styles.splitRow, { borderBottomColor: c.border }]}>
+                <Text style={[styles.splitName, { color: c.text }]}>{s.display_name}</Text>
+                <Text style={[styles.splitPct, { color: c.text }]}>{(s.share_bps / 100).toFixed(0)}%</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Venture contracts (members only) */}
+        {isMember && contracts.length > 0 && (
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>CONTRACTS</Text>
+            {contracts.map((ct: any) => (
+              <View key={ct.id} style={[styles.contractRow, { borderBottomColor: c.border }]}>
+                <View style={styles.contractLeft}>
+                  <Text style={[styles.contractName, { color: c.text }]}>{ct.display_name}</Text>
+                  {ct.business_name && (
+                    <Text style={[styles.contractBiz, { color: c.muted }]}>{ct.business_name}</Text>
+                  )}
+                </View>
+                <View style={styles.contractRight}>
+                  <Text style={[styles.contractStatus, { color: ct.status === 'active' ? c.accent : c.muted }]}>{ct.status}</Text>
+                  <Text style={[styles.contractDate, { color: c.muted }]}>
+                    {new Date(ct.starts_at).toLocaleDateString('en-CA')}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Post update (members only) */}
         {isMember && (
           <View style={[styles.section, { borderBottomColor: c.border }]}>
@@ -312,4 +358,14 @@ const styles = StyleSheet.create({
   postAuthor: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
   postDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
   postBody: { fontSize: 14, fontFamily: fonts.dmSans, lineHeight: 20 },
+  splitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth },
+  splitName: { fontSize: 13, fontFamily: fonts.dmSans },
+  splitPct: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  contractRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+  contractLeft: { flex: 1, gap: 2 },
+  contractName: { fontSize: 13, fontFamily: fonts.dmSans },
+  contractBiz: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  contractRight: { alignItems: 'flex-end', gap: 2 },
+  contractStatus: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, textTransform: 'uppercase' },
+  contractDate: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
 });
