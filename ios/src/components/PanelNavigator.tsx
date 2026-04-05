@@ -6,6 +6,13 @@ import { useColors } from '../theme';
 import HomePanel from './panels/HomePanel';
 import TerminalPanel from './panels/TerminalPanel';
 import LocationPanel from './panels/LocationPanel';
+import ChocolatePanel from './panels/ChocolatePanel';
+import FinishPanel from './panels/FinishPanel';
+import QuantityPanel from './panels/QuantityPanel';
+import WhenPanel from './panels/WhenPanel';
+import ReviewPanel from './panels/ReviewPanel';
+import ConfirmationPanel from './panels/ConfirmationPanel';
+import GiftNotePanel from './panels/GiftNotePanel';
 import VerifiedPanel from './panels/VerifiedPanel';
 import StandingOrderPanel from './panels/StandingOrderPanel';
 import PartnerDetailPanel from './panels/PartnerDetailPanel';
@@ -43,6 +50,13 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
   terminal: TerminalPanel,
   location: LocationPanel,
+  chocolate: ChocolatePanel,
+  finish: FinishPanel,
+  quantity: QuantityPanel,
+  when: WhenPanel,
+  review: ReviewPanel,
+  confirmation: ConfirmationPanel,
+  'gift-note': GiftNotePanel,
   verified: VerifiedPanel,
   standingOrder: StandingOrderPanel,
   'partner-detail': PartnerDetailPanel,
