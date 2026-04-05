@@ -3,7 +3,7 @@ import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { db } from '../db';
 import {
   tournaments, tournamentEntries, tournamentDecks, cardPlayEvents, creatorEarnings,
-  contentTokens, users,
+  creatorPayoutRequests, contentTokens, users,
 } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
@@ -93,8 +93,61 @@ router.get('/earnings/me', requireUser, async (req: any, res: Response) => {
     const total_cents = rows.reduce((sum, r) => sum + r.amount_cents, 0);
     const pending_cents = rows.filter(r => !r.paid_out).reduce((sum, r) => sum + r.amount_cents, 0);
 
-    res.json({ earnings: rows, total_cents, pending_cents });
+    const [pendingRequest] = await db
+      .select({ id: creatorPayoutRequests.id, amount_cents: creatorPayoutRequests.amount_cents, created_at: creatorPayoutRequests.created_at })
+      .from(creatorPayoutRequests)
+      .where(and(
+        eq(creatorPayoutRequests.creator_user_id, req.userId),
+        eq(creatorPayoutRequests.status, 'pending'),
+      ))
+      .orderBy(desc(creatorPayoutRequests.created_at))
+      .limit(1);
+
+    res.json({ earnings: rows, total_cents, pending_cents, pending_request: pendingRequest ?? null });
   } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/tournaments/earnings/payout — request payout of all pending earnings
+// Must be before /:id to avoid shadowing.
+router.post('/earnings/payout', requireUser, async (req: any, res: Response) => {
+  try {
+    const result = await db.transaction(async (tx) => {
+      // Lock the creator's pending earnings row to prevent a concurrent payout race
+      const pendingRows = await tx
+        .select({ amount_cents: creatorEarnings.amount_cents })
+        .from(creatorEarnings)
+        .where(and(
+          eq(creatorEarnings.creator_user_id, req.userId),
+          eq(creatorEarnings.paid_out, false),
+        ))
+        .for('update');
+
+      const amount_cents = pendingRows.reduce((s: number, r: any) => s + r.amount_cents, 0);
+      if (amount_cents === 0) throw Object.assign(new Error('no_pending_earnings'), { status: 400 });
+
+      const [existing] = await tx
+        .select({ id: creatorPayoutRequests.id })
+        .from(creatorPayoutRequests)
+        .where(and(
+          eq(creatorPayoutRequests.creator_user_id, req.userId),
+          eq(creatorPayoutRequests.status, 'pending'),
+        ))
+        .for('update');
+      if (existing) throw Object.assign(new Error('payout_already_requested'), { status: 409 });
+
+      const [request] = await tx
+        .insert(creatorPayoutRequests)
+        .values({ creator_user_id: req.userId, amount_cents, status: 'pending' })
+        .returning({ id: creatorPayoutRequests.id, amount_cents: creatorPayoutRequests.amount_cents, created_at: creatorPayoutRequests.created_at });
+
+      return request;
+    });
+
+    res.status(201).json({ ok: true, request: result });
+  } catch (err: any) {
+    if (err?.status) { res.status(err.status).json({ error: err.message }); return; }
     res.status(500).json({ error: 'internal_error' });
   }
 });
