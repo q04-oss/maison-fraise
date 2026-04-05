@@ -8,6 +8,9 @@ import { requireUser } from '../lib/auth';
 
 const router = Router();
 
+// Self-healing: ensure venture_id column exists on businesses
+db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS venture_id integer`).catch(() => {});
+
 // GET /api/businesses
 router.get('/', async (_req: Request, res: Response) => {
   try {
