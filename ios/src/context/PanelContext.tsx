@@ -27,7 +27,8 @@ export type PanelId =
   | 'tournaments'
   | 'tournament-detail'
   | 'creator-earnings'
-  | 'variety-management';
+  | 'variety-management'
+  | 'tournament-operator';
 
 export interface OrderState {
   variety_id: number | null;

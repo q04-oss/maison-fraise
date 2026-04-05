@@ -489,6 +489,11 @@ const nameInputRef = useRef<TextInput>(null);
                   <Text style={[styles.label, { color: c.accent }]}>→</Text>
                 </TouchableOpacity>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('tournament-operator')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>TOURNAMENTS</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
               </View>
             ) : (
             <>
