@@ -906,3 +906,16 @@ export const creatorEarnings = pgTable('creator_earnings', {
   paid_out: boolean('paid_out').notNull().default(false),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── Creator payout requests ──────────────────────────────────────────────────
+// A creator requests payout of their accumulated pending earnings.
+// Admin reviews and processes manually; paid_out on creatorEarnings is set on completion.
+
+export const creatorPayoutRequests = pgTable('creator_payout_requests', {
+  id: serial('id').primaryKey(),
+  creator_user_id: integer('creator_user_id').notNull().references(() => users.id),
+  amount_cents: integer('amount_cents').notNull(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'paid'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  paid_at: timestamp('paid_at'),
+});

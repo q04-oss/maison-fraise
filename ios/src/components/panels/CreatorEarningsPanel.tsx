@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   StyleSheet,
   Text,
@@ -8,14 +9,20 @@ import {
   View,
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
-import { fetchCreatorEarnings } from '../../lib/api';
+import { fetchCreatorEarnings, requestEarningsPayout } from '../../lib/api';
 import { fonts, SPACING, useColors } from '../../theme';
 
 export default function CreatorEarningsPanel() {
   const { goBack } = usePanel();
   const c = useColors();
-  const [data, setData] = useState<{ earnings: any[]; total_cents: number; pending_cents: number } | null>(null);
+  const [data, setData] = useState<{
+    earnings: any[];
+    total_cents: number;
+    pending_cents: number;
+    pending_request: { id: number; amount_cents: number; created_at: string } | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
     fetchCreatorEarnings()
@@ -23,6 +30,32 @@ export default function CreatorEarningsPanel() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const handleRequestPayout = () => {
+    Alert.alert(
+      'Request payout',
+      `Request payout of CA$${((data?.pending_cents ?? 0) / 100).toFixed(2)}? We'll process it within 3–5 business days.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Request', onPress: async () => {
+            setRequesting(true);
+            try {
+              const result = await requestEarningsPayout();
+              setData(prev => prev ? { ...prev, pending_request: result.request } : prev);
+            } catch (e: any) {
+              const msg = e.message === 'payout_already_requested' ? 'You already have a pending payout request.'
+                : e.message === 'no_pending_earnings' ? 'No pending earnings to pay out.'
+                : 'Could not submit request. Try again.';
+              Alert.alert('Error', msg);
+            } finally {
+              setRequesting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const renderItem = ({ item: e }: { item: any }) => {
     const amount = `CA$${(e.amount_cents / 100).toFixed(2)}`;
@@ -79,6 +112,27 @@ export default function CreatorEarningsPanel() {
               <Text style={[styles.summaryLabel, { color: c.muted }]}>pending payout</Text>
             </View>
           </View>
+
+          {data.pending_cents > 0 && (
+            data.pending_request ? (
+              <View style={[styles.payoutPending, { borderBottomColor: c.border }]}>
+                <Text style={[styles.payoutPendingText, { color: c.muted }]}>
+                  payout requested · CA${(data.pending_request.amount_cents / 100).toFixed(2)} · processing
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={[styles.payoutBtn, { borderBottomColor: c.border }, requesting && { opacity: 0.5 }]}
+                onPress={handleRequestPayout}
+                disabled={requesting}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.payoutBtnText, { color: c.text }]}>
+                  {requesting ? 'requesting…' : 'request payout →'}
+                </Text>
+              </TouchableOpacity>
+            )
+          )}
           <FlatList
             data={data.earnings}
             keyExtractor={e => String(e.id)}
@@ -136,4 +190,14 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: 'row', gap: 10 },
   meta: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
   metaPending: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, fontStyle: 'italic' },
+  payoutBtn: {
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, alignItems: 'center',
+  },
+  payoutBtnText: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  payoutPending: {
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, alignItems: 'center',
+  },
+  payoutPendingText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.3, fontStyle: 'italic' },
 });

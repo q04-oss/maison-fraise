@@ -1677,3 +1677,13 @@ export async function fetchCreatorEarnings(): Promise<{
   return r.json();
 }
 
+
+export async function requestEarningsPayout(): Promise<{ ok: boolean; request: any }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/earnings/payout`, {
+    method: 'POST',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'payout_failed'); }
+  return r.json();
+}
