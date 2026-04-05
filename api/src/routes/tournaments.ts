@@ -305,6 +305,11 @@ router.patch('/:id/status', requireUser, async (req: any, res: Response) => {
       .from(users).where(eq(users.id, req.userId));
     if (!me?.is_operator) { res.status(403).json({ error: 'operators_only' }); return; }
 
+    const [tournament] = await db.select({ created_by: tournaments.created_by })
+      .from(tournaments).where(eq(tournaments.id, id));
+    if (!tournament) { res.status(404).json({ error: 'not_found' }); return; }
+    if (tournament.created_by !== req.userId) { res.status(403).json({ error: 'not_your_tournament' }); return; }
+
     // Only allow the defined forward transitions — no skipping, no reversing
     const expectedPrev = Object.keys(VALID_TRANSITIONS).find(k => VALID_TRANSITIONS[k] === status);
     const [updated] = await db.update(tournaments)
@@ -487,6 +492,9 @@ router.post('/:id/winner', requireUser, async (req: any, res: Response) => {
 
     // Pre-flight checks outside the transaction (non-locking reads are fine here)
     const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, id));
+    if (tournament && tournament.created_by !== req.userId) {
+      res.status(403).json({ error: 'not_your_tournament' }); return;
+    }
     if (!tournament) { res.status(404).json({ error: 'not_found' }); return; }
 
     const [entry] = await db

@@ -88,8 +88,11 @@ export default function TournamentOperatorPanel() {
               setSelected(updated);
               setManagedDetail((prev: any) => prev ? { ...prev, status: next } : prev);
               setTournaments(prev => prev.map(t => t.id === selected.id ? updated : t));
-            } catch {
-              Alert.alert('Error', 'Could not advance status.');
+            } catch (err: any) {
+              const msg = err?.message === 'not_your_tournament' ? 'You can only manage your own tournaments.'
+                : err?.message === 'invalid_transition' ? 'Tournament is no longer in the expected state.'
+                : 'Could not advance status.';
+              Alert.alert('Error', msg);
             } finally {
               setAdvancing(false);
             }
@@ -122,7 +125,9 @@ export default function TournamentOperatorPanel() {
                 `Winner paid ${fmtCAD(result.payout_cents)}.\nCreators earned ${fmtCAD((result.play_pool_cents ?? 0) + (result.win_bonus_pool_cents ?? 0))}.`,
               );
             } catch (e: any) {
-              const msg = e.message === 'already_paid_out' ? 'Already paid out.' : 'Could not declare winner.';
+              const msg = e?.message === 'already_paid_out' ? 'Already paid out.'
+                : e?.message === 'not_your_tournament' ? 'You can only manage your own tournaments.'
+                : 'Could not declare winner.';
               Alert.alert('Error', msg);
             } finally {
               setDeclaringWinner(false);
