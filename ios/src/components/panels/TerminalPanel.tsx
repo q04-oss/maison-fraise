@@ -529,83 +529,6 @@ const nameInputRef = useRef<TextInput>(null);
               ) : null}
             </View>
 
-            {/* VENTURES */}
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('ventures')} activeOpacity={0.7}>
-              <Text style={[styles.label, { color: c.muted }]}>VENTURES</Text>
-              <Text style={[styles.label, { color: c.accent }]}>→</Text>
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('venture-earnings')} activeOpacity={0.7}>
-              <Text style={[styles.label, { color: c.muted }]}>VENTURE EARNINGS</Text>
-              <Text style={[styles.label, { color: c.accent }]}>→</Text>
-            </TouchableOpacity>
-            {myVentures.length > 0 && myVentures.map((v: any) => (
-              <TouchableOpacity
-                key={v.id}
-                style={styles.myVentureRow}
-                onPress={() => showPanel('venture-detail', { ventureId: v.id })}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.myVentureName, { color: c.text }]} numberOfLines={1}>{v.name}</Text>
-                {v.ceo_type === 'dorotka' && (
-                  <Text style={[styles.myVentureTag, { color: c.accent, borderColor: c.accent }]}>D</Text>
-                )}
-              </TouchableOpacity>
-            ))}
-
-            {/* MARKET section */}
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market')} activeOpacity={0.7}>
-              <Text style={[styles.label, { color: c.muted }]}>MARKET</Text>
-              <Text style={[styles.label, { color: c.accent }]}>→</Text>
-            </TouchableOpacity>
-            {marketOrders.length > 0 && marketOrders.slice(0, 3).map((mo: any) => (
-              <TouchableOpacity
-                key={mo.id}
-                style={[styles.marketOrderRow, { borderBottomColor: c.border }]}
-                onPress={async () => {
-                  if (mo.status !== 'paid') return;
-                  Alert.alert(
-                    'Confirm collection?',
-                    `${mo.product_name} from ${mo.vendor_name}`,
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Collected', onPress: async () => {
-                          try {
-                            await collectMarketOrder(mo.id);
-                            setMarketOrders(prev => prev.map(o => o.id === mo.id ? { ...o, status: 'collected' } : o));
-                          } catch { Alert.alert('Error', 'Could not confirm collection.'); }
-                        }
-                      },
-                    ]
-                  );
-                }}
-                activeOpacity={mo.status === 'paid' ? 0.7 : 1}
-              >
-                <View style={styles.marketOrderLeft}>
-                  <Text style={[styles.marketOrderName, { color: c.text }]} numberOfLines={1}>{mo.product_name}</Text>
-                  <Text style={[styles.marketOrderMeta, { color: c.muted }]}>{mo.vendor_name}  ·  {mo.market_name}</Text>
-                </View>
-                <Text style={[styles.marketOrderStatus, { color: mo.status === 'paid' ? c.accent : c.muted }]}>
-                  {mo.status === 'paid' ? 'collect →' : mo.status}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {isVerified && (
-              <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('vendor-stall')} activeOpacity={0.7}>
-                <Text style={[styles.label, { color: c.muted }]}>MY STALL</Text>
-                <Text style={[styles.label, { color: c.accent }]}>→</Text>
-              </TouchableOpacity>
-            )}
-            {isShop && (
-              <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market-admin')} activeOpacity={0.7}>
-                <Text style={[styles.label, { color: c.muted }]}>MARKET ADMIN</Text>
-                <Text style={[styles.label, { color: c.accent }]}>→</Text>
-              </TouchableOpacity>
-            )}
-
             {/* ORDER section */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />
             <View style={styles.orderToggle}>
@@ -884,6 +807,83 @@ const nameInputRef = useRef<TextInput>(null);
                   </>
                 )}
               </View>
+            )}
+
+            {/* VENTURES */}
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('ventures')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>VENTURES</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('venture-earnings')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>VENTURE EARNINGS</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            {myVentures.length > 0 && myVentures.map((v: any) => (
+              <TouchableOpacity
+                key={v.id}
+                style={styles.myVentureRow}
+                onPress={() => showPanel('venture-detail', { ventureId: v.id })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.myVentureName, { color: c.text }]} numberOfLines={1}>{v.name}</Text>
+                {v.ceo_type === 'dorotka' && (
+                  <Text style={[styles.myVentureTag, { color: c.accent, borderColor: c.accent }]}>D</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+
+            {/* MARKET section */}
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>MARKET</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            {marketOrders.length > 0 && marketOrders.slice(0, 3).map((mo: any) => (
+              <TouchableOpacity
+                key={mo.id}
+                style={[styles.marketOrderRow, { borderBottomColor: c.border }]}
+                onPress={async () => {
+                  if (mo.status !== 'paid') return;
+                  Alert.alert(
+                    'Confirm collection?',
+                    `${mo.product_name} from ${mo.vendor_name}`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Collected', onPress: async () => {
+                          try {
+                            await collectMarketOrder(mo.id);
+                            setMarketOrders(prev => prev.map(o => o.id === mo.id ? { ...o, status: 'collected' } : o));
+                          } catch { Alert.alert('Error', 'Could not confirm collection.'); }
+                        }
+                      },
+                    ]
+                  );
+                }}
+                activeOpacity={mo.status === 'paid' ? 0.7 : 1}
+              >
+                <View style={styles.marketOrderLeft}>
+                  <Text style={[styles.marketOrderName, { color: c.text }]} numberOfLines={1}>{mo.product_name}</Text>
+                  <Text style={[styles.marketOrderMeta, { color: c.muted }]}>{mo.vendor_name}  ·  {mo.market_name}</Text>
+                </View>
+                <Text style={[styles.marketOrderStatus, { color: mo.status === 'paid' ? c.accent : c.muted }]}>
+                  {mo.status === 'paid' ? 'collect →' : mo.status}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {isVerified && (
+              <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('vendor-stall')} activeOpacity={0.7}>
+                <Text style={[styles.label, { color: c.muted }]}>MY STALL</Text>
+                <Text style={[styles.label, { color: c.accent }]}>→</Text>
+              </TouchableOpacity>
+            )}
+            {isShop && (
+              <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market-admin')} activeOpacity={0.7}>
+                <Text style={[styles.label, { color: c.muted }]}>MARKET ADMIN</Text>
+                <Text style={[styles.label, { color: c.accent }]}>→</Text>
+              </TouchableOpacity>
             )}
 
 
