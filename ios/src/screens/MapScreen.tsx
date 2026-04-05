@@ -169,6 +169,15 @@ export default function MapScreen() {
       }
       setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
     }
+    if (pendingScreen === 'standingOrder') {
+      clearPendingScreen();
+      if (pendingData?.collectif_id) {
+        showPanel('collectif-detail', { collectifId: parseInt(pendingData.collectif_id, 10) });
+      } else {
+        showPanel('collectif-list');
+      }
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    }
   }, [pendingScreen, businesses]);
 
   const loadBusinesses = () => {

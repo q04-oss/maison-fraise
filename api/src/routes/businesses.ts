@@ -273,4 +273,34 @@ router.post('/:id/tip', requireUser, async (req: Request, res: Response) => {
   }
 });
 
+// ─── Proximity layer ──────────────────────────────────────────────────────────
+
+db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS proximity_message text`).catch(() => {});
+
+// GET /api/businesses/:id/proximity — returns visit history + custom message for this member
+router.get('/:id/proximity', requireUser, async (req: Request, res: Response) => {
+  const businessId = parseInt(req.params.id, 10);
+  const userId: number = (req as any).userId;
+  if (isNaN(businessId)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const [visit] = await db
+      .select({ id: businessVisits.id })
+      .from(businessVisits)
+      .where(eq(businessVisits.business_id, businessId))
+      .limit(1);
+
+    const hasVisited = !!visit;
+
+    const [biz] = await db
+      .select({ proximity_message: sql<string | null>`businesses.proximity_message` })
+      .from(businesses)
+      .where(eq(businesses.id, businessId))
+      .limit(1);
+
+    res.json({ hasVisited, proximityMessage: biz?.proximity_message ?? null });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 export default router;

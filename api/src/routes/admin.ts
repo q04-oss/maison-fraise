@@ -2506,6 +2506,38 @@ router.patch('/collectifs/:id/respond', async (req: Request, res: Response) => {
       }).where(eq(collectifs.id, id));
     }
 
+    // Push committed members
+    const commitments = await db
+      .select({ user_id: collectifCommitments.user_id })
+      .from(collectifCommitments)
+      .where(and(eq(collectifCommitments.collectif_id, id), eq(collectifCommitments.status, response === 'declined' ? 'refunded' : 'captured')));
+
+    const memberIds = commitments.map(c => c.user_id);
+    if (memberIds.length > 0) {
+      const members = await db
+        .select({ push_token: users.push_token })
+        .from(users)
+        .where(inArray(users.id, memberIds));
+
+      const isPopupType = (collectif as any).collectif_type === 'popup';
+      const pushTitle = response === 'accepted'
+        ? (isPopupType ? 'Popup confirmed!' : 'Collectif accepted!')
+        : (isPopupType ? 'Popup proposal declined' : 'Collectif declined');
+      const pushBody = response === 'accepted'
+        ? (note ? note : isPopupType ? 'The business confirmed the event.' : 'The business accepted your group order.')
+        : 'Your payment has been refunded in full.';
+
+      for (const member of members) {
+        if (member.push_token) {
+          sendPushNotification(member.push_token, {
+            title: pushTitle,
+            body: pushBody,
+            data: { screen: 'collectifs' },
+          }).catch(() => {});
+        }
+      }
+    }
+
     res.json({ ok: true });
   } catch (err) {
     logger.error('collectif respond', err);
@@ -2554,6 +2586,19 @@ router.post('/collectifs/:id/confirm-popup', async (req: Request, res: Response)
     res.status(201).json({ ok: true, popup_id: popup.id, popup });
   } catch (err) {
     logger.error('confirm-popup collectif', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/businesses/:id/proximity-message
+router.patch('/businesses/:id/proximity-message', requirePin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { message } = req.body;
+  try {
+    await db.execute(sql`UPDATE businesses SET proximity_message = ${message ?? null} WHERE id = ${id}`);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });

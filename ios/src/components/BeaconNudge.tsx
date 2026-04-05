@@ -3,17 +3,26 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { useColors, fonts } from '../theme';
 import { usePanel } from '../context/PanelContext';
 import { setOnNearbyShop } from '../lib/beaconService';
+import { fetchProximityContext } from '../lib/api';
 
 export default function BeaconNudge() {
   const c = useColors();
   const { showPanel, setPanelData } = usePanel();
   const [nudge, setNudge] = useState<{ shopUserId: number; shopName: string; businessId: number } | null>(null);
+  const [proximityMessage, setProximityMessage] = useState<string | null>(null);
+  const [hasVisited, setHasVisited] = useState(false);
   const slideAnim = useRef(new Animated.Value(-80)).current;
   const dismissTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setOnNearbyShop((shopUserId, shopName, businessId) => {
       setNudge({ shopUserId, shopName, businessId });
+      fetchProximityContext(businessId)
+        .then(ctx => {
+          setHasVisited(ctx.hasVisited);
+          setProximityMessage(ctx.proximityMessage);
+        })
+        .catch(() => {});
     });
     return () => setOnNearbyShop(null);
   }, []);
@@ -49,7 +58,10 @@ export default function BeaconNudge() {
         <View style={styles.left}>
           <Text style={[styles.label, { color: c.accent }]}>nearby</Text>
           <Text style={[styles.name, { color: c.text }]}>{nudge.shopName}</Text>
-          <Text style={[styles.hint, { color: c.muted }]}>tap to see today's offer</Text>
+          {hasVisited && proximityMessage
+            ? <Text style={[styles.hint, { color: c.muted }]}>{proximityMessage}</Text>
+            : <Text style={[styles.hint, { color: c.muted }]}>tap to see today's offer</Text>
+          }
         </View>
         <Text style={[styles.arrow, { color: c.accent }]}>→</Text>
       </TouchableOpacity>

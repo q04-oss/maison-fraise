@@ -1417,3 +1417,10 @@ export async function withdrawCollectif(collectifId: number): Promise<void> {
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'withdraw_failed'); }
 }
+
+export async function fetchProximityContext(businessId: number): Promise<{ hasVisited: boolean; proximityMessage: string | null }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/businesses/${businessId}/proximity`, { headers: auth });
+  if (!r.ok) return { hasVisited: false, proximityMessage: null };
+  return r.json();
+}

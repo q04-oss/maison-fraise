@@ -38,6 +38,8 @@ db.execute(sql`
 db.execute(sql`ALTER TABLE collectifs ADD COLUMN IF NOT EXISTS collectif_type text NOT NULL DEFAULT 'product'`).catch(() => {});
 db.execute(sql`ALTER TABLE collectifs ADD COLUMN IF NOT EXISTS proposed_venue text`).catch(() => {});
 db.execute(sql`ALTER TABLE collectifs ADD COLUMN IF NOT EXISTS proposed_date text`).catch(() => {});
+db.execute(sql`ALTER TABLE collectifs ADD COLUMN IF NOT EXISTS milestone_50_sent boolean NOT NULL DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE collectifs ADD COLUMN IF NOT EXISTS milestone_75_sent boolean NOT NULL DEFAULT false`).catch(() => {});
 
 db.execute(sql`
   CREATE TABLE IF NOT EXISTS collectif_commitments (
@@ -75,6 +77,62 @@ router.get('/', async (_req: Request, res: Response) => {
   } catch (err) {
     logger.error('fetchCollectifs', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/collectifs/:id/share — SSR share page with OG tags
+router.get('/:id/share', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  try {
+    const [row] = await db.execute(sql`
+      SELECT c.*, u.display_name AS creator_display_name
+      FROM collectifs c
+      LEFT JOIN users u ON u.id = c.created_by
+      WHERE c.id = ${id}
+    `);
+    if (!row) { res.status(404).send('<h1>Not found</h1>'); return; }
+
+    const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const r = row as any;
+    const progress = r.target_quantity > 0 ? Math.min(100, Math.round(r.current_quantity / r.target_quantity * 100)) : 0;
+    const isPopup = r.collectif_type === 'popup';
+    const meta = isPopup
+      ? `${esc(r.proposed_venue)} · ${esc(r.proposed_date)} · CA$${(r.price_cents / 100).toFixed(2)} deposit`
+      : `${r.proposed_discount_pct}% off · CA$${(r.price_cents / 100).toFixed(2)}/unit`;
+
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${esc(r.title)} — Maison Fraise</title>
+  <meta name="description" content="${esc(r.business_name)} · ${meta}" />
+  <meta property="og:title" content="${esc(r.title)}" />
+  <meta property="og:description" content="${esc(r.business_name)} · ${meta} · ${r.current_quantity}/${r.target_quantity} committed" />
+  <meta property="og:site_name" content="Maison Fraise" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, sans-serif; max-width: 480px; margin: 60px auto; padding: 0 24px; color: #111; }
+    h1 { font-size: 26px; margin-bottom: 8px; }
+    .meta { color: #888; font-size: 13px; margin-bottom: 24px; }
+    .track { background: #eee; border-radius: 4px; height: 6px; overflow: hidden; margin-bottom: 8px; }
+    .fill { height: 100%; background: #b04b3a; border-radius: 4px; width: ${progress}%; }
+    .label { font-size: 12px; color: #888; margin-bottom: 32px; }
+    .cta { display: block; background: #111; color: #fff; text-align: center; padding: 16px; border-radius: 12px; text-decoration: none; font-size: 15px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <p class="meta">${esc(r.business_name)}${isPopup ? ' · popup' : ''}</p>
+  <h1>${esc(r.title)}</h1>
+  <p class="meta">${meta}</p>
+  <div class="track"><div class="fill"></div></div>
+  <p class="label">${r.current_quantity} of ${r.target_quantity} committed</p>
+  <a href="https://fraise.chat" class="cta">Join on Maison Fraise →</a>
+</body>
+</html>`);
+  } catch (err) {
+    res.status(500).send('<h1>Error</h1>');
   }
 });
 

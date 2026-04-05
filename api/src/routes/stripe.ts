@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Stripe from 'stripe';
-import { eq, sql, and } from 'drizzle-orm';
+import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
@@ -616,10 +616,11 @@ router.post('/webhook', async (req: Request, res: Response) => {
             await db.update(collectifs).set({ status: 'funded' }).where(eq(collectifs.id, collectifId));
 
             const isPopup = (updated as any).collectif_type === 'popup';
-            const pushBody = isPopup
+            const opPushBody = isPopup
               ? `${(updated as any).current_quantity} people want a popup at ${(updated as any).proposed_venue ?? 'unknown venue'} on ${(updated as any).proposed_date ?? 'TBD'} — confirm the event.`
               : `"${(updated as any).title}" hit its target — respond to the group.`;
 
+            // Push operator
             db.select({ push_token: users.push_token })
               .from(users)
               .where(eq(users.email, process.env.OPERATOR_EMAIL ?? 'operator@maison-fraise.com'))
@@ -628,12 +629,79 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 if (op?.push_token) {
                   return sendPushNotification(op.push_token, {
                     title: isPopup ? 'Popup proposed' : 'Collectif funded',
-                    body: pushBody,
+                    body: opPushBody,
                     data: { screen: 'collectifs' },
                   });
                 }
               })
               .catch(() => {});
+
+            // Push all committed members (combined funded + standing order offer for product)
+            db.select({ user_id: collectifCommitments.user_id })
+              .from(collectifCommitments)
+              .where(and(eq(collectifCommitments.collectif_id, collectifId), eq(collectifCommitments.status, 'captured')))
+              .then(async (commitments) => {
+                const memberIds = commitments.map(c => c.user_id);
+                if (memberIds.length === 0) return;
+                const members = await db.select({ push_token: users.push_token }).from(users).where(inArray(users.id, memberIds));
+                const memberTitle = isPopup ? 'Popup is happening!' : 'Collectif funded!';
+                const memberBody = isPopup
+                  ? `The target was reached — awaiting business confirmation.`
+                  : `"${(updated as any).title}" is funded. Want this regularly? Set up a standing order.`;
+                for (const m of members) {
+                  if (m.push_token) {
+                    sendPushNotification(m.push_token, {
+                      title: memberTitle,
+                      body: memberBody,
+                      data: { screen: isPopup ? 'collectifs' : 'standingOrder', collectif_id: String(collectifId) },
+                    }).catch(() => {});
+                  }
+                }
+              })
+              .catch(() => {});
+          } else if (updated && (updated as any).status === 'open') {
+            // Milestone pushes (50% and 75%)
+            const current = (updated as any).current_quantity as number;
+            const target = (updated as any).target_quantity as number;
+            const pct = current / target;
+
+            const shouldPush50 = pct >= 0.5 && !(updated as any).milestone_50_sent;
+            const shouldPush75 = pct >= 0.75 && !(updated as any).milestone_75_sent;
+
+            if (shouldPush50 || shouldPush75) {
+              const col = shouldPush75 ? 'milestone_75_sent' : 'milestone_50_sent';
+              const label = shouldPush75 ? '75%' : '50%';
+
+              // Atomically mark sent to avoid double-push
+              const [marked] = await db.execute(sql`
+                UPDATE collectifs
+                SET ${sql.raw(col)} = true
+                WHERE id = ${collectifId}
+                  AND ${sql.raw(col)} = false
+                RETURNING id
+              `).catch(() => [null]);
+
+              if (marked) {
+                db.select({ user_id: collectifCommitments.user_id })
+                  .from(collectifCommitments)
+                  .where(and(eq(collectifCommitments.collectif_id, collectifId), eq(collectifCommitments.status, 'captured')))
+                  .then(async (commitments) => {
+                    const memberIds = commitments.map(c => c.user_id);
+                    if (memberIds.length === 0) return;
+                    const members = await db.select({ push_token: users.push_token }).from(users).where(inArray(users.id, memberIds));
+                    for (const m of members) {
+                      if (m.push_token) {
+                        sendPushNotification(m.push_token, {
+                          title: `${label} of the way there`,
+                          body: `"${(updated as any).title}" is ${label} funded. Share it to push it over the line.`,
+                          data: { screen: 'collectifs', collectif_id: String(collectifId) },
+                        }).catch(() => {});
+                      }
+                    }
+                  })
+                  .catch(() => {});
+              }
+            }
           }
 
           logger.info(`Collectif ${collectifId} commitment captured for user ${userId}`);

@@ -165,7 +165,20 @@ export default function CollectifDetailPanel() {
           {STATUS_LABEL[collectif.status] ?? collectif.status}
         </Text>
         {collectif.business_response === 'accepted' && (
-          <Text style={[styles.acceptedNote, { color: '#4caf50' }]}>Business accepted — fulfillment in progress.</Text>
+          <View style={[styles.responseCard, { borderColor: '#4caf5044', backgroundColor: '#4caf5011' }]}>
+            <Text style={[styles.responseCardTitle, { color: '#4caf50' }]}>Accepted</Text>
+            <Text style={[styles.responseCardBody, { color: c.text }]}>
+              {collectif.business_response_note ?? 'The business accepted your group order. Fulfillment in progress.'}
+            </Text>
+          </View>
+        )}
+        {collectif.business_response === 'declined' && (
+          <View style={[styles.responseCard, { borderColor: '#e5393544', backgroundColor: '#e5393511' }]}>
+            <Text style={[styles.responseCardTitle, { color: '#e53935' }]}>Declined</Text>
+            <Text style={[styles.responseCardBody, { color: c.muted }]}>
+              {collectif.business_response_note ?? 'The business declined this proposal.'} Your payment has been refunded in full.
+            </Text>
+          </View>
         )}
 
         <Text style={[styles.title, { color: c.text }]}>{collectif.title}</Text>
@@ -269,7 +282,9 @@ const styles = StyleSheet.create({
   shareIcon: { fontSize: 22, lineHeight: 34 },
   headerTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontFamily: fonts.dmMono, letterSpacing: 1 },
   statusLabel: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 8 },
-  acceptedNote: { fontFamily: fonts.dmMono, fontSize: 11, marginBottom: 10 },
+  responseCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 14, marginBottom: 14, gap: 6 },
+  responseCardTitle: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1.5, textTransform: 'uppercase' },
+  responseCardBody: { fontFamily: fonts.dmSans, fontSize: 13, lineHeight: 20 },
   title: { fontFamily: fonts.playfair, fontSize: 22, marginBottom: 10, lineHeight: 30 },
   description: { fontFamily: fonts.dmSans, fontSize: 14, lineHeight: 22, marginBottom: 20 },
   statsRow: {
