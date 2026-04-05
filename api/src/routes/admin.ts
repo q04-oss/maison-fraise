@@ -586,7 +586,7 @@ router.patch('/businesses/:id', async (req: Request, res: Response) => {
       name, address, neighbourhood, starts_at, ends_at, total_spots, spots_remaining,
       status, is_audition, audition_status, approved_by_admin, partner_business_id,
       host_user_id, checkin_token, location_type, partner_name, operating_cost_cents,
-      founding_patron_id, founding_term_ends_at, inaugurated_at,
+      founding_patron_id, founding_term_ends_at, inaugurated_at, hours,
     } = req.body;
     const patch: Record<string, unknown> = {};
     if (name !== undefined) patch.name = name;
@@ -609,6 +609,7 @@ router.patch('/businesses/:id', async (req: Request, res: Response) => {
     if (founding_patron_id !== undefined) patch.founding_patron_id = founding_patron_id;
     if (founding_term_ends_at !== undefined) patch.founding_term_ends_at = founding_term_ends_at;
     if (inaugurated_at !== undefined) patch.inaugurated_at = inaugurated_at;
+    if (hours !== undefined) patch.hours = hours;
     const [updated] = await db.update(businesses).set(patch).where(eq(businesses.id, id)).returning();
     if (!updated) { res.status(404).json({ error: 'Not found' }); return; }
 

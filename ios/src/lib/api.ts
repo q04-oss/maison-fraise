@@ -1677,3 +1677,9 @@ export async function fetchCreatorEarnings(): Promise<{
   return r.json();
 }
 
+
+export async function fetchAdminVarieties(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/admin/varieties`);
+  if (!r.ok) throw new Error('failed_to_fetch_varieties');
+  return r.json();
+}
