@@ -862,7 +862,9 @@ export const tournamentEntries = pgTable('tournament_entries', {
   amount_cents: integer('amount_cents').notNull(),
   status: text('status').notNull().default('pending'), // 'pending'|'paid'
   entered_at: timestamp('entered_at').notNull().defaultNow(),
-});
+}, (t) => ({
+  uniq: unique().on(t.tournament_id, t.user_id),
+}));
 
 // ─── Tournament decks ─────────────────────────────────────────────────────────
 // A user registers up to N content tokens as their "deck" before or during a

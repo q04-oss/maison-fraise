@@ -238,6 +238,8 @@ router.post('/:id/enter', requireUser, async (req: any, res: Response) => {
       // Cancel the PI so no orphaned payment intent is left open
       await stripe.paymentIntents.cancel(pi.id).catch(() => {});
       if (txErr?.status) { res.status(txErr.status).json({ error: txErr.message }); return; }
+      // Unique constraint on (tournament_id, user_id) — concurrent request beat us
+      if (txErr?.code === '23505') { res.status(409).json({ error: 'already_entered' }); return; }
       throw txErr;
     }
 
@@ -497,25 +499,25 @@ router.post('/:id/winner', requireUser, async (req: any, res: Response) => {
       const creatorByToken: Record<number, number> = {};
       for (const tc of tokenCreators) creatorByToken[tc.id] = tc.creator_user_id;
 
-      const playEarningsByCreator: Record<number, { tokenId: number; cents: number }[]> = {};
+      // Build (tokenId, rawCents) pairs first, then fix rounding so sum == playPoolCents exactly.
+      const playPairs: { tokenId: number; creatorId: number; cents: number }[] = [];
       for (const [tokenIdStr, count] of Object.entries(playCountByToken)) {
         const tokenId = Number(tokenIdStr);
         const creatorId = creatorByToken[tokenId];
         if (!creatorId) continue;
-        const cents = Math.round((count / totalPlays) * playPoolCents);
-        if (!playEarningsByCreator[creatorId]) playEarningsByCreator[creatorId] = [];
-        playEarningsByCreator[creatorId].push({ tokenId, cents });
+        playPairs.push({ tokenId, creatorId, cents: Math.round((count / totalPlays) * playPoolCents) });
       }
+      // Distribute rounding remainder to first entry so no cent is lost
+      const distributed = playPairs.reduce((s, p) => s + p.cents, 0);
+      if (playPairs.length > 0) playPairs[0].cents += playPoolCents - distributed;
 
-      playRows = Object.entries(playEarningsByCreator).flatMap(([creatorIdStr, items]) =>
-        items.map(({ tokenId, cents }) => ({
-          creator_user_id: Number(creatorIdStr),
-          tournament_id: id,
-          content_token_id: tokenId,
-          source: 'card_play' as const,
-          amount_cents: cents,
-        }))
-      );
+      playRows = playPairs.map(({ tokenId, creatorId, cents }) => ({
+        creator_user_id: creatorId,
+        tournament_id: id,
+        content_token_id: tokenId,
+        source: 'card_play' as const,
+        amount_cents: cents,
+      }));
     }
 
     let winBonusRows: typeof creatorEarnings.$inferInsert[] = [];
