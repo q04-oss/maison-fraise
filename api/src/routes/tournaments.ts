@@ -41,6 +41,35 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/tournaments/mine — tournaments created by the current user (all statuses)
+// Must be before /:id to avoid shadowing.
+router.get('/mine', requireUser, async (req: any, res: Response) => {
+  try {
+    const rows = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.created_by, req.userId))
+      .orderBy(desc(tournaments.created_at));
+
+    const enriched = await Promise.all(
+      rows.map(async (t) => {
+        const [{ count }] = await db
+          .select({ count: sql<number>`cast(count(*) as int)` })
+          .from(tournamentEntries)
+          .where(and(
+            eq(tournamentEntries.tournament_id, t.id),
+            eq(tournamentEntries.status, 'paid'),
+          ));
+        return { ...t, entry_count: count ?? 0 };
+      }),
+    );
+
+    res.json(enriched);
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 // GET /api/tournaments/earnings/me — creator's lifetime earnings ledger
 // Must be before /:id so Express doesn't match "earnings" as an id.
 router.get('/earnings/me', requireUser, async (req: any, res: Response) => {

@@ -1677,3 +1677,42 @@ export async function fetchCreatorEarnings(): Promise<{
   return r.json();
 }
 
+
+export async function fetchMyTournaments(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/mine`, { headers: auth });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function createTournament(body: {
+  name: string;
+  description?: string;
+  entry_fee_cents: number;
+  max_entries?: number;
+  starts_at?: string;
+  ends_at?: string;
+  platform_cut_bps?: number;
+  creator_play_pool_bps?: number;
+  creator_win_bonus_bps?: number;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function declareWinner(tournamentId: number, winner_user_id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/winner`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ winner_user_id }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'declare_failed'); }
+  return r.json();
+}
