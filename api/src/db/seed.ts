@@ -21,6 +21,8 @@ function daysFromNow(n: number): Date {
 }
 
 export async function seed(): Promise<void> {
+  if (process.env.APP_STORE_REVIEW !== 'true') return;
+
   const existing = await db.select().from(varieties).limit(1);
   if (existing.length > 0) return;
 
