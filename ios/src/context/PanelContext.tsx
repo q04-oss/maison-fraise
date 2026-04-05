@@ -25,7 +25,8 @@ export type PanelId =
   | 'tokens'
   | 'token-detail'
   | 'tournaments'
-  | 'tournament-detail';
+  | 'tournament-detail'
+  | 'creator-earnings';
 
 export interface OrderState {
   variety_id: number | null;

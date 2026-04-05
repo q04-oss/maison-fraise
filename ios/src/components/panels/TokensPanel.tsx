@@ -261,7 +261,9 @@ export default function TokensPanel() {
         <View style={styles.headerCenter}>
           <Text style={[styles.title, { color: c.text }]}>tokens</Text>
         </View>
-        <View style={styles.headerSpacer} />
+        <TouchableOpacity onPress={() => showPanel('creator-earnings')} style={styles.earningsBtn} activeOpacity={0.7}>
+          <Text style={[styles.earningsLabel, { color: c.muted }]}>earnings</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={[styles.tabs, { borderBottomColor: c.border }]}>
@@ -388,6 +390,8 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   title: { textAlign: 'center', fontSize: 17, fontFamily: fonts.playfair },
   headerSpacer: { width: 28 },
+  earningsBtn: { paddingVertical: 4 },
+  earningsLabel: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   tabs: {
     flexDirection: 'row',
     borderBottomWidth: StyleSheet.hairlineWidth,

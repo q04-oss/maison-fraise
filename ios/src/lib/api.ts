@@ -1610,3 +1610,62 @@ export async function enterTournament(
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'enter_failed'); }
   return r.json();
 }
+
+export async function advanceTournamentStatus(
+  tournamentId: number,
+  status: 'in_progress' | 'closed',
+): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/status`, {
+    method: 'PATCH',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'status_update_failed'); }
+}
+
+export async function fetchMyTournamentEntry(tournamentId: number): Promise<{ entered: boolean }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/entry`, { headers: auth });
+  if (!r.ok) return { entered: false };
+  return r.json();
+}
+
+export async function fetchMyDeck(tournamentId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/deck`, { headers: auth });
+  if (!r.ok) throw new Error('failed_to_fetch_deck');
+  return r.json();
+}
+
+export async function registerDeck(tournamentId: number, contentTokenIds: number[]): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/deck`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content_token_ids: contentTokenIds }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'register_deck_failed'); }
+}
+
+export async function recordCardPlay(tournamentId: number, contentTokenId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/${tournamentId}/play`, {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content_token_id: contentTokenId }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'play_failed'); }
+}
+
+export async function fetchCreatorEarnings(): Promise<{
+  earnings: any[];
+  total_cents: number;
+  pending_cents: number;
+}> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tournaments/earnings/me`, { headers: auth });
+  if (!r.ok) throw new Error('failed_to_fetch_earnings');
+  return r.json();
+}
+

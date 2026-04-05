@@ -1,15 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import NfcManager, { NfcTech, Ndef } from 'react-native-nfc-manager';
+import * as Haptics from 'expo-haptics';
 import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
-import { enterTournament, fetchTournament } from '../../lib/api';
+import {
+  enterTournament, fetchTournament, fetchMyDeck, fetchMyTournamentEntry,
+  registerDeck, recordCardPlay, fetchMyContentTokens,
+} from '../../lib/api';
+import { ARCHETYPE_COLORS } from '../../lib/tokenAlgorithm';
 import { fonts, SPACING, useColors } from '../../theme';
 
 export default function TournamentDetailPanel() {
@@ -24,12 +33,29 @@ export default function TournamentDetailPanel() {
   const [entered, setEntered] = useState(false);
   const [enterError, setEnterError] = useState('');
 
+  // Deck management
+  const [deck, setDeck] = useState<number[]>([]);
+  const [myTokens, setMyTokens] = useState<any[]>([]);
+  const [showDeckModal, setShowDeckModal] = useState(false);
+  const [selectedTokenIds, setSelectedTokenIds] = useState<Set<number>>(new Set());
+  const [savingDeck, setSavingDeck] = useState(false);
+
+  // Card play
+  const [playingCard, setPlayingCard] = useState(false);
+
   useEffect(() => {
     if (!tournamentId) { setLoading(false); return; }
-    fetchTournament(tournamentId)
-      .then(setTournament)
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetchTournament(tournamentId),
+      fetchMyTournamentEntry(tournamentId).catch(() => ({ entered: false })),
+      fetchMyDeck(tournamentId).catch(() => null),
+      fetchMyContentTokens().catch(() => []),
+    ]).then(([t, entryStatus, deckData, tokens]) => {
+      setTournament(t);
+      if (entryStatus.entered) setEntered(true);
+      if (deckData?.content_token_ids) setDeck(deckData.content_token_ids);
+      setMyTokens(tokens);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [tournamentId]);
 
   const handleEnter = async () => {
@@ -67,6 +93,64 @@ export default function TournamentDetailPanel() {
       }
     }
     setEntering(false);
+  };
+
+  const openDeckModal = async () => {
+    const tokens = await fetchMyContentTokens().catch(() => []);
+    setMyTokens(tokens);
+    setSelectedTokenIds(new Set(deck));
+    setShowDeckModal(true);
+  };
+
+  const saveDeck = async () => {
+    if (!tournamentId) return;
+    setSavingDeck(true);
+    try {
+      const ids = [...selectedTokenIds];
+      await registerDeck(tournamentId, ids);
+      setDeck(ids);
+      setShowDeckModal(false);
+    } catch (e: any) {
+      Alert.alert('error', e?.message ?? 'save_failed');
+    }
+    setSavingDeck(false);
+  };
+
+  const handleScanCard = async () => {
+    if (!tournamentId || playingCard) return;
+    setPlayingCard(true);
+    try {
+      await NfcManager.requestTechnology(NfcTech.Ndef);
+      const tag = await NfcManager.getTag();
+      const record = tag?.ndefMessage?.[0];
+      if (!record?.payload) throw new Error('no_data');
+
+      const raw = Ndef.text.decodePayload(new Uint8Array(record.payload as number[]));
+      const contentTokenId = parseInt(raw, 10);
+      if (isNaN(contentTokenId)) throw new Error('invalid_card');
+
+      await recordCardPlay(tournamentId, contentTokenId);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Optimistically show which card was played
+      const token = myTokens.find(t => t.id === contentTokenId);
+      const label = token ? `${token.mechanic_archetype} · power ${token.mechanic_power}` : `card #${contentTokenId}`;
+      Alert.alert('played', label);
+    } catch (e: any) {
+      const msg = e?.message ?? '';
+      if (msg !== 'UserCancel' && msg !== 'user_cancel') {
+        const friendly: Record<string, string> = {
+          token_not_in_deck: 'that card isn\'t in your registered deck.',
+          tournament_not_in_progress: 'the tournament isn\'t active yet.',
+          no_data: 'couldn\'t read the chip — try again.',
+          invalid_card: 'this doesn\'t look like a maison fraise card.',
+        };
+        Alert.alert('scan failed', friendly[msg] ?? 'hold the card flat against the top of your phone and try again.');
+      }
+    } finally {
+      NfcManager.cancelTechnologyRequest().catch(() => {});
+      setPlayingCard(false);
+    }
   };
 
   if (loading) {
@@ -174,8 +258,108 @@ export default function TournamentDetailPanel() {
           </View>
         )}
 
+        {/* Deck management — visible once entered */}
+        {entered && (
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
+            <View style={styles.deckHeader}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>your deck</Text>
+              <TouchableOpacity onPress={openDeckModal} activeOpacity={0.7}>
+                <Text style={[styles.deckEdit, { color: c.accent }]}>
+                  {deck.length === 0 ? 'register →' : 'edit →'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {deck.length === 0 ? (
+              <Text style={[styles.deckEmpty, { color: c.muted }]}>no cards registered</Text>
+            ) : (
+              <Text style={[styles.deckCount, { color: c.muted }]}>{deck.length} card{deck.length !== 1 ? 's' : ''} registered</Text>
+            )}
+
+            {/* NFC card play — active during in_progress */}
+            {tournament.status === 'in_progress' && deck.length > 0 && (
+              <TouchableOpacity
+                style={[styles.scanBtn, { borderColor: c.accent }, playingCard && styles.scanBtnActive]}
+                onPress={handleScanCard}
+                disabled={playingCard}
+                activeOpacity={0.75}
+              >
+                {playingCard ? (
+                  <>
+                    <ActivityIndicator size="small" color={c.accent} />
+                    <Text style={[styles.scanBtnText, { color: c.accent }]}>hold card to phone</Text>
+                  </>
+                ) : (
+                  <Text style={[styles.scanBtnText, { color: c.accent }]}>tap to play a card</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Deck registration modal */}
+      <Modal visible={showDeckModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.modalContainer, { backgroundColor: c.panelBg }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: c.border }]}>
+            <TouchableOpacity onPress={() => setShowDeckModal(false)} activeOpacity={0.7}>
+              <Text style={[styles.modalClose, { color: c.accent }]}>cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: c.text }]}>select deck</Text>
+            <TouchableOpacity onPress={saveDeck} disabled={savingDeck} activeOpacity={0.7}>
+              {savingDeck
+                ? <ActivityIndicator size="small" color={c.accent} />
+                : <Text style={[styles.modalClose, { color: c.accent }]}>save</Text>
+              }
+            </TouchableOpacity>
+          </View>
+          <FlatList
+            data={myTokens}
+            keyExtractor={item => String(item.id)}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            renderItem={({ item }) => {
+              const selected = selectedTokenIds.has(item.id);
+              const archetype = item.mechanic_archetype ?? 'allure';
+              return (
+                <TouchableOpacity
+                  style={[
+                    styles.deckTokenRow,
+                    { borderBottomColor: c.border },
+                    selected && { backgroundColor: c.accent + '22' },
+                  ]}
+                  onPress={() => {
+                    setSelectedTokenIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(item.id)) { next.delete(item.id); } else { next.add(item.id); }
+                      return next;
+                    });
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.deckTokenBadge, { backgroundColor: ARCHETYPE_COLORS[archetype as keyof typeof ARCHETYPE_COLORS] ?? '#333' }]}>
+                    <Text style={styles.deckTokenBadgeText}>{archetype[0].toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.deckTokenName, { color: c.text }]} numberOfLines={1}>
+                      {item.variety_name ?? `card #${item.id}`}
+                    </Text>
+                    <Text style={[styles.deckTokenMeta, { color: c.muted }]}>
+                      {archetype} · power {item.mechanic_power} · {item.mechanic_rarity}
+                    </Text>
+                  </View>
+                  {selected && <Text style={[styles.deckCheck, { color: c.accent }]}>✓</Text>}
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <Text style={[styles.deckEmpty, { color: c.muted, textAlign: 'center', marginTop: 40 }]}>
+                no content cards in your collection
+              </Text>
+            }
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -246,4 +430,47 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingHorizontal: SPACING.md,
   },
+  deckHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  deckEdit: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  deckEmpty: { fontSize: 11, fontFamily: fonts.dmSans, fontStyle: 'italic' },
+  deckCount: { fontSize: 11, fontFamily: fonts.dmMono },
+  scanBtn: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    borderStyle: 'dashed',
+    paddingVertical: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  scanBtnActive: { opacity: 0.7 },
+  scanBtnText: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  // Modal
+  modalContainer: { flex: 1 },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingTop: 18,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  modalTitle: { fontSize: 15, fontFamily: fonts.playfair },
+  modalClose: { fontSize: 13, fontFamily: fonts.dmMono },
+  deckTokenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
+  },
+  deckTokenBadge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  deckTokenBadgeText: { fontSize: 14, fontFamily: fonts.playfair, color: '#fff' },
+  deckTokenName: { fontSize: 13, fontFamily: fonts.dmSans },
+  deckTokenMeta: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
+  deckCheck: { fontSize: 16, fontFamily: fonts.dmSans },
 });

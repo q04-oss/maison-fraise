@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and, lte, sum, gte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments, contentTokens } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -2715,6 +2715,64 @@ router.patch('/businesses/:id/proximity-message', requirePin, async (req: Reques
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/card-prints — list pending/in-progress physical card print requests
+// Response includes content_token_id (written to NFC chip), shipping address, creator name.
+router.get('/card-prints', requirePin, async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: contentTokens.id,
+        token_number: contentTokens.token_number,
+        mechanic_archetype: contentTokens.mechanic_archetype,
+        mechanic_power: contentTokens.mechanic_power,
+        mechanic_rarity: contentTokens.mechanic_rarity,
+        print_status: contentTokens.print_status,
+        shipping_address: contentTokens.shipping_address,
+        print_requested_at: contentTokens.print_requested_at,
+        owner_email: users.email,
+        owner_display_name: users.display_name,
+      })
+      .from(contentTokens)
+      .innerJoin(users, eq(users.id, contentTokens.current_owner_id))
+      .where(sql`${contentTokens.print_status} IN ('requested', 'printing')`)
+      .orderBy(contentTokens.print_requested_at);
+
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// PATCH /api/admin/card-prints/:id/status — advance print status (requested→printing→shipped)
+router.patch('/card-prints/:id/status', requirePin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { status } = req.body;
+  const VALID: Record<string, string> = { requested: 'printing', printing: 'shipped' };
+  if (!status || !Object.values(VALID).includes(status)) {
+    res.status(400).json({ error: 'status must be printing or shipped' });
+    return;
+  }
+
+  try {
+    const expectedPrev = Object.keys(VALID).find(k => VALID[k] === status)!;
+    const [updated] = await db
+      .update(contentTokens)
+      .set({ print_status: status })
+      .where(and(
+        eq(contentTokens.id, id),
+        sql`${contentTokens.print_status} = ${expectedPrev}`,
+      ))
+      .returning({ id: contentTokens.id });
+
+    if (!updated) { res.status(409).json({ error: 'invalid_transition' }); return; }
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

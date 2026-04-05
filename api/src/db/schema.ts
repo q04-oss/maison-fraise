@@ -840,7 +840,9 @@ export const tournaments = pgTable('tournaments', {
   description: text('description'),
   entry_fee_cents: integer('entry_fee_cents').notNull(),
   prize_pool_cents: integer('prize_pool_cents').notNull().default(0),
-  platform_cut_bps: integer('platform_cut_bps').notNull().default(1000), // 10%
+  platform_cut_bps: integer('platform_cut_bps').notNull().default(1000),       // 10% platform fee
+  creator_play_pool_bps: integer('creator_play_pool_bps').notNull().default(1500), // 15% distributed by card plays
+  creator_win_bonus_bps: integer('creator_win_bonus_bps').notNull().default(500),  // 5% split among winning deck creators
   status: text('status').notNull().default('open'), // 'open'|'in_progress'|'closed'|'paid_out'
   max_entries: integer('max_entries'),
   starts_at: timestamp('starts_at'),
@@ -860,4 +862,45 @@ export const tournamentEntries = pgTable('tournament_entries', {
   amount_cents: integer('amount_cents').notNull(),
   status: text('status').notNull().default('pending'), // 'pending'|'paid'
   entered_at: timestamp('entered_at').notNull().defaultNow(),
+});
+
+// ─── Tournament decks ─────────────────────────────────────────────────────────
+// A user registers up to N content tokens as their "deck" before or during a
+// tournament. content_token_ids is a JSONB array of contentTokens.id integers.
+
+export const tournamentDecks = pgTable('tournament_decks', {
+  id: serial('id').primaryKey(),
+  tournament_id: integer('tournament_id').notNull().references(() => tournaments.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  content_token_ids: jsonb('content_token_ids').notNull().$type<number[]>(),
+  registered_at: timestamp('registered_at').notNull().defaultNow(),
+}, (t) => ({
+  uniq: unique().on(t.tournament_id, t.user_id),
+}));
+
+// ─── Card play events ─────────────────────────────────────────────────────────
+// Recorded each time a player NFC-taps a card during a live tournament game.
+// This drives the per-play micropayment calculation at tournament close.
+
+export const cardPlayEvents = pgTable('card_play_events', {
+  id: serial('id').primaryKey(),
+  tournament_id: integer('tournament_id').notNull().references(() => tournaments.id),
+  player_user_id: integer('player_user_id').notNull().references(() => users.id),
+  content_token_id: integer('content_token_id').notNull().references(() => contentTokens.id),
+  played_at: timestamp('played_at').notNull().defaultNow(),
+});
+
+// ─── Creator earnings ─────────────────────────────────────────────────────────
+// Ledger of amounts owed to creators from tournament play/win events.
+// paid_out flips to true once funds have been transferred (future Stripe Connect).
+
+export const creatorEarnings = pgTable('creator_earnings', {
+  id: serial('id').primaryKey(),
+  creator_user_id: integer('creator_user_id').notNull().references(() => users.id),
+  tournament_id: integer('tournament_id').notNull().references(() => tournaments.id),
+  content_token_id: integer('content_token_id').references(() => contentTokens.id),
+  source: text('source').notNull(), // 'card_play' | 'win_bonus'
+  amount_cents: integer('amount_cents').notNull(),
+  paid_out: boolean('paid_out').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
 });

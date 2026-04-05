@@ -27,6 +27,7 @@ import TokensPanel from './panels/TokensPanel';
 import TokenDetailPanel from './panels/TokenDetailPanel';
 import TournamentsPanel from './panels/TournamentsPanel';
 import TournamentDetailPanel from './panels/TournamentDetailPanel';
+import CreatorEarningsPanel from './panels/CreatorEarningsPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -53,6 +54,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'token-detail': TokenDetailPanel,
   'tournaments': TournamentsPanel,
   'tournament-detail': TournamentDetailPanel,
+  'creator-earnings': CreatorEarningsPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -60,6 +62,7 @@ const FULL_HEIGHT_PANELS = new Set([
   'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'jobDetail',
   'popup-detail', 'collectif-list', 'collectif-detail', 'collectif-create',
   'market', 'market-stall', 'portal', 'tokens', 'token-detail', 'tournaments', 'tournament-detail',
+  'creator-earnings',
 ]);
 
 export default function PanelNavigator() {
