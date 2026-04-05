@@ -706,6 +706,21 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
           logger.info(`Collectif ${collectifId} commitment captured for user ${userId}`);
         }
+      } else if (type === 'market_order') {
+        await db.execute(sql`
+          UPDATE market_orders SET status = 'paid' WHERE payment_intent_id = ${pi.id}
+        `);
+        // Decrement stock if the product has a finite quantity tracked
+        const productId = parseInt(pi.metadata.product_id, 10);
+        const qty = parseInt(pi.metadata.quantity, 10);
+        if (!isNaN(productId) && !isNaN(qty)) {
+          await db.execute(sql`
+            UPDATE market_products
+            SET stock_quantity = GREATEST(0, stock_quantity - ${qty})
+            WHERE id = ${productId} AND stock_quantity IS NOT NULL
+          `);
+        }
+        logger.info(`Market order paid: ${pi.id}`);
       }
     }
 

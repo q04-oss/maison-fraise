@@ -8,7 +8,7 @@ import { usePanel } from '../../context/PanelContext';
 import { createCollectif } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 
-type CollectifType = 'product' | 'popup';
+type CollectifType = 'product' | 'popup' | 'vendor_invite' | 'product_prebuy';
 
 export default function CollectifCreatePanel() {
   const { goBack, showPanel, panelData } = usePanel();
@@ -16,7 +16,8 @@ export default function CollectifCreatePanel() {
   const insets = useSafeAreaInsets();
 
   const [collectifType, setCollectifType] = useState<CollectifType>(
-    panelData?.isPopup ? 'popup' : 'product'
+    (panelData?.collectifType as CollectifType) ??
+    (panelData?.isPopup ? 'popup' : 'product')
   );
 
   // Shared fields
@@ -31,18 +32,23 @@ export default function CollectifCreatePanel() {
   const [priceStr, setPriceStr] = useState('');
 
   // Popup-only fields
-  const [proposedVenue, setProposedVenue] = useState('');
-  const [proposedDate, setProposedDate] = useState('');
+  const [proposedVenue, setProposedVenue] = useState(panelData?.proposedVenue ?? '');
+  const [proposedDate, setProposedDate] = useState(panelData?.proposedDate ?? '');
   const [depositStr, setDepositStr] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
 
   const isPopup = collectifType === 'popup';
+  const isVendorInvite = collectifType === 'vendor_invite';
+  const isPrebuy = collectifType === 'product_prebuy';
+  const isMarketType = isVendorInvite || isPrebuy;
 
   const canSubmit = (() => {
-    if (!businessName.trim() || !title.trim() || !targetStr || !deadlineStr || submitting) return false;
-    if (isPopup) return !!(proposedVenue.trim() && proposedDate.trim() && depositStr);
-    return !!(discountStr && priceStr);
+    if (!businessName.trim() || !targetStr || !deadlineStr || submitting) return false;
+    if (isPopup) return !!(title.trim() && proposedVenue.trim() && proposedDate.trim() && depositStr);
+    if (isVendorInvite) return !!(title.trim() && proposedVenue.trim() && proposedDate.trim() && depositStr);
+    if (isPrebuy) return !!(title.trim() && priceStr && proposedDate.trim());
+    return !!(title.trim() && discountStr && priceStr);
   })();
 
   const handleSubmit = async () => {
@@ -57,7 +63,62 @@ export default function CollectifCreatePanel() {
       Alert.alert('Invalid deadline', 'Deadline must be a future date (YYYY-MM-DD).'); return;
     }
 
-    if (isPopup) {
+    if (isVendorInvite) {
+      const deposit = Math.round(parseFloat(depositStr) * 100);
+      if (isNaN(deposit) || deposit < 100) {
+        Alert.alert('Invalid deposit', 'Deposit must be at least CA$1.00.'); return;
+      }
+      setSubmitting(true);
+      try {
+        await createCollectif({
+          business_name: businessName.trim(),
+          collectif_type: 'vendor_invite',
+          title: title.trim(),
+          description: description.trim() || undefined,
+          price_cents: deposit,
+          proposed_venue: proposedVenue.trim(),
+          proposed_date: proposedDate.trim(),
+          target_quantity: target,
+          deadline: deadline.toISOString(),
+        });
+        Alert.alert(
+          'Vendor invite proposed.',
+          'If enough members commit, the vendor gets a formal invitation.',
+          [{ text: 'OK', onPress: () => { goBack(); showPanel('collectif-list'); } }],
+        );
+      } catch (e: any) {
+        Alert.alert('Could not post', e.message ?? 'Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (isPrebuy) {
+      const price = Math.round(parseFloat(priceStr) * 100);
+      if (isNaN(price) || price < 100) {
+        Alert.alert('Invalid price', 'Price must be at least CA$1.00.'); return;
+      }
+      setSubmitting(true);
+      try {
+        await createCollectif({
+          business_name: businessName.trim(),
+          collectif_type: 'product_prebuy',
+          title: title.trim(),
+          description: description.trim() || undefined,
+          price_cents: price,
+          proposed_date: proposedDate.trim(),
+          target_quantity: target,
+          deadline: deadline.toISOString(),
+        });
+        Alert.alert(
+          'Pre-buy proposed.',
+          'If enough members commit, the vendor is expected to bring it.',
+          [{ text: 'OK', onPress: () => { goBack(); showPanel('collectif-list'); } }],
+        );
+      } catch (e: any) {
+        Alert.alert('Could not post', e.message ?? 'Please try again.');
+      } finally {
+        setSubmitting(false);
+      }
+    } else if (isPopup) {
       const deposit = Math.round(parseFloat(depositStr) * 100);
       if (isNaN(deposit) || deposit < 100) {
         Alert.alert('Invalid deposit', 'Deposit must be at least CA$1.00.'); return;
@@ -152,7 +213,7 @@ export default function CollectifCreatePanel() {
           <Text style={[styles.backArrow, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: c.text }]}>
-          {isPopup ? 'propose a popup' : 'propose a collectif'}
+          {isVendorInvite ? 'invite a vendor' : isPrebuy ? 'propose a pre-buy' : isPopup ? 'propose a popup' : 'propose a collectif'}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -164,79 +225,110 @@ export default function CollectifCreatePanel() {
       >
         {/* Type toggle */}
         <View style={[styles.toggle, { backgroundColor: c.cardDark }]}>
-          <TouchableOpacity
-            style={[styles.toggleOption, collectifType === 'product' && { backgroundColor: c.accent }]}
-            onPress={() => setCollectifType('product')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.toggleText, { color: collectifType === 'product' ? c.panelBg : c.muted }]}>
-              Product Order
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleOption, collectifType === 'popup' && { backgroundColor: c.accent }]}
-            onPress={() => setCollectifType('popup')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.toggleText, { color: collectifType === 'popup' ? c.panelBg : c.muted }]}>
-              Popup Event
-            </Text>
-          </TouchableOpacity>
+          {([
+            { id: 'product' as CollectifType, label: 'Product' },
+            { id: 'popup' as CollectifType, label: 'Popup' },
+            { id: 'vendor_invite' as CollectifType, label: 'Vendor' },
+            { id: 'product_prebuy' as CollectifType, label: 'Pre-buy' },
+          ]).map(({ id, label }) => (
+            <TouchableOpacity
+              key={id}
+              style={[styles.toggleOption, collectifType === id && { backgroundColor: c.accent }]}
+              onPress={() => setCollectifType(id)}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.toggleText, { color: collectifType === id ? c.panelBg : c.muted }]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         <Text style={[styles.subheading, { color: c.muted }]}>
-          {isPopup
+          {isVendorInvite
+            ? 'Invite a vendor to the market. If enough members commit a deposit, the vendor gets a formal invitation with a guaranteed audience.'
+            : isPrebuy
+            ? 'Request a product from a vendor. If enough members pre-buy, the vendor is expected to bring it on market day.'
+            : isPopup
             ? 'Propose a popup event. If enough members commit a deposit, the business is formally invited to host.'
-            : 'Name the business, describe what you want, set a discount and target. If enough members commit, the business gets a formal request.'}
+            : 'Name the business, describe what you want, set a discount and target. If enough members commit, the business gets a formal request.'
+          }
         </Text>
 
         <Field
-          label="BUSINESS NAME"
+          label={isVendorInvite ? 'VENDOR NAME' : isPrebuy ? 'VENDOR NAME' : 'BUSINESS NAME'}
           value={businessName}
           onChange={setBusinessName}
-          placeholder="e.g. Valrhona, Chocolaterie Bernard"
-          hint="Must be a business on the Maison platform."
+          placeholder={isMarketType ? 'e.g. Le Potager des Sœurs' : 'e.g. Valrhona, Chocolaterie Bernard'}
+          hint={isMarketType ? undefined : 'Must be a business on the Maison platform.'}
         />
         <Field
           label="TITLE"
           value={title}
           onChange={setTitle}
-          placeholder={isPopup ? "e.g. Valentine's popup at Café Central" : 'e.g. Bulk order — 10 boxes Guanaja 70%'}
+          placeholder={
+            isVendorInvite ? "e.g. Invite Le Potager to the June market" :
+            isPrebuy ? "e.g. Heritage tomato flat (6 lbs)" :
+            isPopup ? "e.g. Valentine's popup at Café Central" :
+            'e.g. Bulk order — 10 boxes Guanaja 70%'
+          }
         />
         <Field
           label="DESCRIPTION (OPTIONAL)"
           value={description}
           onChange={setDescription}
-          placeholder={isPopup ? "Describe the event concept, vibe, what you'd like…" : "What you're asking for, any specific details…"}
+          placeholder={isMarketType ? "Any context for other members…" : isPopup ? "Describe the event concept, vibe, what you'd like…" : "What you're asking for, any specific details…"}
           multiline
         />
 
-        {isPopup ? (
+        {(isPopup || isVendorInvite) && (
           <>
             <Field
-              label="PROPOSED VENUE"
+              label={isVendorInvite ? 'MARKET NAME / VENUE' : 'PROPOSED VENUE'}
               value={proposedVenue}
               onChange={setProposedVenue}
-              placeholder="e.g. Café Central, 123 Rue Saint-Denis"
-              hint="Where you'd like the popup to happen."
+              placeholder={isVendorInvite ? 'e.g. Marché Fraise — Plateau' : 'e.g. Café Central, 123 Rue Saint-Denis'}
+              hint={isVendorInvite ? 'Links this invite to the right market date.' : 'Where you\'d like the popup to happen.'}
             />
             <Field
-              label="PROPOSED DATE"
+              label="MARKET DATE (YYYY-MM-DD)"
               value={proposedDate}
               onChange={setProposedDate}
-              placeholder="e.g. Jun 14, 2026"
-              hint="Approximate date you have in mind."
+              placeholder="e.g. 2026-06-14"
+              hint={isVendorInvite ? 'The market date you want the vendor at.' : 'Approximate date you have in mind.'}
             />
             <Field
-              label="DEPOSIT PER PERSON (CA$)"
+              label={isVendorInvite ? 'DEPOSIT PER PERSON (CA$)' : 'DEPOSIT PER PERSON (CA$)'}
               value={depositStr}
               onChange={setDepositStr}
-              placeholder="e.g. 15.00"
+              placeholder="e.g. 5.00"
               keyboardType="decimal-pad"
-              hint="Held until the business confirms. Refunded if declined."
+              hint={isVendorInvite ? 'Good-faith commitment. Refunded if vendor declines.' : 'Held until the business confirms. Refunded if declined.'}
             />
           </>
-        ) : (
+        )}
+
+        {isPrebuy && (
+          <>
+            <Field
+              label="MARKET DATE (YYYY-MM-DD)"
+              value={proposedDate}
+              onChange={setProposedDate}
+              placeholder="e.g. 2026-06-14"
+              hint="The market date you want this product at."
+            />
+            <Field
+              label="PRICE PER UNIT (CA$)"
+              value={priceStr}
+              onChange={setPriceStr}
+              placeholder="e.g. 12.00"
+              keyboardType="decimal-pad"
+              hint="What each member pays. Held on commitment."
+            />
+          </>
+        )}
+
+        {!isPopup && !isVendorInvite && !isPrebuy && (
           <>
             <Field
               label="PROPOSED DISCOUNT (%)"
@@ -258,14 +350,22 @@ export default function CollectifCreatePanel() {
         )}
 
         <Field
-          label={isPopup ? 'TARGET (# OF ATTENDEES)' : 'TARGET (# OF COMMITMENTS)'}
+          label={
+            isVendorInvite ? 'TARGET (# OF COMMITMENTS)' :
+            isPrebuy ? 'TARGET (# OF PRE-BUYS)' :
+            isPopup ? 'TARGET (# OF ATTENDEES)' :
+            'TARGET (# OF COMMITMENTS)'
+          }
           value={targetStr}
           onChange={setTargetStr}
           placeholder="e.g. 20"
           keyboardType="numeric"
-          hint={isPopup
-            ? 'Minimum 2. The business sees the full group once this is reached.'
-            : 'Minimum 2. The business sees the full pooled amount once this is reached.'}
+          hint={
+            isVendorInvite ? 'Minimum 2. The vendor sees this many guaranteed attendees.' :
+            isPrebuy ? 'Minimum 2. Vendor brings the product when this is reached.' :
+            isPopup ? 'Minimum 2. The business sees the full group once this is reached.' :
+            'Minimum 2. The business sees the full pooled amount once this is reached.'
+          }
         />
         <Field
           label="DEADLINE (YYYY-MM-DD)"
@@ -284,7 +384,7 @@ export default function CollectifCreatePanel() {
           activeOpacity={0.8}
         >
           <Text style={[styles.submitBtnText, { color: c.ctaText }]}>
-            {submitting ? 'Posting…' : isPopup ? 'Propose Popup' : 'Post Collectif'}
+            {submitting ? 'Posting…' : isVendorInvite ? 'Invite Vendor' : isPrebuy ? 'Propose Pre-buy' : isPopup ? 'Propose Popup' : 'Post Collectif'}
           </Text>
         </TouchableOpacity>
       </View>

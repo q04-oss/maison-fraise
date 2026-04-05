@@ -2590,6 +2590,121 @@ router.post('/collectifs/:id/confirm-popup', async (req: Request, res: Response)
   }
 });
 
+// ─── Market admin ─────────────────────────────────────────────────────────────
+
+// POST /api/admin/market/dates — create a market date
+router.post('/market/dates', requirePin, async (req: Request, res: Response) => {
+  const { name, location, address, latitude, longitude, starts_at, ends_at, notes } = req.body;
+  if (!name || !location || !address || !starts_at || !ends_at) {
+    res.status(400).json({ error: 'missing_fields' }); return;
+  }
+  try {
+    const [row] = await db.execute(sql`
+      INSERT INTO market_dates (name, location, address, latitude, longitude, starts_at, ends_at, notes)
+      VALUES (${name}, ${location}, ${address}, ${latitude ?? null}, ${longitude ?? null}, ${starts_at}, ${ends_at}, ${notes ?? null})
+      RETURNING *
+    `);
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/market/dates/:id — update status, notes
+router.patch('/market/dates/:id', requirePin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { status, notes } = req.body;
+  try {
+    await db.execute(sql`
+      UPDATE market_dates
+      SET
+        status = COALESCE(${status ?? null}, status),
+        notes = COALESCE(${notes ?? null}, notes)
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/market/stalls — add a vendor stall to a market date
+router.post('/market/stalls', requirePin, async (req: Request, res: Response) => {
+  const { market_date_id, vendor_name, description, vendor_user_id, confirmed = false } = req.body;
+  if (!market_date_id || !vendor_name) {
+    res.status(400).json({ error: 'missing_fields' }); return;
+  }
+  try {
+    const [row] = await db.execute(sql`
+      INSERT INTO market_stalls (market_date_id, vendor_name, description, vendor_user_id, confirmed)
+      VALUES (${market_date_id}, ${vendor_name}, ${description ?? null}, ${vendor_user_id ?? null}, ${confirmed})
+      RETURNING *
+    `);
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/market/stalls/:id — confirm or update a stall
+router.patch('/market/stalls/:id', requirePin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { confirmed, description } = req.body;
+  try {
+    await db.execute(sql`
+      UPDATE market_stalls
+      SET
+        confirmed = COALESCE(${confirmed ?? null}, confirmed),
+        description = COALESCE(${description ?? null}, description)
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/market/products — add a product to a stall
+router.post('/market/products', requirePin, async (req: Request, res: Response) => {
+  const { stall_id, name, description, price_cents, unit = 'unit', stock_quantity } = req.body;
+  if (!stall_id || !name || !price_cents) {
+    res.status(400).json({ error: 'missing_fields' }); return;
+  }
+  try {
+    const [row] = await db.execute(sql`
+      INSERT INTO market_products (stall_id, name, description, price_cents, unit, stock_quantity)
+      VALUES (${stall_id}, ${name}, ${description ?? null}, ${price_cents}, ${unit}, ${stock_quantity ?? null})
+      RETURNING *
+    `);
+    res.status(201).json(row);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/market/products/:id — update price, stock
+router.patch('/market/products/:id', requirePin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { price_cents, stock_quantity, name, description } = req.body;
+  try {
+    await db.execute(sql`
+      UPDATE market_products
+      SET
+        price_cents = COALESCE(${price_cents ?? null}, price_cents),
+        stock_quantity = COALESCE(${stock_quantity ?? null}, stock_quantity),
+        name = COALESCE(${name ?? null}, name),
+        description = COALESCE(${description ?? null}, description)
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // PATCH /api/admin/businesses/:id/proximity-message
 router.patch('/businesses/:id/proximity-message', requirePin, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);

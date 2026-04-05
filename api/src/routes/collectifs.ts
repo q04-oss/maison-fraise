@@ -177,11 +177,17 @@ router.post('/', requireUser, async (req: any, res: Response) => {
   }
 
   const isPopup = collectif_type === 'popup';
+  const isVendorInvite = collectif_type === 'vendor_invite';
+  const isPrebuy = collectif_type === 'product_prebuy';
+  const isMarketType = isVendorInvite || isPrebuy;
 
-  if (isPopup) {
-    if (!proposed_venue) { res.status(400).json({ error: 'proposed_venue required for popup proposals' }); return; }
-    if (!proposed_date) { res.status(400).json({ error: 'proposed_date required for popup proposals' }); return; }
+  if (isPopup || isVendorInvite) {
+    if (!proposed_venue) { res.status(400).json({ error: 'proposed_venue required' }); return; }
+    if (!proposed_date) { res.status(400).json({ error: 'proposed_date required' }); return; }
     if (!price_cents || price_cents < 100) { res.status(400).json({ error: 'deposit must be at least CA$1.00' }); return; }
+  } else if (isPrebuy) {
+    if (!proposed_date) { res.status(400).json({ error: 'proposed_date required' }); return; }
+    if (!price_cents || price_cents < 100) { res.status(400).json({ error: 'price must be at least CA$1.00' }); return; }
   } else {
     if (!proposed_discount_pct || !price_cents) { res.status(400).json({ error: 'missing_fields' }); return; }
     if (proposed_discount_pct < 1 || proposed_discount_pct > 80) { res.status(400).json({ error: 'discount must be 1–80%' }); return; }
@@ -206,7 +212,7 @@ router.post('/', requireUser, async (req: any, res: Response) => {
       collectif_type,
       title,
       description: description ?? null,
-      proposed_discount_pct: isPopup ? 0 : proposed_discount_pct,
+      proposed_discount_pct: (isPopup || isMarketType) ? 0 : proposed_discount_pct,
       price_cents,
       proposed_venue: proposed_venue ?? null,
       proposed_date: proposed_date ?? null,

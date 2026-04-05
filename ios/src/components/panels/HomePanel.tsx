@@ -139,6 +139,12 @@ export default function HomePanel() {
                 <Text style={[styles.collectifLinkText, { color: c.accent }]}>collectifs →</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                onPress={() => showPanel('market')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>market →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 onPress={() => showPanel('order-history')}
                 activeOpacity={0.7}
               >
