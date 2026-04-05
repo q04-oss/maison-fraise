@@ -1206,7 +1206,7 @@ router.post('/contracts', async (req: Request, res: Response) => {
 
     // Default contract duration: 2 months from starts_at
     const start = new Date(starts_at);
-    const end = ends_at ? new Date(ends_at) : new Date(new Date(starts_at).setMonth(start.getMonth() + 2));
+    const end = ends_at ? new Date(ends_at) : (() => { const d = new Date(starts_at); d.setMonth(d.getMonth() + 2); return d; })();
 
     const [contract] = await db.insert(employmentContracts).values({
       business_id,
