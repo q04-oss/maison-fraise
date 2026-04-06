@@ -1,4 +1,4 @@
-const { withXcodeProject } = require('@expo/config-plugins');
+const { withXcodeProject, withDangerousMod } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
@@ -93,9 +93,37 @@ const SOURCE_DIR = path.join(__dirname, '..', 'modules', 'ARBoxModule');
  * 1. Copies the ARBoxModule native sources into the generated Xcode project
  * 2. Adds each file to the main app target's compile sources
  * 3. Links ARKit.framework
+ * 4. Ensures the bridging header imports <React/RCTBridgeModule.h> so Swift
+ *    can see RCTPromiseResolveBlock / RCTPromiseRejectBlock
  */
 const withARBoxModule = (config) => {
-  return withXcodeProject(config, (config) => {
+  // Step 1 — bridging header: runs after Expo generates the ios/ tree
+  config = withDangerousMod(config, [
+    'ios',
+    (config) => {
+      const iosRoot = config.modRequest.platformProjectRoot;
+      // Find *-Bridging-Header.h in any immediate subdirectory
+      try {
+        const entries = fs.readdirSync(iosRoot, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue;
+          const headerPath = path.join(iosRoot, entry.name, `${entry.name}-Bridging-Header.h`);
+          if (fs.existsSync(headerPath)) {
+            let content = fs.readFileSync(headerPath, 'utf8');
+            if (!content.includes('<React/RCTBridgeModule.h>')) {
+              content = content.trimEnd() + '\n#import <React/RCTBridgeModule.h>\n';
+              fs.writeFileSync(headerPath, content);
+            }
+            break;
+          }
+        }
+      } catch (_) {}
+      return config;
+    },
+  ]);
+
+  // Step 2 — Xcode project manipulation
+  config = withXcodeProject(config, (config) => {
     const project = config.modResults;
     const projectRoot = config.modRequest.projectRoot;
     const iosRoot = path.join(projectRoot, 'ios');
@@ -147,6 +175,8 @@ const withARBoxModule = (config) => {
 
     return config;
   });
+
+  return config;
 };
 
 module.exports = withARBoxModule;
