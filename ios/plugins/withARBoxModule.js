@@ -35,6 +35,19 @@ const MODULE_FILES = [
   'ARProducerVideoView.swift',
   'AROrderRoutingGrid.swift',
   'ARColdChainView.swift',
+  // AR Expanded 4
+  'ARUnboxingAnimator.swift',
+  'ARNutritionRingsView.swift',
+  'ARAllergyFlagView.swift',
+  'ARAchievementBadgeView.swift',
+  'ARConstellationViewController.swift',
+  'ARPriceHistoryView.swift',
+  'ARCarbonFootprintView.swift',
+  'ARSunlightHoursView.swift',
+  'ARFarmVisitCTAView.swift',
+  'ARQuantityCounterOverlay.swift',
+  'ARStickyNoteView.swift',
+  'ARStickyNoteComposer.swift',
 ];
 
 const SOURCE_DIR = path.join(__dirname, '..', 'modules', 'ARBoxModule');

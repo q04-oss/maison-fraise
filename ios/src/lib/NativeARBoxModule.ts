@@ -64,7 +64,18 @@ export interface ARVarietyData {
   streak_weeks?: number | null;
   collectif_rank?: number | null;
   collectif_total_members?: number | null;
-  scanned_varieties?: Array<{ variety_id: number; variety_name: string; farm_lat?: number | null; farm_lng?: number | null }>;
+  scanned_varieties?: Array<{ variety_id: number; variety_name: string; farm_lat?: number | null; farm_lng?: number | null; order_count?: number }>;
+  // AR Expanded 4
+  fiber_today_g?: number | null;
+  allergy_flags?: string[];
+  unlocked_achievements?: string[];
+  collectif_milestone_pct?: number | null;
+  co2_grams?: number | null;
+  carbon_offset_program?: string | null;
+  sunlight_hours?: number | null;
+  price_history_json?: string | null;
+  open_farm_visit?: { visit_date: string; spots_left: number; visit_id: number } | null;
+  nearby_ar_notes?: Array<{ id: number; body: string; author_name: string; color: string; created_at: string }>;
 }
 
 // Feature E: Staff AR
@@ -101,7 +112,7 @@ export interface ARMarketStallData {
 }
 
 export interface Spec extends TurboModule {
-  presentAR(varietyData: ARVarietyData): Promise<{ rating: number; notes: string | null } | null>;
+  presentAR(varietyData: ARVarietyData): Promise<{ rating: number; notes: string | null; farm_visit_tapped?: boolean; note_body?: string; note_color?: string } | null>;
   // Feature E
   presentStaffAR(staffData: ARStaffData): Promise<{ action: string; order_id: number } | null>;
   // Feature F

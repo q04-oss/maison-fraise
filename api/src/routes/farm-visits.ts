@@ -46,6 +46,43 @@ router.get('/', requireUser, async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/farm-visits/open-for-farm — returns upcoming open visits filtered by farm_name fragment
+router.get('/open-for-farm', requireUser, async (req: Request, res: Response) => {
+  const farmName = req.query.farm_name as string | undefined;
+  try {
+    let rows;
+    if (farmName) {
+      rows = await db.execute(sql`
+        SELECT fv.*,
+          (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') AS participant_count,
+          fv.max_participants - (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') AS spots_left
+        FROM farm_visits fv
+        WHERE fv.status = 'open'
+          AND fv.visit_date >= CURRENT_DATE
+          AND (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') < fv.max_participants
+          AND fv.farm_name ILIKE ${'%' + farmName + '%'}
+        ORDER BY fv.visit_date ASC
+        LIMIT 3
+      `);
+    } else {
+      rows = await db.execute(sql`
+        SELECT fv.*,
+          (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') AS participant_count,
+          fv.max_participants - (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') AS spots_left
+        FROM farm_visits fv
+        WHERE fv.status = 'open'
+          AND fv.visit_date >= CURRENT_DATE
+          AND (SELECT COUNT(*)::int FROM farm_visit_bookings fvb WHERE fvb.visit_id = fv.id AND fvb.status='confirmed') < fv.max_participants
+        ORDER BY fv.visit_date ASC
+        LIMIT 3
+      `);
+    }
+    res.json((rows as any).rows ?? rows);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // POST /api/farm-visits/:id/book
 router.post('/:id/book', requireUser, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -95,13 +95,25 @@ export default function VerifyNFCPanel() {
       if (alreadyVerified) {
         const reorderData = await verifyNfcReorder(token);
 
+        // Get device location for nearby AR notes (best-effort, 3s timeout)
+        let deviceLat = 0, deviceLng = 0;
+        await new Promise<void>((res) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { deviceLat = pos.coords.latitude; deviceLng = pos.coords.longitude; res(); },
+            () => res(),
+            { timeout: 3000, enableHighAccuracy: false }
+          );
+        });
+
         // Fetch all enrichment data in parallel
-        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData] = await Promise.all([
+        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits] = await Promise.all([
           getTodayHealthContext().catch(() => null),
           reorderData.variety_id ? fetchVarietyProfile(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           reorderData.variety_id ? fetchActiveDropForVariety(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           fetchMyScannedVarieties().catch(() => [] as any[]),
           fetchCollectifRank().catch(() => null),
+          fetchNearbyArNotes(deviceLat, deviceLng).catch(() => [] as any[]),
+          fetchOpenFarmVisits(reorderData.farm ?? '').catch(() => [] as any[]),
         ]);
 
         // Feature C: format standing order label server data into display string
@@ -110,6 +122,23 @@ export default function VerifyNFCPanel() {
           const so = reorderData.next_standing_order;
           nextStandingOrderLabel = `NEXT ORDER  ·  ${so.variety_name}  ·  in ${so.days_until} day${so.days_until === 1 ? '' : 's'}`;
         }
+
+        // Compute unlocked achievements (client-side)
+        const seenFarmsRaw = await AsyncStorage.getItem('seen_farms').catch(() => null);
+        const seenFarms: string[] = seenFarmsRaw ? JSON.parse(seenFarmsRaw) : [];
+        const farmName = reorderData.farm ?? '';
+        if (farmName && !seenFarms.includes(farmName)) {
+          seenFarms.push(farmName);
+          AsyncStorage.setItem('seen_farms', JSON.stringify(seenFarms)).catch(() => {});
+        }
+        const unlockedAchievements = computeUnlockedAchievements({
+          orderCount: reorderData.order_count ?? 0,
+          varietyId: reorderData.variety_id,
+          farmName,
+          isWinterVariety: false,
+          streakWeeks: reorderData.streak_weeks ?? 0,
+          seenFarms,
+        });
 
         // Is this the first time the user has scanned this variety?
         const seenKey = `seen_variety_${reorderData.variety_id}`;
@@ -166,12 +195,31 @@ export default function VerifyNFCPanel() {
           collectif_rank: collectifRankData?.rank ?? null,
           collectif_total_members: collectifRankData?.total_members ?? null,
           scanned_varieties: scannedVarieties ?? [],
+          // AR Expanded 4: new enrichment
+          fiber_today_g: (healthCtx as any)?.dietaryFiber ?? null,
+          allergy_flags: [],
+          unlocked_achievements: unlockedAchievements,
+          collectif_milestone_pct: reorderData.collectif_milestone_pct ?? null,
+          co2_grams: (varietyProfile as any)?.co2_grams ?? null,
+          carbon_offset_program: (varietyProfile as any)?.carbon_offset_program ?? null,
+          sunlight_hours: (varietyProfile as any)?.sunlight_hours ?? null,
+          price_history_json: (varietyProfile as any)?.price_history_json ?? null,
+          open_farm_visit: (openFarmVisits as any[])[0] ?? null,
+          nearby_ar_notes: nearbyNotes ?? [],
         };
         setState('success');
         const arResult = await ARBoxModule.presentAR(arPayload);
         // Save tasting journal rating if user provided one
         if (arResult && arResult.rating && reorderData.variety_id) {
           saveTastingRating(reorderData.variety_id, arResult.rating, arResult.notes ?? null).catch(() => {});
+        }
+        // AR Expanded 4: handle farm visit tap, leave note
+        if (arResult?.farm_visit_tapped) {
+          showPanel('farm-visits');
+          return;
+        }
+        if (arResult?.note_body && arResult?.note_color) {
+          postArNote(deviceLat, deviceLng, arResult.note_body, arResult.note_color).catch(() => {});
         }
         if (activeDrop) {
           showPanel('drop-detail', { drop: activeDrop });
