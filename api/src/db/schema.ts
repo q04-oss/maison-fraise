@@ -1177,3 +1177,61 @@ export const adImpressions = pgTable('ad_impressions', {
   responded_at: timestamp('responded_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── Portrait tokens ──────────────────────────────────────────────────────────
+
+export const portraitTokens = pgTable('portrait_tokens', {
+  id: serial('id').primaryKey(),
+  nfc_uid: text('nfc_uid').unique(),
+  owner_id: integer('owner_id').notNull().references(() => users.id),
+  original_owner_id: integer('original_owner_id').notNull().references(() => users.id),
+  image_url: text('image_url').notNull(),
+  shot_at: timestamp('shot_at'),
+  minted_by: integer('minted_by').notNull().references(() => users.id),
+  minted_at: timestamp('minted_at').notNull().defaultNow(),
+  handle_visible: boolean('handle_visible').notNull().default(false),
+  instagram_handle: text('instagram_handle'),
+  open_to_licensing: boolean('open_to_licensing').notNull().default(true),
+  status: text('status').notNull().default('active'), // 'active' | 'listed' | 'transferred'
+});
+
+export const portraitLicenseRequests = pgTable('portrait_license_requests', {
+  id: serial('id').primaryKey(),
+  token_id: integer('token_id').notNull().references(() => portraitTokens.id),
+  requesting_businesses: jsonb('requesting_businesses').notNull().$type<Array<{ id: number; name: string; contribution_cents: number }>>(),
+  scope: text('scope').notNull().default('in_app'), // 'in_app' | 'regional_print' | 'global'
+  duration_months: integer('duration_months').notNull().default(3),
+  total_offered_cents: integer('total_offered_cents').notNull(),
+  commission_cents: integer('commission_cents').notNull().default(0),
+  subject_cents: integer('subject_cents').notNull().default(0),
+  handle_visible: boolean('handle_visible').notNull().default(false),
+  message: text('message'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined' | 'expired'
+  expires_at: timestamp('expires_at').notNull(),
+  accepted_at: timestamp('accepted_at'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const portraitLicenses = pgTable('portrait_licenses', {
+  id: serial('id').primaryKey(),
+  token_id: integer('token_id').notNull().references(() => portraitTokens.id),
+  request_id: integer('request_id').notNull().references(() => portraitLicenseRequests.id).unique(),
+  active_from: timestamp('active_from').notNull().defaultNow(),
+  active_until: timestamp('active_until').notNull(),
+  scope: text('scope').notNull(),
+  impression_rate_cents: integer('impression_rate_cents').notNull().default(5),
+  total_impressions: integer('total_impressions').notNull().default(0),
+  total_earned_cents: integer('total_earned_cents').notNull().default(0),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const portraitTokenListings = pgTable('portrait_token_listings', {
+  id: serial('id').primaryKey(),
+  token_id: integer('token_id').notNull().references(() => portraitTokens.id).unique(),
+  seller_user_id: integer('seller_user_id').notNull().references(() => users.id),
+  asking_price_cents: integer('asking_price_cents').notNull(),
+  status: text('status').notNull().default('listed'), // 'listed' | 'sold' | 'cancelled'
+  buyer_user_id: integer('buyer_user_id').references(() => users.id),
+  sold_at: timestamp('sold_at'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
