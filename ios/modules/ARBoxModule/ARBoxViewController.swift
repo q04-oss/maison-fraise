@@ -1,6 +1,7 @@
 import UIKit
 import ARKit
 import SceneKit
+import CoreMotion
 
 class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
@@ -40,6 +41,14 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
   var onFarmVisitTap: (() -> Void)?
   var onLeaveNote: ((String, String) -> Void)?
   var onQuantityConfirm: ((Int) -> Void)?
+
+  // AR Expanded 5-6: new callbacks
+  var onGiftRegistryAdd: (() -> Void)?
+  var onReferralTap: (() -> Void)?
+  var onBundleTap: (() -> Void)?
+
+  // AR Expanded 5-6: CoreMotion
+  private var motionManager: CMMotionManager?
 
   init(varietyData: NSDictionary, onDismiss: @escaping () -> Void) {
     self.varietyData = varietyData
@@ -331,6 +340,41 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
       setupConstellationButton()
     }
 
+    // ─ ar-expanded-5-6 features ─
+    if !staffMode {
+      setupFlavorMemory()
+      setupMicronutrients()
+      setupSugarAcidDial()
+      setupAntioxidantShield()
+      setupFermentationCard()
+      setupPigmentSpectrum()
+      setupFarmerPortrait()
+      setupFarmCertWall()
+      setupFarmFounding()
+      setupIrrigationDiagram()
+      setupCoverCrop()
+      setupMicroclimate()
+      setupBundleSuggestion()
+      setupEarlyAccessCountdown()
+      setupPriceDropBadge()
+      setupReferralBubble()
+      setupGiftRegistry()
+      setupWordCloud()
+      setupWhoElseGotThis()
+      setupMemoryLane()
+      setupChallengeQuest()
+      setupCoScanButton()
+      setupStreakLeaderboard()
+      setupAmbientAudio()
+      setupShakeToShuffle()
+      setupMascot()
+    }
+    if staffMode {
+      setupOrderExpiryGrid()
+      setupStaffPerformance()
+      setupPostalHeatMap()
+    }
+
     // Staff: quantity counter
     if staffMode && !batchScanMode, let sd = staffData {
       let qty = (sd["quantity"] as? NSNumber)?.intValue ?? 0
@@ -356,6 +400,7 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
     super.viewWillDisappear(animated)
     sceneView.session.pause()
     dismissTimer?.invalidate()
+    motionManager?.stopAccelerometerUpdates()
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -1166,6 +1211,10 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
   @objc private func handleDismiss() {
     dismissTimer?.invalidate()
+    // Feature 57: Thank-you overlay
+    if let farm = varietyData["farm"] as? String, !farm.isEmpty {
+      ARThankYouOverlay.present(farmName: farm, in: view)
+    }
     // Show tasting journal for user (non-staff, non-market, non-batch) mode
     if !staffMode && !marketStallMode && !batchScanMode && onTastingRating != nil {
       let varietyName = (varietyData["variety_name"] as? String) ?? "Strawberry"
@@ -1197,5 +1246,556 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
   @objc private func appDidBackground() {
     sceneView.session.pause()
+  }
+
+  // MARK: - ar-expanded-5-6 setup
+
+  // Feature 31: Flavor memory overlay
+  private func setupFlavorMemory() {
+    guard
+      let pb = varietyData["personal_best_flavor"] as? NSDictionary,
+      let fp = varietyData["flavor_profile"] as? NSDictionary
+    else { return }
+    let toCurrent = ARFlavorMemoryView.FlavorProfile(
+      sweetness: (fp["sweetness"] as? NSNumber)?.doubleValue ?? 5,
+      acidity: (fp["acidity"] as? NSNumber)?.doubleValue ?? 5,
+      aroma: (fp["aroma"] as? NSNumber)?.doubleValue ?? 5,
+      texture: (fp["texture"] as? NSNumber)?.doubleValue ?? 5,
+      intensity: (fp["intensity"] as? NSNumber)?.doubleValue ?? 5
+    )
+    let toBest = ARFlavorMemoryView.FlavorProfile(
+      sweetness: (pb["sweetness"] as? NSNumber)?.doubleValue ?? 5,
+      acidity: (pb["acidity"] as? NSNumber)?.doubleValue ?? 5,
+      aroma: (pb["aroma"] as? NSNumber)?.doubleValue ?? 5,
+      texture: (pb["texture"] as? NSNumber)?.doubleValue ?? 5,
+      intensity: (pb["intensity"] as? NSNumber)?.doubleValue ?? 5
+    )
+    let v = ARFlavorMemoryView(current: toCurrent, personalBest: toBest)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.18, height: 0.18)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.30, 0.10, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 32: Micronutrient mosaic
+  private func setupMicronutrients() {
+    let folate = (varietyData["folate_mcg"] as? NSNumber)?.doubleValue
+    let manganese = (varietyData["manganese_mg"] as? NSNumber)?.doubleValue
+    let potassium = (varietyData["potassium_mg"] as? NSNumber)?.doubleValue
+    let vitaminK = (varietyData["vitamin_k_mcg"] as? NSNumber)?.doubleValue
+    guard folate != nil || manganese != nil || potassium != nil || vitaminK != nil else { return }
+    let v = ARMicronutrientMosaicView(folate_mcg: folate, manganese_mg: manganese, potassium_mg: potassium, vitamin_k_mcg: vitaminK)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.09)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.0, 0.30, -0.55)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 33: Sugar/acid dial
+  private func setupSugarAcidDial() {
+    guard let brix = (varietyData["brix_score"] as? NSNumber)?.doubleValue,
+          let fp = varietyData["flavor_profile"] as? NSDictionary else { return }
+    let acidity = (fp["acidity"] as? NSNumber)?.doubleValue ?? 5
+    let v = ARSugarAcidDialView(brix: brix, acidity: acidity)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.16, height: 0.12)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.28, -0.40, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 34: Antioxidant shield (UIKit overlay — animated)
+  private func setupAntioxidantShield() {
+    guard let orac = (varietyData["orac_value"] as? NSNumber)?.intValue else { return }
+    let v = ARAntioxidantShieldView(oracValue: orac)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 180),
+      v.heightAnchor.constraint(equalToConstant: 210),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
+    ])
+  }
+
+  // Feature 35: Fermentation card
+  private func setupFermentationCard() {
+    guard let fp = varietyData["fermentation_profile"] as? NSDictionary else { return }
+    let jam = (fp["jam"] as? NSNumber)?.intValue ?? 0
+    let wine = (fp["wine"] as? NSNumber)?.intValue ?? 0
+    let coulis = (fp["coulis"] as? NSNumber)?.intValue ?? 0
+    let vinegar = (fp["vinegar"] as? NSNumber)?.intValue ?? 0
+    guard jam + wine + coulis + vinegar > 0 else { return }
+    let v = ARFermentationCardView(jam: jam, wine: wine, coulis: coulis, vinegar: vinegar)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.08)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.28, -0.40, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 36: Pigment spectrum
+  private func setupPigmentSpectrum() {
+    guard let hue = (varietyData["hue_value"] as? NSNumber)?.intValue else { return }
+    let v = ARPigmentSpectrumView(hueValue: hue)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.05)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.0, -0.60, -0.65)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 37: Farmer portrait (UIKit overlay)
+  private func setupFarmerPortrait() {
+    guard let name = varietyData["farmer_name"] as? String, !name.isEmpty else { return }
+    let quote = varietyData["farmer_quote"] as? String ?? ""
+    let v = ARFarmerPortraitView(farmerName: name, quote: quote)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 240),
+      v.heightAnchor.constraint(equalToConstant: 180),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -140),
+    ])
+  }
+
+  // Feature 38: Farm certification wall
+  private func setupFarmCertWall() {
+    guard let arr = varietyData["certifications"] as? NSArray, arr.count > 0 else { return }
+    let certs = arr.compactMap { $0 as? String }
+    guard !certs.isEmpty else { return }
+    let v = ARFarmCertWallView(certifications: certs)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.22, height: 0.07)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.0, 0.52, -0.60)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 39: Farm founding timeline
+  private func setupFarmFounding() {
+    guard let year = (varietyData["farm_founded_year"] as? NSNumber)?.intValue else { return }
+    var milestones: [ARFarmFoundingView.Milestone] = []
+    if let arr = varietyData["farm_milestones"] as? NSArray {
+      milestones = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> ARFarmFoundingView.Milestone? in
+        guard let y = (d["year"] as? NSNumber)?.intValue, let l = d["label"] as? String else { return nil }
+        return ARFarmFoundingView.Milestone(year: y, label: l)
+      }
+    }
+    let v = ARFarmFoundingView(foundedYear: year, milestones: milestones)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.22, height: 0.06)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.28, 0.35, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 40: Irrigation diagram (UIKit — animated)
+  private func setupIrrigationDiagram() {
+    guard let method = varietyData["irrigation_method"] as? String, !method.isEmpty else { return }
+    let v = ARIrrigationDiagramView(method: method)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 260),
+      v.heightAnchor.constraint(equalToConstant: 110),
+      v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 300),
+    ])
+  }
+
+  // Feature 41: Cover crop
+  private func setupCoverCrop() {
+    guard let crop = varietyData["cover_crop"] as? String, !crop.isEmpty else { return }
+    let v = ARCoverCropView(coverCrop: crop)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.05)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.28, 0.35, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 42: Microclimate
+  private func setupMicroclimate() {
+    guard let terrain = varietyData["terrain_type"] as? String, !terrain.isEmpty else { return }
+    let wind = varietyData["prevailing_wind"] as? String ?? "N"
+    let v = ARMicroclimateView(terrainType: terrain, prevailingWind: wind)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.09)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.30, -0.22, -0.62)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 43: Bundle suggestion (UIKit overlay)
+  private func setupBundleSuggestion() {
+    guard let bs = varietyData["bundle_suggestion"] as? NSDictionary,
+          let title = bs["title"] as? String,
+          let cents = (bs["price_cents"] as? NSNumber)?.intValue else { return }
+    let v = ARBundleSuggestionView(title: title, priceCents: cents)
+    v.onTap = { [weak self] in self?.onBundleTap?() }
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 280),
+      v.heightAnchor.constraint(equalToConstant: 100),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -220),
+    ])
+  }
+
+  // Feature 44: Early access countdown (UIKit overlay)
+  private func setupEarlyAccessCountdown() {
+    guard let dateStr = varietyData["upcoming_drop_at"] as? String else { return }
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: dateStr), date > Date() else { return }
+    let v = AREarlyAccessCountdownView(dropsAt: date)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 280),
+      v.heightAnchor.constraint(equalToConstant: 90),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 300),
+    ])
+  }
+
+  // Feature 45: Price drop badge (UIKit overlay)
+  private func setupPriceDropBadge() {
+    guard let pct = (varietyData["price_drop_pct"] as? NSNumber)?.intValue, pct > 0 else { return }
+    let v = ARPriceDropBadgeView(dropPercent: pct)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 170),
+      v.heightAnchor.constraint(equalToConstant: 65),
+      v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 180),
+    ])
+  }
+
+  // Feature 46: Referral bubble (UIKit overlay)
+  private func setupReferralBubble() {
+    guard (varietyData["show_referral_bubble"] as? NSNumber)?.boolValue == true else { return }
+    let v = ARReferralBubbleView()
+    v.onTap = { [weak self] in
+      self?.onReferralTap?()
+      v.animateOut()
+    }
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 270),
+      v.heightAnchor.constraint(equalToConstant: 80),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -310),
+    ])
+    v.animateIn()
+  }
+
+  // Feature 47: Gift registry (UIKit overlay)
+  private func setupGiftRegistry() {
+    let v = ARGiftRegistryView()
+    v.onAdd = { [weak self] in
+      self?.onGiftRegistryAdd?()
+    }
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 230),
+      v.heightAnchor.constraint(equalToConstant: 60),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -390),
+    ])
+  }
+
+  // Feature 48: Word cloud (SCNPlane)
+  private func setupWordCloud() {
+    guard let arr = varietyData["tasting_word_cloud"] as? NSArray, arr.count > 0 else { return }
+    let words = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> (word: String, count: Int)? in
+      guard let w = d["word"] as? String, let c = (d["count"] as? NSNumber)?.intValue else { return nil }
+      return (w, c)
+    }
+    guard !words.isEmpty else { return }
+    let v = ARWordCloudView(words: words)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.22, height: 0.14)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.32, 0.52, -0.65)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 49: Who else got this (SCNPlane)
+  private func setupWhoElseGotThis() {
+    guard let arr = varietyData["batch_members"] as? NSArray, arr.count > 0 else { return }
+    let members = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> (initial: String, colorHex: String)? in
+      guard let i = d["initial"] as? String, let c = d["colorHex"] as? String else { return nil }
+      return (i, c)
+    }
+    guard !members.isEmpty else { return }
+    let v = ARWhoElseGotThisView(members: members)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.20, height: 0.05)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.0, -0.68, -0.60)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 50: Memory lane
+  private func setupMemoryLane() {
+    guard let dateStr = varietyData["last_scan_date"] as? String else { return }
+    let formatter = ISO8601DateFormatter()
+    guard let date = formatter.date(from: dateStr) else { return }
+    let rating = (varietyData["last_scan_rating"] as? NSNumber)?.intValue ?? 0
+    let note = varietyData["last_scan_note"] as? String
+    let v = ARMemoryLaneView(lastDate: date, rating: rating, note: note)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.19, height: 0.08)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.32, 0.52, -0.65)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 51: Challenge quest (UIKit overlay)
+  private func setupChallengeQuest() {
+    guard let ch = varietyData["collectif_challenge"] as? NSDictionary,
+          let title = ch["title"] as? String else { return }
+    let desc = ch["description"] as? String ?? ""
+    let progress = (ch["progress"] as? NSNumber)?.intValue ?? 0
+    let target = (ch["target"] as? NSNumber)?.intValue ?? 3
+    let v = ARChallengeQuestView(title: title, description: desc, progress: progress, target: target)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 280),
+      v.heightAnchor.constraint(equalToConstant: 130),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 400),
+    ])
+  }
+
+  // Feature 52: Co-scan QR (button + presented sheet)
+  private func setupCoScanButton() {
+    let btn = UIButton(type: .system)
+    btn.setTitle("⟳ Co-Scan", for: .normal)
+    btn.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+    btn.tintColor = UIColor.white.withAlphaComponent(0.5)
+    btn.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(btn)
+    btn.addTarget(self, action: #selector(handleCoScan), for: .touchUpInside)
+    NSLayoutConstraint.activate([
+      btn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+      btn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -60),
+    ])
+  }
+
+  @objc private func handleCoScan() {
+    let varId = String((varietyData["variety_id"] as? NSNumber)?.intValue ?? 0)
+    let qrVC = UIViewController()
+    let qrView = ARCoScanQRView(code: "fraise-coscan-\(varId)-\(Int(Date().timeIntervalSince1970))")
+    qrView.onClose = { [weak qrVC] in qrVC?.dismiss(animated: true) }
+    qrView.translatesAutoresizingMaskIntoConstraints = false
+    qrVC.view.addSubview(qrView)
+    qrVC.view.backgroundColor = UIColor.black.withAlphaComponent(0.85)
+    NSLayoutConstraint.activate([
+      qrView.centerXAnchor.constraint(equalTo: qrVC.view.centerXAnchor),
+      qrView.centerYAnchor.constraint(equalTo: qrVC.view.centerYAnchor),
+      qrView.widthAnchor.constraint(equalToConstant: 250),
+      qrView.heightAnchor.constraint(equalToConstant: 300),
+    ])
+    qrVC.modalPresentationStyle = .overFullScreen
+    present(qrVC, animated: true)
+  }
+
+  // Feature 53: Streak leaderboard
+  private func setupStreakLeaderboard() {
+    guard let arr = varietyData["variety_streak_leaders"] as? NSArray, arr.count > 0 else { return }
+    let leaders = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> (rank: Int, name: String, farmName: String, streakWeeks: Int)? in
+      guard let rank = (d["rank"] as? NSNumber)?.intValue,
+            let name = d["name"] as? String else { return nil }
+      let farm = d["farmName"] as? String ?? ""
+      let weeks = (d["streakWeeks"] as? NSNumber)?.intValue ?? 0
+      return (rank, name, farm, weeks)
+    }
+    guard !leaders.isEmpty else { return }
+    let currentRank = (varietyData["current_user_streak_rank"] as? NSNumber)?.intValue
+    let v = ARVarietyStreakLeaderView(leaders: leaders, currentUserRank: currentRank)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.19, height: 0.13)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.30, -0.62, -0.65)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 54: Ambient audio player (UIKit overlay)
+  private func setupAmbientAudio() {
+    guard let urlStr = varietyData["ambient_audio_url"] as? String, !urlStr.isEmpty else { return }
+    let v = ARAmbientAudioView(audioURL: urlStr)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 150),
+      v.heightAnchor.constraint(equalToConstant: 65),
+      v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 12),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110),
+    ])
+  }
+
+  // Feature 55: Shake to shuffle (CoreMotion)
+  private func setupShakeToShuffle() {
+    motionManager = CMMotionManager()
+    guard motionManager?.isAccelerometerAvailable == true else { return }
+    motionManager?.accelerometerUpdateInterval = 0.15
+    var lastShake = Date.distantPast
+    motionManager?.startAccelerometerUpdates(to: .main) { [weak self] data, _ in
+      guard let data = data else { return }
+      let a = data.acceleration
+      let mag = sqrt(a.x*a.x + a.y*a.y + a.z*a.z)
+      guard mag > 2.5, Date().timeIntervalSince(lastShake) > 1.0 else { return }
+      lastShake = Date()
+      UIImpactFeedbackGenerator(style: .light).impactOccurred()
+      let nodes = self?.sceneView.scene.rootNode.childNodes.filter { $0.geometry is SCNPlane } ?? []
+      guard !nodes.isEmpty else { return }
+      for node in nodes { node.isHidden = true }
+      let idx = Int.random(in: 0..<nodes.count)
+      nodes[idx].isHidden = false
+    }
+  }
+
+  // Feature 56: Variety mascot (UIKit overlay)
+  private func setupMascot() {
+    guard let mascotId = varietyData["mascot_id"] as? String, !mascotId.isEmpty else { return }
+    let v = ARVarietyMascotView(mascotId: mascotId)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 80),
+      v.heightAnchor.constraint(equalToConstant: 80),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -12),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -110),
+    ])
+  }
+
+  // Staff: Feature 58 — Order expiry grid
+  private func setupOrderExpiryGrid() {
+    guard let arr = varietyData["staff_expiry_orders"] as? NSArray, arr.count > 0 else { return }
+    let orders = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> AROrderExpiryGridView.ExpiryOrder? in
+      guard let id = (d["id"] as? NSNumber)?.intValue,
+            let name = d["customerName"] as? String,
+            let slotStr = d["slotTime"] as? String else { return nil }
+      let formatter = ISO8601DateFormatter()
+      let slotDate = formatter.date(from: slotStr) ?? Date()
+      return AROrderExpiryGridView.ExpiryOrder(id: id, customerName: name, slotTime: slotDate)
+    }
+    guard !orders.isEmpty else { return }
+    let v = AROrderExpiryGridView(orders: orders)
+    v.onSelect = { [weak self] orderId in
+      self?.onStaffAction?("view_order", orderId)
+    }
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 320),
+      v.heightAnchor.constraint(equalToConstant: 290),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 80),
+    ])
+  }
+
+  // Staff: Feature 59 — Performance rings
+  private func setupStaffPerformance() {
+    guard staffMode else { return }
+    let orders = (varietyData["staff_orders_today"] as? NSNumber)?.intValue ?? 0
+    guard orders > 0 else { return }
+    let prep = (varietyData["staff_avg_prep_seconds"] as? NSNumber)?.intValue ?? 0
+    let accuracy = (varietyData["staff_accuracy_pct"] as? NSNumber)?.doubleValue ?? 0
+    let v = ARStaffPerformanceView(ordersToday: orders, avgPrepSeconds: prep, accuracyPct: accuracy)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.19, height: 0.13)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.30, 0.30, -0.60)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Staff: Feature 60 — Postal heat map (UIKit overlay)
+  private func setupPostalHeatMap() {
+    guard staffMode,
+          let arr = varietyData["postal_heat_map"] as? NSArray, arr.count > 0 else { return }
+    let points = arr.compactMap { $0 as? NSDictionary }.compactMap { d -> ARPostalHeatMapView.PostalPoint? in
+      guard let prefix = d["prefix"] as? String,
+            let lat = (d["lat"] as? NSNumber)?.doubleValue,
+            let lng = (d["lng"] as? NSNumber)?.doubleValue,
+            let count = (d["count"] as? NSNumber)?.intValue else { return nil }
+      return ARPostalHeatMapView.PostalPoint(prefix: prefix, lat: lat, lng: lng, count: count)
+    }
+    guard !points.isEmpty else { return }
+    let v = ARPostalHeatMapView(postalCounts: points)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.widthAnchor.constraint(equalToConstant: 310),
+      v.heightAnchor.constraint(equalToConstant: 210),
+      v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -80),
+    ])
   }
 }

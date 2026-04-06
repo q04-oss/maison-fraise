@@ -42,6 +42,15 @@ class ARBoxModule: NSObject {
       arVC.onQuantityConfirm = { counted in
         resolve(["quantity_confirmed": counted])
       }
+      arVC.onGiftRegistryAdd = {
+        if !resolved { resolved = true; resolve(["gift_registry_added": true]) }
+      }
+      arVC.onReferralTap = {
+        if !resolved { resolved = true; resolve(["referral_tapped": true]) }
+      }
+      arVC.onBundleTap = {
+        if !resolved { resolved = true; resolve(["bundle_tapped": true]) }
+      }
       arVC.modalPresentationStyle = .fullScreen
       topVC.present(arVC, animated: true)
     }

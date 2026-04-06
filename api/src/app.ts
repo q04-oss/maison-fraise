@@ -73,6 +73,9 @@ import arNotesRouter from './routes/ar-notes';
 import tastingJournalRouter from './routes/tasting-journal';
 import varietyMapRouter from './routes/variety-map';
 import pickupGridRouter from './routes/pickup-grid';
+import giftRegistryRouter from './routes/gift-registry';
+import collectifChallengesRouter from './routes/collectif-challenges';
+import coScansRouter from './routes/co-scans';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -184,6 +187,9 @@ app.use('/api/ar-notes', arNotesRouter);
 app.use('/api/tasting-journal', tastingJournalRouter);
 app.use('/api/variety-map', varietyMapRouter);
 app.use('/api/pickup-grid', pickupGridRouter);
+app.use('/api/gift-registry', giftRegistryRouter);
+app.use('/api/collectif-challenges', collectifChallengesRouter);
+app.use('/api/co-scans', coScansRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

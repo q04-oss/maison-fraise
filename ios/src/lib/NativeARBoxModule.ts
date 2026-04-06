@@ -76,6 +76,47 @@ export interface ARVarietyData {
   price_history_json?: string | null;
   open_farm_visit?: { visit_date: string; spots_left: number; visit_id: number } | null;
   nearby_ar_notes?: Array<{ id: number; body: string; author_name: string; color: string; created_at: string }>;
+  // AR Expanded 5-6: science & sensory
+  personal_best_flavor?: { sweetness: number; acidity: number; aroma: number; texture: number; intensity: number } | null;
+  orac_value?: number | null;
+  fermentation_profile?: { jam: number; wine: number; coulis: number; vinegar: number } | null;
+  hue_value?: number | null;
+  folate_mcg?: number | null;
+  manganese_mg?: number | null;
+  potassium_mg?: number | null;
+  vitamin_k_mcg?: number | null;
+  // AR Expanded 5-6: farm storytelling
+  farmer_name?: string | null;
+  farmer_quote?: string | null;
+  certifications?: string[];
+  farm_founded_year?: number | null;
+  farm_milestones?: Array<{ year: number; label: string }>;
+  irrigation_method?: string | null;
+  cover_crop?: string | null;
+  terrain_type?: string | null;
+  prevailing_wind?: string | null;
+  ambient_audio_url?: string | null;
+  mascot_id?: string | null;
+  // AR Expanded 5-6: commerce
+  bundle_suggestion?: { title: string; price_cents: number } | null;
+  upcoming_drop_at?: string | null;
+  price_drop_pct?: number | null;
+  show_referral_bubble?: boolean;
+  // AR Expanded 5-6: social
+  tasting_word_cloud?: Array<{ word: string; count: number }>;
+  batch_members?: Array<{ initial: string; colorHex: string }>;
+  last_scan_date?: string | null;
+  last_scan_rating?: number | null;
+  last_scan_note?: string | null;
+  collectif_challenge?: { title: string; description: string; progress: number; target: number } | null;
+  variety_streak_leaders?: Array<{ rank: number; name: string; farmName: string; streakWeeks: number }>;
+  current_user_streak_rank?: number | null;
+  // AR Expanded 5-6: staff-only
+  staff_expiry_orders?: Array<{ id: number; customerName: string; slotTime: string }>;
+  staff_orders_today?: number;
+  staff_avg_prep_seconds?: number | null;
+  staff_accuracy_pct?: number | null;
+  postal_heat_map?: Array<{ prefix: string; lat: number; lng: number; count: number }>;
 }
 
 // Feature E: Staff AR
@@ -112,7 +153,7 @@ export interface ARMarketStallData {
 }
 
 export interface Spec extends TurboModule {
-  presentAR(varietyData: ARVarietyData): Promise<{ rating: number; notes: string | null; farm_visit_tapped?: boolean; note_body?: string; note_color?: string } | null>;
+  presentAR(varietyData: ARVarietyData): Promise<{ rating: number; notes: string | null; farm_visit_tapped?: boolean; note_body?: string; note_color?: string; referral_tapped?: boolean; bundle_tapped?: boolean; gift_registry_added?: boolean } | null>;
   // Feature E
   presentStaffAR(staffData: ARStaffData): Promise<{ action: string; order_id: number } | null>;
   // Feature F

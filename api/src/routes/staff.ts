@@ -183,6 +183,17 @@ router.post('/orders/:id/flag', requireStaff, async (req: Request, res: Response
 
 db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity_confirmed integer`).catch(() => {});
 db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity_confirmed_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_address text`).catch(() => {});
+
+db.execute(sql`CREATE TABLE IF NOT EXISTS staff_sessions (
+  id serial PRIMARY KEY,
+  staff_user_id integer NOT NULL,
+  session_date date NOT NULL DEFAULT CURRENT_DATE,
+  orders_processed integer DEFAULT 0,
+  avg_prep_seconds integer,
+  accuracy_pct numeric(5,2),
+  UNIQUE(staff_user_id, session_date)
+)`).catch(() => {});
 
 // POST /api/staff/orders/:id/quantity-confirm — record physically counted quantity
 router.post('/orders/:id/quantity-confirm', requireStaff, async (req: Request, res: Response) => {
@@ -195,6 +206,87 @@ router.post('/orders/:id/quantity-confirm', requireStaff, async (req: Request, r
       UPDATE orders SET quantity_confirmed = ${counted}, quantity_confirmed_at = now() WHERE id = ${id}
     `);
     res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/staff/orders/expiry-grid — today's uncollected orders with slot_time
+router.get('/orders/expiry-grid', requireStaff, async (req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT o.id, o.customer_email, ts.time AS slot_time
+      FROM orders o
+      LEFT JOIN time_slots ts ON ts.id = o.time_slot_id
+      WHERE DATE(COALESCE(ts.time, o.created_at)) = CURRENT_DATE
+        AND o.status NOT IN ('collected', 'cancelled')
+      ORDER BY ts.time ASC NULLS LAST
+      LIMIT 50
+    `);
+    const data = (rows as any).rows ?? rows;
+    const result = (data as any[]).map((r: any) => ({
+      id: r.id,
+      customerName: r.customer_email ? String(r.customer_email).charAt(0) : '?',
+      slotTime: r.slot_time,
+    }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/staff/sessions/today — today's session stats for the staff user
+router.get('/sessions/today', requireStaff, async (req: Request, res: Response) => {
+  // requireStaff doesn't set req.userId; derive it from the JWT if present
+  let userId: number | null = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    try {
+      const { verifyToken } = await import('../lib/auth');
+      const payload = verifyToken(authHeader.replace('Bearer ', ''));
+      userId = payload?.userId ?? null;
+    } catch { /* pin-only auth, no user id */ }
+  }
+  if (!userId) {
+    res.json({ orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null });
+    return;
+  }
+  try {
+    const rows = await db.execute(sql`
+      SELECT * FROM staff_sessions
+      WHERE staff_user_id = ${userId} AND session_date = CURRENT_DATE
+    `);
+    const row = ((rows as any).rows ?? rows)[0];
+    if (!row) {
+      res.json({ orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null });
+      return;
+    }
+    res.json(row);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/staff/postal-heatmap — delivery address postal prefix counts for today
+router.get('/postal-heatmap', requireStaff, async (req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT SUBSTRING(delivery_address, 1, 3) AS prefix, COUNT(*) AS count
+      FROM orders
+      WHERE DATE(COALESCE(slot_time, created_at)) = CURRENT_DATE
+        AND delivery_address IS NOT NULL
+      GROUP BY prefix
+      ORDER BY count DESC
+      LIMIT 20
+    `);
+    const data = (rows as any).rows ?? rows;
+    const result = (data as any[]).map((r: any) => ({
+      prefix: r.prefix,
+      lat: 45.5017,
+      lng: -73.5673,
+      count: Number(r.count),
+    }));
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'internal' });
   }
