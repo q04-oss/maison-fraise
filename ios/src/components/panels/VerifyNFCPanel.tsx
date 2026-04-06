@@ -5,11 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
 type State = 'scanning' | 'success' | 'error';
+type FirstTapResult = { streak_weeks?: number; streak_milestone?: boolean; bank_days?: number; tier?: string | null } | null;
 
 export default function VerifyNFCPanel() {
   const { goHome, showPanel } = usePanel();
@@ -17,6 +18,7 @@ export default function VerifyNFCPanel() {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<State>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
+  const [firstTapResult, setFirstTapResult] = useState<FirstTapResult>(null);
 
   const scan = async () => {
     setState('scanning');
@@ -119,7 +121,7 @@ export default function VerifyNFCPanel() {
         });
 
         // Fetch all enrichment data in parallel
-        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits, wordCloud, batchMembers, streakLeaders, currentChallenge, bundleSuggestion, upcomingDrop, personalBestFlavor] = await Promise.all([
+        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits, wordCloud, batchMembers, streakLeaders, currentChallenge, bundleSuggestion, upcomingDrop, personalBestFlavor, lotCompanions] = await Promise.all([
           getTodayHealthContext().catch(() => null),
           reorderData.variety_id ? fetchVarietyProfile(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           reorderData.variety_id ? fetchActiveDropForVariety(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
@@ -134,6 +136,7 @@ export default function VerifyNFCPanel() {
           fetchBundleSuggestion().catch(() => null),
           reorderData.variety_id ? fetchUpcomingDrop(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           fetchPersonalBestFlavor().catch(() => null),
+          reorderData.variety_id ? fetchLotCompanions(reorderData.variety_id).catch(() => [] as any[]) : Promise.resolve([]),
         ]);
 
         // AR Expanded 7: fetch poem and solar data (after varietyProfile to use farm coords)
@@ -302,6 +305,8 @@ export default function VerifyNFCPanel() {
           farm_webcam_url: vp?.farm_webcam_url ?? null,
           ar_poem: arPoem ?? null,
           solar_data: solarData ?? null,
+          // Social expanded
+          lot_companions: (lotCompanions as any[]) ?? [],
         };
         setState('success');
         const arResult = await ARBoxModule.presentAR(arPayload);
@@ -347,8 +352,9 @@ export default function VerifyNFCPanel() {
           logStrawberries(result.quantity).catch(() => {});
         }
         requestHealthKitPermissions().catch(() => {});
+        setFirstTapResult({ streak_weeks: result.streak_weeks, streak_milestone: result.streak_milestone, bank_days: result.bank_days, tier: result.tier });
         setState('success');
-        setTimeout(() => showPanel('verified'), 600);
+        setTimeout(() => showPanel('verified'), result.streak_milestone ? 2000 : 600);
       }
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
@@ -375,9 +381,23 @@ export default function VerifyNFCPanel() {
         {state === 'success' && (
           <>
             <View style={[styles.badge, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.badgeIcon, { color: c.accent }]}>✓</Text>
+              <Text style={[styles.badgeIcon, { color: c.accent }]}>
+                {firstTapResult?.streak_milestone ? '🍓' : '✓'}
+              </Text>
             </View>
-            <Text style={[styles.title, { color: c.text }]}>Verified.</Text>
+            <Text style={[styles.title, { color: c.text }]}>
+              {firstTapResult?.streak_milestone ? `${firstTapResult.streak_weeks}-week streak.` : 'Verified.'}
+            </Text>
+            {firstTapResult?.streak_milestone && (
+              <Text style={[styles.subtitle, { color: c.muted }]}>
+                You've tapped every week for {firstTapResult.streak_weeks} weeks straight.
+              </Text>
+            )}
+            {firstTapResult?.bank_days != null && firstTapResult.bank_days > 0 && (
+              <Text style={[styles.subtitle, { color: c.muted }]}>
+                {firstTapResult.bank_days} days of {firstTapResult.tier ?? 'standard'} access added.
+              </Text>
+            )}
           </>
         )}
 

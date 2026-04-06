@@ -6,7 +6,7 @@ import { useColors, fonts, SPACING } from '../../theme';
 import { fetchFarmVisits, bookFarmVisit, cancelFarmVisitBooking } from '../../lib/api';
 
 export default function FarmVisitsPanel() {
-  const { goBack } = usePanel();
+  const { goBack, showPanel } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [visits, setVisits] = useState<any[]>([]);
@@ -43,7 +43,9 @@ export default function FarmVisitsPanel() {
           <Text style={[styles.back, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: c.text, fontFamily: fonts.dmMono }]}>FARM VISITS</Text>
-        <View style={{ width: 28 }} />
+        <TouchableOpacity onPress={() => showPanel('ar-video-feed')} activeOpacity={0.7}>
+          <Text style={{ color: c.accent, fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5 }}>AR ▶</Text>
+        </TouchableOpacity>
       </View>
 
       {loading && (

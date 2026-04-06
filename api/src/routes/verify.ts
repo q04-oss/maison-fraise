@@ -40,12 +40,15 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     const creditsSeconds = creditsDays * 86400;
     const varietyCeiling = varietyRow?.social_tier ?? null;
 
-    // Read current bank balance before transaction (drain elapsed time first)
+    // Read current bank balance + streak before transaction
     const [bankRow] = await db
       .select({
         social_time_bank_seconds: users.social_time_bank_seconds,
         social_time_bank_updated_at: users.social_time_bank_updated_at,
         social_lifetime_credits_seconds: users.social_lifetime_credits_seconds,
+        current_streak_weeks: users.current_streak_weeks,
+        longest_streak_weeks: users.longest_streak_weeks,
+        last_tap_week: users.last_tap_week,
       })
       .from(users).where(eq(users.id, user_id));
 
@@ -55,6 +58,30 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     );
     const newBalance = currentBalance + creditsSeconds;
     const newLifetime = (bankRow?.social_lifetime_credits_seconds ?? 0) + creditsSeconds;
+
+    // Compute ISO week string: e.g. "2026-W14"
+    const getISOWeek = (d: Date): string => {
+      const jan4 = new Date(d.getFullYear(), 0, 4);
+      const weekNum = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7);
+      return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+    };
+    const thisWeek = getISOWeek(now);
+    const lastWeek = bankRow?.last_tap_week ?? null;
+    const prevStreak = bankRow?.current_streak_weeks ?? 0;
+    const longestStreak = bankRow?.longest_streak_weeks ?? 0;
+    let newStreak = prevStreak;
+    if (lastWeek === null) {
+      newStreak = 1;
+    } else if (lastWeek === thisWeek) {
+      newStreak = prevStreak; // already tapped this week
+    } else {
+      // check if last tap was the immediately preceding week
+      const lastDate = new Date(now);
+      lastDate.setDate(lastDate.getDate() - 7);
+      const prevWeekStr = getISOWeek(lastDate);
+      newStreak = lastWeek === prevWeekStr ? prevStreak + 1 : 1;
+    }
+    const newLongest = Math.max(longestStreak, newStreak);
 
     await db.transaction(async (tx) => {
       // Atomic claim: only succeeds if nfc_token_used is still false
@@ -75,7 +102,10 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
           social_time_bank_seconds: Math.round(newBalance),
           social_time_bank_updated_at: now,
           social_lifetime_credits_seconds: Math.round(newLifetime),
-          social_tier: varietyCeiling, // ceiling = grade of the box just tapped
+          social_tier: varietyCeiling,
+          current_streak_weeks: newStreak,
+          longest_streak_weeks: newLongest,
+          last_tap_week: thisWeek,
           ...(fraiseChatEmail ? { fraise_chat_email: fraiseChatEmail } : {}),
         })
         .where(eq(users.id, user_id));
@@ -123,6 +153,8 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       bank_days: Math.floor(newBalance / 86400),
       credits_added_days: creditsDays,
       lifetime_days: Math.floor(newLifetime / 86400),
+      streak_weeks: newStreak,
+      streak_milestone: newStreak > prevStreak && newStreak % 4 === 0,
     });
   } catch (err: any) {
     if (err?.code === 'already_used') {

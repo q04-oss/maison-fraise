@@ -96,7 +96,8 @@ export type PanelId =
   | 'proposals'
   | 'ar-video-feed'
   | 'ar-video-detail'
-  | 'submit-ar-video';
+  | 'submit-ar-video'
+  | 'tasting-feed';
 
 export interface OrderState {
   variety_id: number | null;

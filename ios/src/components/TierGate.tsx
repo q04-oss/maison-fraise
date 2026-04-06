@@ -65,6 +65,7 @@ export const PANEL_TIER_REQUIREMENTS: Partial<Record<PanelId, SocialTier>> = {
   'write-piece':                'reserve',
   'submit-ar-video':            'reserve',
   'ar-video-feed':              'reserve',
+  'tasting-feed':               'standard',
   'proposals':                  'reserve',
   'reservation-offers':         'reserve',
   'reservation-discovery':      'reserve',
