@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -265,17 +265,22 @@ export default function VarietyPassportPanel() {
       )}
 
       {!loading && passport.length > 0 && (
-        <>
-          <View style={styles.countRow}>
-            <Text style={[styles.countNum, { color: c.accent, fontFamily: fonts.playfair }]}>{passport.length}</Text>
-            <Text style={[styles.countLabel, { color: c.muted, fontFamily: fonts.dmMono }]}>VARIETIES COLLECTED</Text>
-          </View>
-          <ScrollView contentContainerStyle={styles.list}>
-            {passport.map(item => (
-              <PassportCard key={String(item.variety_id)} item={item} />
-            ))}
-          </ScrollView>
-        </>
+        <FlatList
+          data={passport}
+          keyExtractor={item => String(item.variety_id)}
+          renderItem={({ item }) => <PassportCard item={item} />}
+          ListHeaderComponent={
+            <View style={styles.countRow}>
+              <Text style={[styles.countNum, { color: c.accent, fontFamily: fonts.playfair }]}>{passport.length}</Text>
+              <Text style={[styles.countLabel, { color: c.muted, fontFamily: fonts.dmMono }]}>VARIETIES COLLECTED</Text>
+            </View>
+          }
+          contentContainerStyle={styles.list}
+          initialNumToRender={4}
+          maxToRenderPerBatch={3}
+          windowSize={5}
+          showsVerticalScrollIndicator={false}
+        />
       )}
     </View>
   );

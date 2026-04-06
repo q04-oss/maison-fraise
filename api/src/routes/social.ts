@@ -6,6 +6,30 @@ import { requireUser } from '../lib/auth';
 
 const router = Router();
 
+// ─── Boot-time migrations ─────────────────────────────────────────────────────
+db.execute(sql`ALTER TABLE tasting_journal ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false`).catch(() => {});
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS variety_reviews (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id),
+    variety_id integer NOT NULL REFERENCES varieties(id),
+    rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    note text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (user_id, variety_id)
+  )
+`).catch(() => {});
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS tasting_feed_reactions (
+    id serial PRIMARY KEY,
+    entry_id integer NOT NULL REFERENCES tasting_journal(id) ON DELETE CASCADE,
+    user_id integer NOT NULL REFERENCES users(id),
+    emoji text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (entry_id, user_id, emoji)
+  )
+`).catch(() => {});
+
 // ─── Variety Reviews ──────────────────────────────────────────────────────────
 
 // GET /api/social/varieties/:id/reviews
