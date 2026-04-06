@@ -3454,3 +3454,133 @@ export function computeUnlockedAchievements(params: {
   return unlocked;
 }
 
+// AR Expanded 5-6: personal best flavor from tasting journal
+export async function fetchPersonalBestFlavor(): Promise<{ sweetness: number; acidity: number; aroma: number; texture: number; intensity: number } | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/tasting-journal/personal-best-flavor`, { headers: auth });
+    if (!r.ok) return null;
+    return r.json().catch(() => null);
+  } catch { return null; }
+}
+
+// AR Expanded 5-6: tasting word cloud for a variety
+export async function fetchTastingWordCloud(varietyId: number): Promise<Array<{ word: string; count: number }>> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/tasting-journal/word-cloud/${varietyId}`, { headers: auth });
+    if (!r.ok) return [];
+    const res = await r.json().catch(() => []);
+    return Array.isArray(res) ? res : [];
+  } catch { return []; }
+}
+
+// AR Expanded 5-6: who else in batch got this variety this week
+export async function fetchBatchMembers(varietyId: number): Promise<Array<{ initial: string; colorHex: string }>> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/collectifs/who-got-variety?variety_id=${varietyId}`, { headers: auth });
+    if (!r.ok) return [];
+    const res = await r.json().catch(() => []);
+    return Array.isArray(res) ? res : [];
+  } catch { return []; }
+}
+
+// AR Expanded 5-6: streak leaderboard for a variety
+export async function fetchVarietyStreakLeaders(varietyId: number): Promise<{ leaders: Array<{ rank: number; name: string; farmName: string; streakWeeks: number }>; my_rank: number | null }> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/collectifs/variety-streak-leaders?variety_id=${varietyId}`, { headers: auth });
+    if (!r.ok) return { leaders: [], my_rank: null };
+    const res = await r.json().catch(() => null);
+    return res ?? { leaders: [], my_rank: null };
+  } catch { return { leaders: [], my_rank: null }; }
+}
+
+// AR Expanded 5-6: current weekly collectif challenge
+export async function fetchCurrentChallenge(): Promise<{ title: string; description: string; progress: number; target: number } | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/collectif-challenges/current`, { headers: auth });
+    if (!r.ok) return null;
+    const res = await r.json().catch(() => null);
+    return res?.challenge ?? null;
+  } catch { return null; }
+}
+
+// AR Expanded 5-6: bundle product suggestion
+export async function fetchBundleSuggestion(): Promise<{ title: string; price_cents: number } | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/drops/bundle-suggestion`, { headers: auth });
+    if (!r.ok) return null;
+    return r.json().catch(() => null);
+  } catch { return null; }
+}
+
+// AR Expanded 5-6: upcoming drop for a variety
+export async function fetchUpcomingDrop(varietyId: number): Promise<{ upcoming_drop_at: string } | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/drops/upcoming?variety_id=${varietyId}`, { headers: auth });
+    if (!r.ok) return null;
+    return r.json().catch(() => null);
+  } catch { return null; }
+}
+
+// AR Expanded 5-6: add to gift registry
+export async function addToGiftRegistry(varietyId: number, varietyName?: string): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/gift-registry`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ variety_id: varietyId, variety_name: varietyName }),
+  });
+}
+
+// AR Expanded 5-6: initiate co-scan session
+export async function initiateCoScan(varietyId: number): Promise<{ code: string } | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/co-scans/initiate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      body: JSON.stringify({ variety_id: varietyId }),
+    });
+    if (!r.ok) return null;
+    return r.json().catch(() => null);
+  } catch { return null; }
+}
+
+// AR Expanded 5-6: staff order expiry grid
+export async function fetchStaffExpiryGrid(): Promise<Array<{ id: number; customerName: string; slotTime: string }>> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/staff/orders/expiry-grid`, { headers: auth });
+    if (!r.ok) return [];
+    const res = await r.json().catch(() => []);
+    return Array.isArray(res) ? res : [];
+  } catch { return []; }
+}
+
+// AR Expanded 5-6: staff session stats today
+export async function fetchStaffSessionToday(): Promise<{ orders_processed: number; avg_prep_seconds: number | null; accuracy_pct: number | null }> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/staff/sessions/today`, { headers: auth });
+    if (!r.ok) return { orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null };
+    return r.json().catch(() => ({ orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null }));
+  } catch { return { orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null }; }
+}
+
+// AR Expanded 5-6: staff postal pickup heat map
+export async function fetchPostalHeatMap(): Promise<Array<{ prefix: string; lat: number; lng: number; count: number }>> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/staff/postal-heatmap`, { headers: auth });
+    if (!r.ok) return [];
+    const res = await r.json().catch(() => []);
+    return Array.isArray(res) ? res : [];
+  } catch { return []; }
+}
+

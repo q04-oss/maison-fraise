@@ -395,4 +395,73 @@ router.get('/my-rank', requireUser, async (req: any, res: Response) => {
   }
 });
 
+// GET /api/collectifs/who-got-variety?variety_id=&week= — anonymized list of users who ordered this variety this week
+router.get('/who-got-variety', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const varietyId = parseInt(req.query.variety_id as string, 10);
+  if (isNaN(varietyId)) { res.status(400).json({ error: 'variety_id required' }); return; }
+  try {
+    const rows = await db.execute(sql`
+      SELECT DISTINCT ON (o.user_id)
+        SUBSTR(u.email, 1, 1) AS initial,
+        '#' || LPAD(TO_HEX((o.user_id * 2654435761) % 16777216), 6, '0') AS color_hex
+      FROM orders o
+      JOIN users u ON u.id = o.user_id
+      WHERE o.variety_id = ${varietyId}
+        AND DATE_TRUNC('week', o.created_at) = DATE_TRUNC('week', now())
+        AND o.user_id != ${userId}
+      LIMIT 8
+    `);
+    res.json((rows as any).rows ?? rows);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/collectifs/variety-streak-leaders?variety_id= — top 5 users by order count for this variety
+router.get('/variety-streak-leaders', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const varietyId = parseInt(req.query.variety_id as string, 10);
+  if (isNaN(varietyId)) { res.status(400).json({ error: 'variety_id required' }); return; }
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        u.email,
+        COUNT(*) AS streak_weeks,
+        ROW_NUMBER() OVER (ORDER BY COUNT(*) DESC) AS rank
+      FROM orders o
+      JOIN users u ON u.id = o.user_id
+      WHERE o.variety_id = ${varietyId}
+      GROUP BY o.user_id, u.email
+      ORDER BY streak_weeks DESC
+      LIMIT 5
+    `);
+    const data = (rows as any).rows ?? rows;
+    const leaders = (data as any[]).map((r: any) => ({
+      rank: Number(r.rank),
+      name: String(r.email).charAt(0).toUpperCase() + '***',
+      farm_name: '',
+      streak_weeks: Number(r.streak_weeks),
+    }));
+
+    // Find current user's rank separately
+    const myRows = await db.execute(sql`
+      WITH ranked AS (
+        SELECT user_id, COUNT(*) AS streak_weeks,
+          RANK() OVER (ORDER BY COUNT(*) DESC) AS rank
+        FROM orders
+        WHERE variety_id = ${varietyId}
+        GROUP BY user_id
+      )
+      SELECT rank FROM ranked WHERE user_id = ${userId}
+    `);
+    const myData = ((myRows as any).rows ?? myRows)[0] ?? null;
+    const myRank = myData ? Number(myData.rank) : null;
+
+    res.json({ leaders, my_rank: myRank });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 export default router;

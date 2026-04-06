@@ -39,6 +39,54 @@ db.execute(sql`CREATE TABLE IF NOT EXISTS drop_waitlist (
   UNIQUE(drop_id, user_id)
 )`).catch(() => {});
 
+// Marketing drops table (bundle suggestions / announcements)
+db.execute(sql`CREATE TABLE IF NOT EXISTS drops (
+  id serial PRIMARY KEY,
+  title text NOT NULL,
+  price_cents integer,
+  active boolean NOT NULL DEFAULT true,
+  variety_id integer,
+  upcoming_drop_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+)`).catch(() => {});
+
+db.execute(sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS variety_id integer`).catch(() => {});
+db.execute(sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS upcoming_drop_at timestamptz`).catch(() => {});
+
+// GET /api/drops/bundle-suggestion?variety_id= — no auth, latest active marketing drop
+router.get('/bundle-suggestion', async (req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT id, title, price_cents FROM drops
+      WHERE active = true
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const drop = ((rows as any).rows ?? rows)[0] ?? null;
+    res.json(drop);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/drops/upcoming?variety_id= — no auth, next upcoming drop for a variety
+router.get('/upcoming', async (req: Request, res: Response) => {
+  const varietyId = parseInt(req.query.variety_id as string, 10);
+  if (isNaN(varietyId)) { res.status(400).json({ error: 'variety_id required' }); return; }
+  try {
+    const rows = await db.execute(sql`
+      SELECT id, title, upcoming_drop_at FROM drops
+      WHERE variety_id = ${varietyId} AND upcoming_drop_at > now()
+      ORDER BY upcoming_drop_at ASC
+      LIMIT 1
+    `);
+    const drop = ((rows as any).rows ?? rows)[0] ?? null;
+    res.json(drop);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // GET /api/drops
 router.get('/', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;

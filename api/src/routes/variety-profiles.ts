@@ -40,6 +40,29 @@ db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS sunlight_ho
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS price_history_json text`).catch(() => {});
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_id integer`).catch(() => {});
 
+// AR expanded 5-6 columns
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS orac_value integer`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS fermentation_profile_json text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS hue_value integer`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farmer_name text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farmer_quote text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS certifications_json text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_founded_year integer`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_milestones_json text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS irrigation_method text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS cover_crop text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS terrain_type text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS prevailing_wind text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS ambient_audio_url text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS mascot_id text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS folate_mcg numeric(8,2)`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS manganese_mg numeric(8,3)`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS potassium_mg numeric(8,1)`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS vitamin_k_mcg numeric(8,2)`).catch(() => {});
+
+// drops table
+db.execute(sql`ALTER TABLE drops ADD COLUMN IF NOT EXISTS upcoming_drop_at timestamptz`).catch(() => {});
+
 // GET /api/variety-profiles/:varietyId — public
 router.get('/:varietyId', async (req: Request, res: Response) => {
   const varietyId = parseInt(req.params.varietyId, 10);
@@ -66,6 +89,10 @@ router.post('/', async (req: Request, res: Response) => {
     altitude_m, soil_type, eat_by_days, recipe_name, recipe_description,
     harvest_weather_json, farm_photo_url, producer_video_url, farm_lat, farm_lng,
     co2_grams, carbon_offset_program, sunlight_hours, price_history_json, farm_id,
+    orac_value, fermentation_profile_json, hue_value, farmer_name, farmer_quote,
+    certifications_json, farm_founded_year, farm_milestones_json, irrigation_method,
+    cover_crop, terrain_type, prevailing_wind, ambient_audio_url, mascot_id,
+    folate_mcg, manganese_mg, potassium_mg, vitamin_k_mcg,
   } = req.body;
   if (!variety_id) { res.status(400).json({ error: 'variety_id required' }); return; }
   try {
@@ -77,6 +104,10 @@ router.post('/', async (req: Request, res: Response) => {
         altitude_m, soil_type, eat_by_days, recipe_name, recipe_description,
         harvest_weather_json, farm_photo_url, producer_video_url, farm_lat, farm_lng,
         co2_grams, carbon_offset_program, sunlight_hours, price_history_json, farm_id,
+        orac_value, fermentation_profile_json, hue_value, farmer_name, farmer_quote,
+        certifications_json, farm_founded_year, farm_milestones_json, irrigation_method,
+        cover_crop, terrain_type, prevailing_wind, ambient_audio_url, mascot_id,
+        folate_mcg, manganese_mg, potassium_mg, vitamin_k_mcg,
         updated_at
       )
       VALUES (
@@ -86,6 +117,10 @@ router.post('/', async (req: Request, res: Response) => {
         ${altitude_m ?? null}, ${soil_type ?? null}, ${eat_by_days ?? null}, ${recipe_name ?? null}, ${recipe_description ?? null},
         ${harvest_weather_json ?? null}, ${farm_photo_url ?? null}, ${producer_video_url ?? null}, ${farm_lat ?? null}, ${farm_lng ?? null},
         ${co2_grams ?? null}, ${carbon_offset_program ?? null}, ${sunlight_hours ?? null}, ${price_history_json ?? null}, ${farm_id ?? null},
+        ${orac_value ?? null}, ${fermentation_profile_json ?? null}, ${hue_value ?? null}, ${farmer_name ?? null}, ${farmer_quote ?? null},
+        ${certifications_json ?? null}, ${farm_founded_year ?? null}, ${farm_milestones_json ?? null}, ${irrigation_method ?? null},
+        ${cover_crop ?? null}, ${terrain_type ?? null}, ${prevailing_wind ?? null}, ${ambient_audio_url ?? null}, ${mascot_id ?? null},
+        ${folate_mcg ?? null}, ${manganese_mg ?? null}, ${potassium_mg ?? null}, ${vitamin_k_mcg ?? null},
         now()
       )
       ON CONFLICT (variety_id) DO UPDATE SET
@@ -118,6 +153,24 @@ router.post('/', async (req: Request, res: Response) => {
         sunlight_hours = EXCLUDED.sunlight_hours,
         price_history_json = EXCLUDED.price_history_json,
         farm_id = EXCLUDED.farm_id,
+        orac_value = EXCLUDED.orac_value,
+        fermentation_profile_json = EXCLUDED.fermentation_profile_json,
+        hue_value = EXCLUDED.hue_value,
+        farmer_name = EXCLUDED.farmer_name,
+        farmer_quote = EXCLUDED.farmer_quote,
+        certifications_json = EXCLUDED.certifications_json,
+        farm_founded_year = EXCLUDED.farm_founded_year,
+        farm_milestones_json = EXCLUDED.farm_milestones_json,
+        irrigation_method = EXCLUDED.irrigation_method,
+        cover_crop = EXCLUDED.cover_crop,
+        terrain_type = EXCLUDED.terrain_type,
+        prevailing_wind = EXCLUDED.prevailing_wind,
+        ambient_audio_url = EXCLUDED.ambient_audio_url,
+        mascot_id = EXCLUDED.mascot_id,
+        folate_mcg = EXCLUDED.folate_mcg,
+        manganese_mg = EXCLUDED.manganese_mg,
+        potassium_mg = EXCLUDED.potassium_mg,
+        vitamin_k_mcg = EXCLUDED.vitamin_k_mcg,
         updated_at = now()
       RETURNING *
     `);

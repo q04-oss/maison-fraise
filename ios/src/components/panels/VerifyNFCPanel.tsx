@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -75,7 +75,20 @@ export default function VerifyNFCPanel() {
           fetchPickupGrid().catch(() => [] as any[]),
         ]);
         setState('success');
-        const staffPayload = { ...staffOrderData, pickup_slots: pickupSlots };
+        const [staffExpiryOrders, staffSession, postalHeatMap] = await Promise.all([
+          fetchStaffExpiryGrid().catch(() => [] as any[]),
+          fetchStaffSessionToday().catch(() => ({ orders_processed: 0, avg_prep_seconds: null, accuracy_pct: null })),
+          fetchPostalHeatMap().catch(() => [] as any[]),
+        ]);
+        const staffPayload = {
+          ...staffOrderData,
+          pickup_slots: pickupSlots,
+          staff_expiry_orders: staffExpiryOrders,
+          staff_orders_today: (staffSession as any).orders_processed ?? 0,
+          staff_avg_prep_seconds: (staffSession as any).avg_prep_seconds ?? null,
+          staff_accuracy_pct: (staffSession as any).accuracy_pct ?? null,
+          postal_heat_map: postalHeatMap,
+        };
         const actionResult = await ARBoxModule.presentStaffAR(staffPayload);
         if (actionResult) {
           const pin = await AsyncStorage.getItem('staff_pin') ?? '';
@@ -106,7 +119,7 @@ export default function VerifyNFCPanel() {
         });
 
         // Fetch all enrichment data in parallel
-        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits] = await Promise.all([
+        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits, wordCloud, batchMembers, streakLeaders, currentChallenge, bundleSuggestion, upcomingDrop, personalBestFlavor] = await Promise.all([
           getTodayHealthContext().catch(() => null),
           reorderData.variety_id ? fetchVarietyProfile(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           reorderData.variety_id ? fetchActiveDropForVariety(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
@@ -114,6 +127,13 @@ export default function VerifyNFCPanel() {
           fetchCollectifRank().catch(() => null),
           fetchNearbyArNotes(deviceLat, deviceLng).catch(() => [] as any[]),
           fetchOpenFarmVisits(reorderData.farm ?? '').catch(() => [] as any[]),
+          reorderData.variety_id ? fetchTastingWordCloud(reorderData.variety_id).catch(() => [] as any[]) : Promise.resolve([]),
+          reorderData.variety_id ? fetchBatchMembers(reorderData.variety_id).catch(() => [] as any[]) : Promise.resolve([]),
+          reorderData.variety_id ? fetchVarietyStreakLeaders(reorderData.variety_id).catch(() => ({ leaders: [], my_rank: null })) : Promise.resolve({ leaders: [], my_rank: null }),
+          fetchCurrentChallenge().catch(() => null),
+          fetchBundleSuggestion().catch(() => null),
+          reorderData.variety_id ? fetchUpcomingDrop(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
+          fetchPersonalBestFlavor().catch(() => null),
         ]);
 
         // Feature C: format standing order label server data into display string
@@ -122,6 +142,12 @@ export default function VerifyNFCPanel() {
           const so = reorderData.next_standing_order;
           nextStandingOrderLabel = `NEXT ORDER  ·  ${so.variety_name}  ·  in ${so.days_until} day${so.days_until === 1 ? '' : 's'}`;
         }
+
+        // AR Expanded 5-6: referral bubble threshold (lifetime scan count)
+        const totalScansRaw = await AsyncStorage.getItem('total_scan_count').catch(() => null);
+        const totalScans = parseInt(totalScansRaw ?? '0', 10);
+        await AsyncStorage.setItem('total_scan_count', String(totalScans + 1)).catch(() => {});
+        const showReferralBubble = totalScans >= 3;
 
         // Compute unlocked achievements (client-side)
         const seenFarmsRaw = await AsyncStorage.getItem('seen_farms').catch(() => null);
@@ -206,6 +232,53 @@ export default function VerifyNFCPanel() {
           price_history_json: (varietyProfile as any)?.price_history_json ?? null,
           open_farm_visit: (openFarmVisits as any[])[0] ?? null,
           nearby_ar_notes: nearbyNotes ?? [],
+          // AR Expanded 5-6: science & sensory
+          personal_best_flavor: (personalBestFlavor as any) ?? null,
+          orac_value: (varietyProfile as any)?.orac_value ?? null,
+          fermentation_profile: (() => { try { const j = (varietyProfile as any)?.fermentation_profile_json; return j ? JSON.parse(j) : null; } catch { return null; } })(),
+          hue_value: (varietyProfile as any)?.hue_value ?? null,
+          folate_mcg: (varietyProfile as any)?.folate_mcg ?? null,
+          manganese_mg: (varietyProfile as any)?.manganese_mg ?? null,
+          potassium_mg: (varietyProfile as any)?.potassium_mg ?? null,
+          vitamin_k_mcg: (varietyProfile as any)?.vitamin_k_mcg ?? null,
+          // AR Expanded 5-6: farm storytelling
+          farmer_name: (varietyProfile as any)?.farmer_name ?? null,
+          farmer_quote: (varietyProfile as any)?.farmer_quote ?? null,
+          certifications: (() => { try { return JSON.parse((varietyProfile as any)?.certifications_json ?? '[]'); } catch { return []; } })(),
+          farm_founded_year: (varietyProfile as any)?.farm_founded_year ?? null,
+          farm_milestones: (() => { try { return JSON.parse((varietyProfile as any)?.farm_milestones_json ?? '[]'); } catch { return []; } })(),
+          irrigation_method: (varietyProfile as any)?.irrigation_method ?? null,
+          cover_crop: (varietyProfile as any)?.cover_crop ?? null,
+          terrain_type: (varietyProfile as any)?.terrain_type ?? null,
+          prevailing_wind: (varietyProfile as any)?.prevailing_wind ?? null,
+          ambient_audio_url: (varietyProfile as any)?.ambient_audio_url ?? null,
+          mascot_id: (varietyProfile as any)?.mascot_id ?? null,
+          // AR Expanded 5-6: commerce
+          bundle_suggestion: (bundleSuggestion as any) ?? null,
+          upcoming_drop_at: (upcomingDrop as any)?.upcoming_drop_at ?? null,
+          price_drop_pct: (() => {
+            const hist = (varietyProfile as any)?.price_history_json;
+            if (!hist) return null;
+            try {
+              const pts = JSON.parse(hist) as Array<{ season: string; priceCents: number }>;
+              if (pts.length < 2) return null;
+              const latest = pts[pts.length - 1].priceCents;
+              const prev = pts[pts.length - 2].priceCents;
+              if (prev <= 0) return null;
+              const drop = Math.round((prev - latest) / prev * 100);
+              return drop > 0 ? drop : null;
+            } catch { return null; }
+          })(),
+          show_referral_bubble: showReferralBubble,
+          // AR Expanded 5-6: social
+          tasting_word_cloud: (wordCloud as any[]) ?? [],
+          batch_members: (batchMembers as any[]) ?? [],
+          last_scan_date: reorderData.last_scan_date ?? null,
+          last_scan_rating: reorderData.last_scan_rating ?? null,
+          last_scan_note: reorderData.last_scan_note ?? null,
+          collectif_challenge: (currentChallenge as any) ?? null,
+          variety_streak_leaders: (streakLeaders as any)?.leaders ?? (Array.isArray(streakLeaders) ? streakLeaders : []),
+          current_user_streak_rank: (streakLeaders as any)?.my_rank ?? null,
         };
         setState('success');
         const arResult = await ARBoxModule.presentAR(arPayload);
@@ -214,8 +287,19 @@ export default function VerifyNFCPanel() {
           saveTastingRating(reorderData.variety_id, arResult.rating, arResult.notes ?? null).catch(() => {});
         }
         // AR Expanded 4: handle farm visit tap, leave note
+        if (arResult?.gift_registry_added && reorderData.variety_id) {
+          addToGiftRegistry(reorderData.variety_id, reorderData.variety_name ?? undefined).catch(() => {});
+        }
         if (arResult?.farm_visit_tapped) {
           showPanel('farm-visits');
+          return;
+        }
+        if (arResult?.referral_tapped) {
+          showPanel('referral');
+          return;
+        }
+        if (arResult?.bundle_tapped) {
+          showPanel('drops');
           return;
         }
         if (arResult?.note_body && arResult?.note_color) {
