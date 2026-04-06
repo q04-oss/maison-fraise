@@ -78,6 +78,12 @@ const MODULE_FILES = [
   'AROrderExpiryGridView.swift',
   'ARStaffPerformanceView.swift',
   'ARPostalHeatMapView.swift',
+  // AR Expanded 7
+  'ARImageAnchorController.swift',
+  'ARFarmPortalView.swift',
+  'ARTastingPoemView.swift',
+  'ARSpatialAudioController.swift',
+  'ARPhotosynthesisMeterView.swift',
 ];
 
 const SOURCE_DIR = path.join(__dirname, '..', 'modules', 'ARBoxModule');

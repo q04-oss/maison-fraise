@@ -70,6 +70,7 @@ import fraiseChatRouter from './routes/fraise-chat';
 import webhooksRouter from './routes/webhooks';
 import varietyProfilesRouter from './routes/variety-profiles';
 import arNotesRouter from './routes/ar-notes';
+import arPoemRouter from './routes/ar-poem';
 import tastingJournalRouter from './routes/tasting-journal';
 import varietyMapRouter from './routes/variety-map';
 import pickupGridRouter from './routes/pickup-grid';
@@ -101,6 +102,7 @@ app.use('/api/admin', adminLimiter);
 const aiLimiter = rateLimit({ windowMs: 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
 app.use('/api/gift-note', aiLimiter);
 app.use('/api/ask', aiLimiter);
+app.use('/api/ar-poem', aiLimiter);
 
 // Raw body for Stripe webhook — must be registered before express.json()
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
@@ -190,6 +192,7 @@ app.use('/api/pickup-grid', pickupGridRouter);
 app.use('/api/gift-registry', giftRegistryRouter);
 app.use('/api/collectif-challenges', collectifChallengesRouter);
 app.use('/api/co-scans', coScansRouter);
+app.use('/api/ar-poem', arPoemRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

@@ -5,7 +5,7 @@ import CoreMotion
 
 class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
-  private let sceneView = ARSCNView()
+  let sceneView = ARSCNView()
   private let varietyData: NSDictionary
   private let onDismiss: () -> Void
   private var dismissTimer: Timer?
@@ -49,6 +49,11 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
   // AR Expanded 5-6: CoreMotion
   private var motionManager: CMMotionManager?
+
+  // AR Expanded 7
+  private var anchorController: ARImageAnchorController?
+  private var spatialAudioController: ARSpatialAudioController?
+  private var farmPortalView: ARFarmPortalView?
 
   init(varietyData: NSDictionary, onDismiss: @escaping () -> Void) {
     self.varietyData = varietyData
@@ -375,6 +380,15 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
       setupPostalHeatMap()
     }
 
+    // ─ ar-expanded-7 features ─
+    if !staffMode && !batchScanMode {
+      setupWorldAnchor()
+      setupFarmPortal()
+      setupTastingPoem()
+      setupSpatialAudio()
+      setupPhotosynthesisMeter()
+    }
+
     // Staff: quantity counter
     if staffMode && !batchScanMode, let sd = staffData {
       let qty = (sd["quantity"] as? NSNumber)?.intValue ?? 0
@@ -401,6 +415,8 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
     sceneView.session.pause()
     dismissTimer?.invalidate()
     motionManager?.stopAccelerometerUpdates()
+    spatialAudioController?.stop()
+    farmPortalView?.stopPolling()
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -1797,5 +1813,106 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
       v.centerXAnchor.constraint(equalTo: view.centerXAnchor),
       v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -80),
     ])
+  }
+
+  // MARK: - AR Expanded 7
+
+  // Feature 61 — World anchor (tap-to-lock surface)
+  private func setupWorldAnchor() {
+    let ctrl = ARImageAnchorController()
+    ctrl.attach(to: self)
+    anchorController = ctrl
+  }
+
+  // Feature 62 — Live farm portal webcam
+  private func setupFarmPortal() {
+    guard let urlStr = varietyData["farm_webcam_url"] as? String,
+          !urlStr.isEmpty,
+          let url = URL(string: urlStr) else { return }
+    let portal = ARFarmPortalView(webcamURL: url)
+    farmPortalView = portal
+    let img = UIGraphicsImageRenderer(size: portal.bounds.size).image { ctx in portal.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.22, height: 0.14)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0, 0.75, -0.70)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+    // Refresh texture every 2 seconds as portal polls
+    Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self, weak node, weak portal] _ in
+      guard let self = self, let node = node, let portal = portal else { return }
+      let fresh = UIGraphicsImageRenderer(size: portal.bounds.size).image { ctx in portal.layer.render(in: ctx.cgContext) }
+      (node.geometry as? SCNPlane)?.firstMaterial?.diffuse.contents = fresh
+    }
+  }
+
+  // Feature 63 — Generative tasting poem
+  private func setupTastingPoem() {
+    guard let poem = varietyData["ar_poem"] as? String, !poem.isEmpty else { return }
+    let v = ARTastingPoemView(poem: poem)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.21, height: 0.126)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(-0.26, -0.12, -0.60)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // Feature 64 — Spatial farm audio
+  private func setupSpatialAudio() {
+    guard let urlStr = varietyData["ambient_audio_url"] as? String,
+          !urlStr.isEmpty,
+          let url = URL(string: urlStr) else { return }
+    spatialAudioController = ARSpatialAudioController(audioURL: url)
+    // Source positioned near the main card
+    spatialAudioController?.updateSourcePosition(SCNVector3(0, 0, -0.55))
+  }
+
+  // Feature 65 — Photosynthesis meter (live solar data)
+  private func setupPhotosynthesisMeter() {
+    guard let solarRaw = varietyData["solar_data"] as? NSDictionary,
+          let irradiance = (solarRaw["irradiance_wm2"] as? NSNumber)?.intValue else { return }
+    let data = ARPhotosynthesisMeterView.SolarData(
+      irradianceWm2: irradiance,
+      cloudCoverPct: (solarRaw["cloud_cover_pct"] as? NSNumber)?.intValue ?? 0,
+      uvIndex: (solarRaw["uv_index"] as? NSNumber)?.doubleValue ?? 0
+    )
+    let v = ARPhotosynthesisMeterView(data: data)
+    let img = UIGraphicsImageRenderer(size: v.bounds.size).image { ctx in v.layer.render(in: ctx.cgContext) }
+    let plane = SCNPlane(width: 0.196, height: 0.084)
+    plane.firstMaterial!.diffuse.contents = img
+    plane.firstMaterial!.isDoubleSided = true
+    let node = SCNNode(geometry: plane)
+    node.position = SCNVector3(0.27, 0.50, -0.60)
+    let bc = SCNBillboardConstraint(); bc.freeAxes = .all
+    node.constraints = [bc]
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  // MARK: - ARSCNViewDelegate — plane detection for world anchor
+
+  func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
+    guard let planeAnchor = anchor as? ARPlaneAnchor else { return }
+    DispatchQueue.main.async {
+      self.anchorController?.planeDetected(at: planeAnchor.transform)
+    }
+  }
+
+  func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
+    guard let planeAnchor = anchor as? ARPlaneAnchor else { return }
+    DispatchQueue.main.async {
+      self.anchorController?.planeDetected(at: planeAnchor.transform)
+    }
+  }
+
+  // Spatial audio listener update each frame
+  func renderer(_ renderer: SCNSceneRenderer, updateAtTime time: TimeInterval) {
+    guard let transform = sceneView.session.currentFrame?.camera.transform else { return }
+    spatialAudioController?.updateListenerTransform(transform)
   }
 }

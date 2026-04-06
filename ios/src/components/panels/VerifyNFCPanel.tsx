@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -134,6 +134,25 @@ export default function VerifyNFCPanel() {
           fetchBundleSuggestion().catch(() => null),
           reorderData.variety_id ? fetchUpcomingDrop(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           fetchPersonalBestFlavor().catch(() => null),
+        ]);
+
+        // AR Expanded 7: fetch poem and solar data (after varietyProfile to use farm coords)
+        const vp = varietyProfile as any;
+        const farmLat = vp?.farm_lat ?? null;
+        const farmLng = vp?.farm_lng ?? null;
+        const [arPoem, solarData] = await Promise.all([
+          fetchArPoem({
+            variety_name: reorderData.variety_name ?? undefined,
+            farm: reorderData.farm ?? undefined,
+            harvest_date: reorderData.harvest_date ?? undefined,
+            brix_score: vp?.brix_score ?? undefined,
+            terrain_type: vp?.terrain_type ?? undefined,
+            moon_phase_at_harvest: vp?.moon_phase_at_harvest ?? undefined,
+            growing_method: vp?.growing_method ?? undefined,
+            farmer_name: vp?.farmer_name ?? undefined,
+            flavor_profile: vp ? { sweetness: vp.sweetness, acidity: vp.acidity, aroma: vp.aroma, tasting_notes: vp.tasting_notes } : undefined,
+          }).catch(() => null),
+          (farmLat != null && farmLng != null) ? fetchSolarIrradiance(farmLat, farmLng).catch(() => null) : Promise.resolve(null),
         ]);
 
         // Feature C: format standing order label server data into display string
@@ -279,6 +298,10 @@ export default function VerifyNFCPanel() {
           collectif_challenge: (currentChallenge as any) ?? null,
           variety_streak_leaders: (streakLeaders as any)?.leaders ?? (Array.isArray(streakLeaders) ? streakLeaders : []),
           current_user_streak_rank: (streakLeaders as any)?.my_rank ?? null,
+          // AR Expanded 7
+          farm_webcam_url: vp?.farm_webcam_url ?? null,
+          ar_poem: arPoem ?? null,
+          solar_data: solarData ?? null,
         };
         setState('success');
         const arResult = await ARBoxModule.presentAR(arPayload);

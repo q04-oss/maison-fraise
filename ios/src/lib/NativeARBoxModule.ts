@@ -117,6 +117,10 @@ export interface ARVarietyData {
   staff_avg_prep_seconds?: number | null;
   staff_accuracy_pct?: number | null;
   postal_heat_map?: Array<{ prefix: string; lat: number; lng: number; count: number }>;
+  // AR Expanded 7
+  farm_webcam_url?: string | null;
+  ar_poem?: string | null;
+  solar_data?: { irradiance_wm2: number; cloud_cover_pct: number; uv_index: number } | null;
 }
 
 // Feature E: Staff AR

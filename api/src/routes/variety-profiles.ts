@@ -40,6 +40,11 @@ db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS sunlight_ho
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS price_history_json text`).catch(() => {});
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_id integer`).catch(() => {});
 
+// AR expanded 7 columns
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_webcam_url text`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_lat numeric(10,6)`).catch(() => {});
+db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS farm_lng numeric(10,6)`).catch(() => {});
+
 // AR expanded 5-6 columns
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS orac_value integer`).catch(() => {});
 db.execute(sql`ALTER TABLE variety_profiles ADD COLUMN IF NOT EXISTS fermentation_profile_json text`).catch(() => {});
@@ -93,6 +98,7 @@ router.post('/', async (req: Request, res: Response) => {
     certifications_json, farm_founded_year, farm_milestones_json, irrigation_method,
     cover_crop, terrain_type, prevailing_wind, ambient_audio_url, mascot_id,
     folate_mcg, manganese_mg, potassium_mg, vitamin_k_mcg,
+    farm_webcam_url,
   } = req.body;
   if (!variety_id) { res.status(400).json({ error: 'variety_id required' }); return; }
   try {
@@ -108,6 +114,7 @@ router.post('/', async (req: Request, res: Response) => {
         certifications_json, farm_founded_year, farm_milestones_json, irrigation_method,
         cover_crop, terrain_type, prevailing_wind, ambient_audio_url, mascot_id,
         folate_mcg, manganese_mg, potassium_mg, vitamin_k_mcg,
+        farm_webcam_url,
         updated_at
       )
       VALUES (
@@ -121,6 +128,7 @@ router.post('/', async (req: Request, res: Response) => {
         ${certifications_json ?? null}, ${farm_founded_year ?? null}, ${farm_milestones_json ?? null}, ${irrigation_method ?? null},
         ${cover_crop ?? null}, ${terrain_type ?? null}, ${prevailing_wind ?? null}, ${ambient_audio_url ?? null}, ${mascot_id ?? null},
         ${folate_mcg ?? null}, ${manganese_mg ?? null}, ${potassium_mg ?? null}, ${vitamin_k_mcg ?? null},
+        ${farm_webcam_url ?? null},
         now()
       )
       ON CONFLICT (variety_id) DO UPDATE SET
@@ -171,6 +179,7 @@ router.post('/', async (req: Request, res: Response) => {
         manganese_mg = EXCLUDED.manganese_mg,
         potassium_mg = EXCLUDED.potassium_mg,
         vitamin_k_mcg = EXCLUDED.vitamin_k_mcg,
+        farm_webcam_url = EXCLUDED.farm_webcam_url,
         updated_at = now()
       RETURNING *
     `);

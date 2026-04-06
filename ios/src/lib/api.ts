@@ -3584,3 +3584,45 @@ export async function fetchPostalHeatMap(): Promise<Array<{ prefix: string; lat:
   } catch { return []; }
 }
 
+
+// AR Expanded 7: generative tasting poem
+export async function fetchArPoem(params: {
+  variety_name?: string | null;
+  farm?: string | null;
+  harvest_date?: string | null;
+  brix_score?: number | null;
+  terrain_type?: string | null;
+  moon_phase_at_harvest?: string | null;
+  growing_method?: string | null;
+  farmer_name?: string | null;
+  flavor_profile?: { sweetness?: number; acidity?: number; aroma?: number; tasting_notes?: string } | null;
+}): Promise<string | null> {
+  try {
+    const auth = await authHeader();
+    const r = await fetch(`${BASE_URL}/api/ar-poem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...auth },
+      body: JSON.stringify(params),
+    });
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    return data?.poem ?? null;
+  } catch { return null; }
+}
+
+// AR Expanded 7: real-time solar irradiance from Open-Meteo
+export async function fetchSolarIrradiance(lat: number, lng: number): Promise<{ irradiance_wm2: number; cloud_cover_pct: number; uv_index: number } | null> {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=direct_radiation,cloud_cover,uv_index&timezone=auto`;
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    const current = data?.current;
+    if (!current) return null;
+    return {
+      irradiance_wm2: Math.round(current.direct_radiation ?? 0),
+      cloud_cover_pct: Math.round(current.cloud_cover ?? 0),
+      uv_index: parseFloat((current.uv_index ?? 0).toFixed(1)),
+    };
+  } catch { return null; }
+}
