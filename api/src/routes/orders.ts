@@ -346,6 +346,125 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
 });
 
 
+// POST /api/orders/pay-with-balance — pay for an order using ad_balance_cents
+// Atomically deducts the balance and confirms the order immediately (no Stripe)
+router.post('/pay-with-balance', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const {
+    variety_id, location_id, time_slot_id,
+    chocolate, finish, quantity, is_gift, gift_note, push_token,
+  } = req.body;
+
+  if (!variety_id || !location_id || !time_slot_id || !chocolate || !finish || !quantity) {
+    res.status(400).json({ error: 'Missing required fields' }); return;
+  }
+
+  try {
+    const [currentUser] = await db.select({ email: users.email, ad_balance_cents: users.ad_balance_cents, referred_by_code: users.referred_by_code })
+      .from(users).where(eq(users.id, userId)).limit(1);
+    if (!currentUser) { res.status(401).json({ error: 'unauthorized' }); return; }
+
+    const [variety] = await db.select().from(varieties).where(eq(varieties.id, variety_id));
+    if (!variety || !variety.active) { res.status(404).json({ error: 'Variety not found' }); return; }
+
+    if (variety.stock_remaining < quantity) { res.status(409).json({ error: 'insufficient_stock', available: variety.stock_remaining }); return; }
+
+    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id));
+    if (!slot) { res.status(404).json({ error: 'Time slot not found' }); return; }
+    if (slot.capacity - slot.booked < quantity) { res.status(400).json({ error: 'Time slot is full' }); return; }
+
+    let total_cents = variety.price_cents * quantity;
+
+    // Apply referral discount if applicable (first order only)
+    let discount_applied = false;
+    if (currentUser.referred_by_code) {
+      const [prior] = await db.select({ id: orders.id }).from(orders)
+        .where(and(eq(orders.customer_email, currentUser.email), eq(orders.discount_applied, true))).limit(1);
+      if (!prior) { total_cents = Math.round(total_cents * 0.9); discount_applied = true; }
+    }
+
+    // Atomically deduct balance — fails if insufficient
+    const deducted = await db.update(users)
+      .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${total_cents}` })
+      .where(and(eq(users.id, userId), sql`${users.ad_balance_cents} >= ${total_cents}`))
+      .returning({ ad_balance_cents: users.ad_balance_cents });
+    if (!deducted.length) { res.status(402).json({ error: 'insufficient_balance' }); return; }
+
+    const nfc_token = randomUUID();
+
+    // Create order + confirm atomically
+    const [order] = await db.insert(orders).values({
+      variety_id, location_id, time_slot_id, chocolate, finish,
+      quantity, is_gift: is_gift ?? false, total_cents,
+      stripe_payment_intent_id: `balance_${randomUUID()}`,
+      status: 'paid', customer_email: currentUser.email,
+      push_token: push_token ?? null, gift_note: gift_note ?? null,
+      nfc_token, discount_applied,
+    }).returning();
+
+    // Stock + slot update
+    await db.transaction(async (tx) => {
+      const result = await tx.update(varieties)
+        .set({ stock_remaining: sql`${varieties.stock_remaining} - ${quantity}` })
+        .where(and(eq(varieties.id, variety_id), sql`${varieties.stock_remaining} >= ${quantity}`))
+        .returning({ stock_remaining: varieties.stock_remaining });
+      if (!result.length) throw new Error('sold_out');
+      await tx.update(timeSlots)
+        .set({ booked: sql`${timeSlots.booked} + ${quantity}` })
+        .where(eq(timeSlots.id, time_slot_id));
+    });
+
+    // Legitimacy event
+    await db.insert(legitimacyEvents).values({ user_id: userId, event_type: 'order_placed', weight: 1 }).catch(() => {});
+
+    // Confirmation email
+    const [slotRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id));
+    if (slotRow && variety) {
+      sendOrderConfirmation({
+        to: currentUser.email,
+        varietyName: variety.name,
+        chocolate: order.chocolate,
+        finish: order.finish,
+        quantity: order.quantity,
+        isGift: order.is_gift,
+        totalCents: total_cents,
+        slotDate: slotRow.date,
+        slotTime: slotRow.time,
+      }).catch(() => {});
+    }
+
+    // Shop thread
+    (async () => {
+      try {
+        const [location] = await db.select({ business_id: locations.id }).from(locations).where(eq(locations.id, location_id));
+        if (!location) return;
+        const [shopUser] = await db.select({ id: users.id, display_name: users.display_name, push_token: users.push_token })
+          .from(users).where(and(eq(users.is_shop, true), eq(users.business_id, location.business_id ?? location_id)));
+        if (!shopUser) return;
+        const [varietyRow] = await db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, variety_id));
+        const [slotData] = await db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id));
+        const timeStr = slotData?.time ? slotData.time.substring(0, 5) : '';
+        await db.insert(messages).values({
+          sender_id: shopUser.id, recipient_id: userId,
+          body: `Order received — ${varietyRow?.name ?? 'your order'} ready at ${timeStr}. See you then.`,
+          order_id: order.id,
+        });
+        if (shopUser.push_token) {
+          sendPushNotification(shopUser.push_token, {
+            title: 'New order', body: `Order #${order.id} placed`,
+            data: { screen: 'messages', user_id: userId },
+          }).catch(() => {});
+        }
+      } catch { /* non-fatal */ }
+    })();
+
+    res.status(201).json({ ...order, user_db_id: userId });
+  } catch (err) {
+    logger.error('Balance order error: ' + String(err));
+    res.status(500).json({ error: String(err) });
+  }
+});
+
 // GET /api/orders?email= — orders by customer email, enriched with variety/slot
 router.get('/', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;

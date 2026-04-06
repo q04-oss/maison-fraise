@@ -156,6 +156,32 @@ export async function createOrder(body: {
 }
 
 
+export async function payOrderWithBalance(body: {
+  variety_id: number;
+  location_id: number;
+  time_slot_id: number;
+  chocolate: string;
+  finish: string;
+  quantity: number;
+  is_gift: boolean;
+  push_token?: string | null;
+  gift_note?: string | null;
+}) {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/orders/pay-with-balance`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    if (errBody?.error === 'insufficient_balance') throw new Error('insufficient_balance');
+    if (errBody?.error === 'sold_out') throw new Error('sold_out');
+    throw new Error(errBody?.error ?? 'Order could not be placed.');
+  }
+  return res.json();
+}
+
 export async function confirmOrder(orderId: number) {
   const res = await fetch(`${BASE_URL}/api/orders/${orderId}/confirm`, {
     method: 'POST',

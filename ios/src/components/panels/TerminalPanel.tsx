@@ -14,7 +14,7 @@ import {
   verifyAppleSignIn, setAuthToken, deleteAuthToken,
   fetchOrdersByEmail, fetchTimeSlots,
   demoLogin, updateDisplayName,
-  createOrder, confirmOrder, operatorLogin,
+  createOrder, confirmOrder, payOrderWithBalance, operatorLogin,
   startIdentityVerification, fetchMyVentures,
   fetchMyMarketOrders, collectMarketOrder, fetchAdBalance, fetchAvailableAds,
   respondToAdImpression,
@@ -360,6 +360,48 @@ const nameInputRef = useRef<TextInput>(null);
         setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 150);
       } else {
         Alert.alert('Something went wrong.', err instanceof Error ? err.message : 'Try again.');
+      }
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const handlePayWithBalance = async () => {
+    if (!location?.id || !inlineOrder.variety_id || !inlineOrder.chocolate || !inlineOrder.finish || !inlineOrder.time_slot_id) {
+      Alert.alert('Incomplete', 'Something is missing from your order.'); return;
+    }
+    setPaying(true);
+    try {
+      const confirmed = await payOrderWithBalance({
+        variety_id: inlineOrder.variety_id!,
+        location_id: location.id,
+        time_slot_id: inlineOrder.time_slot_id!,
+        chocolate: inlineOrder.chocolate!,
+        finish: inlineOrder.finish!,
+        quantity: inlineOrder.quantity,
+        is_gift: false,
+        push_token: pushToken,
+        gift_note: null,
+      });
+      if (confirmed.user_db_id) await AsyncStorage.setItem('user_db_id', String(confirmed.user_db_id));
+      setAdBalanceCents(prev => prev - totalCents);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setConfirmedOrder(confirmed);
+      setOrderStep('confirmed');
+      setOrder({ order_id: confirmed.id, location_id: location.id });
+      fetchOrdersByEmail()
+        .then((orders: any[]) => {
+          const paid = orders.filter((o: any) => o.status === 'paid' || o.status === 'confirmed').sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
+          setRecentOrders(paid.slice(0, 5));
+        }).catch(() => {});
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Try again.';
+      if (msg === 'insufficient_balance') {
+        Alert.alert('Insufficient balance', 'Your ad earnings don\'t cover this order. Pay with card instead.');
+      } else if (msg === 'sold_out') {
+        Alert.alert('Sold out', 'This variety is no longer available.');
+      } else {
+        Alert.alert('Something went wrong.', msg);
       }
     } finally {
       setPaying(false);
@@ -807,14 +849,30 @@ const nameInputRef = useRef<TextInput>(null);
                           <Text style={[styles.reviewDetail, { color: c.muted }]}>{inlineOrder.time_slot_time}  ·  {location?.name}</Text>
                           <View style={styles.reviewFooter}>
                             <Text style={[styles.reviewTotal, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
-                            <TouchableOpacity
-                              style={[styles.payBtn, { backgroundColor: c.accent }, paying && { opacity: 0.5 }]}
-                              onPress={handlePay}
-                              disabled={paying}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={[styles.payBtnText, { color: c.ctaText }]}>{paying ? 'Processing…' : 'Place Order'}</Text>
-                            </TouchableOpacity>
+                            <View style={styles.reviewPayBtns}>
+                              {userDbId && adBalanceCents >= totalCents && (
+                                <TouchableOpacity
+                                  style={[styles.payBtn, { backgroundColor: c.accent }, paying && { opacity: 0.5 }]}
+                                  onPress={handlePayWithBalance}
+                                  disabled={paying}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[styles.payBtnText, { color: c.ctaText }]}>
+                                    {paying ? 'Processing…' : `use ad balance  ·  CA$${(adBalanceCents / 100).toFixed(2)}`}
+                                  </Text>
+                                </TouchableOpacity>
+                              )}
+                              <TouchableOpacity
+                                style={[styles.payBtn, userDbId && adBalanceCents >= totalCents ? [styles.payBtnOutline, { borderColor: c.border }] : { backgroundColor: c.accent }, paying && { opacity: 0.5 }]}
+                                onPress={handlePay}
+                                disabled={paying}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.payBtnText, { color: userDbId && adBalanceCents >= totalCents ? c.text : c.ctaText }]}>
+                                  {paying ? 'Processing…' : 'pay with card'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
                       </>
@@ -1045,9 +1103,11 @@ const styles = StyleSheet.create({
   reviewBlock: { paddingTop: 12, gap: 6 },
   reviewVariety: { fontSize: 22, fontFamily: fonts.playfair },
   reviewDetail: { fontSize: 12, fontFamily: fonts.dmMono },
-  reviewFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12 },
+  reviewFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, gap: 12 },
   reviewTotal: { fontSize: 24, fontFamily: fonts.playfair },
+  reviewPayBtns: { flex: 1, gap: 8, alignItems: 'flex-end' },
   payBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 24 },
+  payBtnOutline: { borderWidth: 1 },
   payBtnText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '700' },
   confirmedBlock: { paddingTop: 12, gap: 8 },
   confirmedTitle: { fontSize: 22, fontFamily: fonts.playfair },
