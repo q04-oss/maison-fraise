@@ -7,6 +7,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useApp } from '../../../App';
 import { searchVerifiedUsers, generateGiftNote, createStandingOrder, placeStandingOrderFromFund } from '../../lib/api';
+import { getAverageWakeTimeMinutesAfterMidnight } from '../../lib/HealthKitService';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
@@ -41,6 +42,23 @@ export default function StandingOrderPanel() {
       setIsVerified(verified === 'true');
     });
   }, []);
+
+  useEffect(() => {
+    // TIME_PREFS start hours in minutes after midnight: 9:00=540, 11:00=660, 13:00=780, 15:00=900
+    const slotStartMinutes = [540, 660, 780, 900];
+    getAverageWakeTimeMinutesAfterMidnight(14).then(wakeMinutes => {
+      if (wakeMinutes === null) return;
+      const targetMinutes = wakeMinutes + 60; // 1 hour after wake
+      let closestIndex = 0;
+      let closestDiff = Math.abs(targetMinutes - slotStartMinutes[0]);
+      for (let i = 1; i < slotStartMinutes.length; i++) {
+        const diff = Math.abs(targetMinutes - slotStartMinutes[i]);
+        if (diff < closestDiff) { closestDiff = diff; closestIndex = i; }
+      }
+      setSuggestedSlot(TIME_PREFS[closestIndex]);
+    }).catch(() => {});
+  }, []);
+  const [suggestedSlot, setSuggestedSlot] = useState<string | null>(null);
   const [freq, setFreq] = useState('monthly');
   const [timePref, setTimePref] = useState(TIME_PREFS[0]);
   const [recipientQuery, setRecipientQuery] = useState('');
@@ -284,6 +302,21 @@ export default function StandingOrderPanel() {
 
         {/* Time */}
         <Text style={[styles.sectionLabel, { color: c.muted }]}>PREFERRED TIME</Text>
+        {suggestedSlot !== null && (
+          <View style={[styles.sleepSuggestion, { backgroundColor: c.card, borderColor: c.border }]}>
+            <Text style={[styles.sleepSuggestionLabel, { color: c.muted }]}>BASED ON YOUR SLEEP</Text>
+            <View style={styles.sleepSuggestionRow}>
+              <Text style={[styles.sleepSuggestionText, { color: c.text }]}>
+                {'Your usual wake time suggests the '}
+                <Text style={{ color: c.accent }}>{suggestedSlot}</Text>
+                {' slot.'}
+              </Text>
+              <TouchableOpacity onPress={() => setTimePref(suggestedSlot)} activeOpacity={0.7}>
+                <Text style={[styles.sleepSuggestionCta, { color: c.accent }]}>use this →</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
         <View style={styles.timeRow}>
           {TIME_PREFS.map(t => (
             <TouchableOpacity
@@ -453,4 +486,12 @@ const styles = StyleSheet.create({
   paymentOptionText: { fontSize: 13, fontFamily: fonts.dmMono },
   paymentOptionSub: { fontSize: 12, fontFamily: fonts.dmMono, marginTop: 2 },
   fundError: { fontSize: 12, fontFamily: fonts.dmMono, lineHeight: 18, marginTop: 4 },
+  sleepSuggestion: {
+    borderRadius: 12, borderWidth: StyleSheet.hairlineWidth,
+    padding: SPACING.sm, gap: 6,
+  },
+  sleepSuggestionLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.8 },
+  sleepSuggestionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  sleepSuggestionText: { flex: 1, fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20 },
+  sleepSuggestionCta: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1 },
 });

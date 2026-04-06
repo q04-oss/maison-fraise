@@ -17,6 +17,8 @@ db.execute(sql`
   ALTER TABLE business_menu_items ADD COLUMN IF NOT EXISTS sugar_g INTEGER;
   ALTER TABLE business_menu_items ADD COLUMN IF NOT EXISTS fiber_g INTEGER;
 `).catch(() => {});
+// ALTER TYPE must run outside the transaction above
+db.execute(sql`ALTER TYPE chocolate ADD VALUE IF NOT EXISTS 'none'`).catch(() => {});
 
 interface HealthContext {
   active_energy_kcal: number;

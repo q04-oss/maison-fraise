@@ -5,15 +5,20 @@ import {
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchMyStats } from '../../lib/api';
+import { getAverageVitaminCMgPerDay } from '../../lib/HealthKitService';
 
 export default function MyProfilePanel() {
   const { goBack, showPanel } = usePanel();
   const c = useColors();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [vitaminCNudge, setVitaminCNudge] = useState(false);
 
   useEffect(() => {
     fetchMyStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
+    getAverageVitaminCMgPerDay(7).then(avg => {
+      if (avg < 50) setVitaminCNudge(true);
+    }).catch(() => {});
   }, []);
 
   return (
@@ -58,6 +63,17 @@ export default function MyProfilePanel() {
               <Text style={[styles.statLabel, { color: c.muted }]}>CONNECTIONS</Text>
             </View>
           </View>
+
+          {/* Vitamin C nudge */}
+          {vitaminCNudge && (
+            <View style={[styles.nudgeCard, { borderColor: c.accent, backgroundColor: c.card }]}>
+              <Text style={[styles.nudgeTitle, { color: c.text }]}>YOUR VITAMIN C HAS BEEN LOW THIS WEEK</Text>
+              <Text style={[styles.nudgeSub, { color: c.muted }]}>Plain strawberries are one of the richest sources.</Text>
+              <TouchableOpacity onPress={() => showPanel('standing-order')} activeOpacity={0.7}>
+                <Text style={[styles.nudgeCta, { color: c.accent }]}>order plain strawberries →</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Ad balance / earnings */}
           <View style={[styles.section, { borderBottomColor: c.border }]}>
@@ -148,4 +164,12 @@ const styles = StyleSheet.create({
   },
   navLabel: { fontFamily: fonts.dmSans, fontSize: 15 },
   navChevron: { fontSize: 18 },
+  nudgeCard: {
+    marginHorizontal: SPACING.md, marginVertical: SPACING.sm,
+    borderRadius: 12, borderWidth: 1,
+    padding: SPACING.md, gap: 6,
+  },
+  nudgeTitle: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1.5 },
+  nudgeSub: { fontFamily: fonts.dmSans, fontSize: 13, lineHeight: 20 },
+  nudgeCta: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 1, marginTop: 4 },
 });

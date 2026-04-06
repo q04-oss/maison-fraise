@@ -96,6 +96,15 @@ export const STRAWBERRIES: Strawberry[] = [
 
 export const CHOCOLATES: Chocolate[] = [
   {
+    id: 'none',
+    name: 'No chocolate',
+    source: 'Plain strawberry',
+    description: 'The strawberry, unadorned.',
+    tagline: 'As nature intended.',
+    swatchColor: '#E8D5C4',
+    tag: 'PLAIN',
+  },
+  {
     id: 'guanaja_70',
     name: 'Guanaja 70%',
     source: 'Valrhona, Rhône Valley',

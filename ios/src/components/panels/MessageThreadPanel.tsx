@@ -10,7 +10,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearbyJobs, applyForJob, JobPosting, acceptDinnerInvite, declineDinnerInvite, confirmEveningToken } from '../../lib/api';
-import { logStrawberries } from '../../lib/HealthKitService';
+import { logStrawberries, logMindfulSession } from '../../lib/HealthKitService';
 import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
@@ -199,6 +199,11 @@ export default function MessageThreadPanel() {
       setMessages(prev => prev.map(m =>
         m.id === messageId ? { ...m, metadata: { ...m.metadata, status: newStatus } } : m
       ));
+      if (result.status === 'minted') {
+        const endDate = new Date();
+        const startDate = new Date(endDate.getTime() - 2 * 60 * 60 * 1000); // 2 hours ago
+        logMindfulSession(startDate, endDate).catch(() => {});
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Could not confirm');
     } finally {

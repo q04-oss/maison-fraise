@@ -35,6 +35,8 @@ export async function requestHealthKitPermissions(): Promise<boolean> {
         'dietarySugar',
         'dietaryFiber',
         'stepCount',
+        'dietaryVitaminC',
+        'sleepAnalysis',
       ],
       share: [
         'dietaryEnergyConsumed',
@@ -44,6 +46,7 @@ export async function requestHealthKitPermissions(): Promise<boolean> {
         'dietarySugar',
         'dietaryFiber',
         'dietaryVitaminC',
+        'mindfulSession',
       ],
     });
     return true;
@@ -86,6 +89,62 @@ async function sumSamples(type: string, from: Date, to: Date): Promise<number> {
     return samples.reduce((acc: number, s: any) => acc + (s.quantity ?? 0), 0);
   } catch {
     return 0;
+  }
+}
+
+// Returns average dietary vitamin C in mg/day over the past `days` days.
+// Returns 0 if no data is available.
+export async function getAverageVitaminCMgPerDay(days: number): Promise<number> {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+  const total = await sumSamples('dietaryVitaminC', from, to);
+  return total / days;
+}
+
+// Saves a mindful session category sample spanning the given time range.
+// Returns true on success, false on failure.
+export async function logMindfulSession(startDate: Date, endDate: Date): Promise<boolean> {
+  const HKCategoryValueNotApplicable = 0;
+  try {
+    await HealthKit.saveCategorySample('mindfulSession', HKCategoryValueNotApplicable, { startDate, endDate });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Returns the average wake time (minutes after midnight) based on sleep data
+// from the past `days` days, or null if fewer than 3 days of data are available.
+// Wake time is proxied as the latest end time of any 'Asleep' (value === 1) sample each day.
+export async function getAverageWakeTimeMinutesAfterMidnight(days: number): Promise<number | null> {
+  const to = new Date();
+  const from = new Date(to.getTime() - days * 24 * 60 * 60 * 1000);
+  try {
+    const samples = await HealthKit.queryCategorySamples('sleepAnalysis', { from, to });
+    // value === 1 means Asleep
+    const asleepSamples = (samples as any[]).filter((s: any) => s.value === 1);
+
+    // Group by calendar day (using endDate), keep latest endDate per day
+    const latestEndByDay = new Map<string, Date>();
+    for (const s of asleepSamples) {
+      const end = new Date(s.endDate);
+      const dayKey = `${end.getFullYear()}-${end.getMonth()}-${end.getDate()}`;
+      const existing = latestEndByDay.get(dayKey);
+      if (!existing || end > existing) {
+        latestEndByDay.set(dayKey, end);
+      }
+    }
+
+    if (latestEndByDay.size < 3) return null;
+
+    let totalMinutes = 0;
+    for (const wakeTime of latestEndByDay.values()) {
+      const minutesAfterMidnight = wakeTime.getHours() * 60 + wakeTime.getMinutes();
+      totalMinutes += minutesAfterMidnight;
+    }
+    return totalMinutes / latestEndByDay.size;
+  } catch {
+    return null;
   }
 }
 

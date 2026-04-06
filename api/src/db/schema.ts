@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 export const chocolateEnum = pgEnum('chocolate', [
+  'none',
   'guanaja_70',
   'caraibe_66',
   'jivara_40',
