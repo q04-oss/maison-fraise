@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearbyJobs, applyForJob, JobPosting } from '../../lib/api';
+import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearbyJobs, applyForJob, JobPosting, acceptDinnerInvite, declineDinnerInvite, confirmEveningToken } from '../../lib/api';
 import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
@@ -34,6 +34,8 @@ export default function MessageThreadPanel() {
   const businessId: number | null = panelData?.businessId ?? null;
   const otherName: string = panelData?.displayName ?? panelData?.userCode ?? 'Unknown';
   const otherCode: string = panelData?.userCode ?? otherName;
+
+  const [actingInvite, setActingInvite] = useState<number | null>(null);
 
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [appliedJobIds, setAppliedJobIds] = useState<Set<number>>(new Set());
@@ -144,6 +146,50 @@ export default function MessageThreadPanel() {
       }
     } finally {
       setApplyingJobId(null);
+    }
+  };
+
+  const handleAcceptInvite = async (messageId: number) => {
+    setActingInvite(messageId);
+    try {
+      const result = await acceptDinnerInvite(messageId);
+      setMessages(prev => prev.map(m =>
+        m.id === messageId
+          ? { ...m, metadata: { ...m.metadata, status: result.status === 'confirmed' ? 'confirmed' : 'accepted' } }
+          : m
+      ));
+      load();
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not accept');
+    } finally {
+      setActingInvite(null);
+    }
+  };
+
+  const handleDeclineInvite = async (messageId: number) => {
+    setActingInvite(messageId);
+    try {
+      await declineDinnerInvite(messageId);
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...m.metadata, status: 'declined' } } : m
+      ));
+    } catch { /* ignore */ } finally {
+      setActingInvite(null);
+    }
+  };
+
+  const handleRememberEvening = async (messageId: number, bookingId: number) => {
+    setActingInvite(messageId);
+    try {
+      const result = await confirmEveningToken(bookingId);
+      const newStatus = result.status === 'minted' ? 'minted' : 'remember';
+      setMessages(prev => prev.map(m =>
+        m.id === messageId ? { ...m, metadata: { ...m.metadata, status: newStatus } } : m
+      ));
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not confirm');
+    } finally {
+      setActingInvite(null);
     }
   };
 
@@ -263,6 +309,92 @@ export default function MessageThreadPanel() {
               );
             }
 
+            if (item.type === 'dinner_invite') {
+              const meta = item.metadata ?? {};
+              const status = meta.status ?? 'pending';
+              const isActing = actingInvite === item.id;
+              const windowOpen = meta.window_closes_at && new Date(meta.window_closes_at) > new Date();
+              const showRemember = status === 'confirmed' && windowOpen;
+
+              if (status === 'declined') return null;
+
+              return (
+                <View style={[styles.dinnerCard, { borderColor: c.border, backgroundColor: c.card }]}>
+                  <Text style={[styles.offerLabel, { color: c.accent }]}>evening invitation</Text>
+                  <Text style={[styles.offerVariety, { color: c.text }]}>{meta.offer_title ?? meta.business_name}</Text>
+                  <Text style={[styles.offerDetail, { color: c.muted }]}>{meta.business_name}</Text>
+                  {(meta.reservation_date || meta.reservation_time) && (
+                    <Text style={[styles.offerDetail, { color: c.muted }]}>
+                      {[meta.reservation_date, meta.reservation_time].filter(Boolean).join(' · ')}
+                    </Text>
+                  )}
+
+                  {status === 'pending' && (
+                    <View style={styles.offerFooter}>
+                      <TouchableOpacity
+                        style={[styles.offerBtn, { borderColor: c.border }]}
+                        onPress={() => handleDeclineInvite(item.id)}
+                        disabled={isActing} activeOpacity={0.7}
+                      >
+                        {isActing ? <ActivityIndicator size="small" color={c.muted} /> :
+                          <Text style={[styles.offerBtnText, { color: c.muted }]}>decline</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.offerBtn, { borderColor: c.accent }]}
+                        onPress={() => handleAcceptInvite(item.id)}
+                        disabled={isActing} activeOpacity={0.7}
+                      >
+                        {isActing ? <ActivityIndicator size="small" color={c.accent} /> :
+                          <Text style={[styles.offerBtnText, { color: c.accent }]}>accept →</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {status === 'accepted' && (
+                    <Text style={[styles.offerDetail, { color: c.muted, marginTop: 8 }]}>
+                      You're confirmed — waiting for your companion.
+                    </Text>
+                  )}
+
+                  {status === 'confirmed' && meta.companion_name && !showRemember && (
+                    <Text style={[styles.offerDetail, { color: c.muted, marginTop: 8 }]}>
+                      Your companion is {meta.companion_name}.
+                    </Text>
+                  )}
+
+                  {showRemember && (
+                    <View>
+                      {meta.companion_name && (
+                        <Text style={[styles.offerDetail, { color: c.muted, marginTop: 8 }]}>
+                          Evening with {meta.companion_name}.
+                        </Text>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.offerBtn, { borderColor: c.accent, marginTop: 10, alignSelf: 'flex-start' }]}
+                        onPress={() => handleRememberEvening(item.id, meta.booking_id)}
+                        disabled={isActing} activeOpacity={0.7}
+                      >
+                        {isActing ? <ActivityIndicator size="small" color={c.accent} /> :
+                          <Text style={[styles.offerBtnText, { color: c.accent }]}>remember this evening</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {status === 'minted' && (
+                    <Text style={[styles.offerDetail, { color: c.accent, marginTop: 8, letterSpacing: 1 }]}>
+                      evening remembered · #{String(meta.booking_id).padStart(4, '0')}
+                    </Text>
+                  )}
+
+                  {status === 'expired' && (
+                    <Text style={[styles.offerDetail, { color: c.muted, marginTop: 8 }]}>
+                      This evening has passed.
+                    </Text>
+                  )}
+                </View>
+              );
+            }
+
             if (item.type === 'order_confirm') {
               const meta = item.metadata ?? {};
               return (
@@ -371,6 +503,11 @@ const styles = StyleSheet.create({
   offerBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   offerBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   confirmCard: {
+    marginHorizontal: SPACING.md, marginVertical: 8,
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 12,
+    padding: SPACING.md, gap: 6,
+  },
+  dinnerCard: {
     marginHorizontal: SPACING.md, marginVertical: 8,
     borderWidth: StyleSheet.hairlineWidth, borderRadius: 12,
     padding: SPACING.md, gap: 6,

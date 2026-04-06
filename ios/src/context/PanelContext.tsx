@@ -51,7 +51,8 @@ export type PanelId =
   | 'reservation-booking'
   | 'portrait-tokens'
   | 'portrait-token-detail'
-  | 'portrait-licensing';
+  | 'portrait-licensing'
+  | 'evening-tokens';
 
 export interface OrderState {
   variety_id: number | null;

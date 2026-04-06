@@ -1235,3 +1235,19 @@ export const portraitTokenListings = pgTable('portrait_token_listings', {
   sold_at: timestamp('sold_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── Evening tokens ───────────────────────────────────────────────────────────
+
+export const eveningTokens = pgTable('evening_tokens', {
+  id: serial('id').primaryKey(),
+  booking_id: integer('booking_id').notNull().unique(),
+  user_a_id: integer('user_a_id').notNull(),
+  user_b_id: integer('user_b_id').notNull(),
+  business_id: integer('business_id').notNull(),
+  offer_id: integer('offer_id').notNull(),
+  window_closes_at: timestamp('window_closes_at').notNull(),
+  user_a_confirmed: boolean('user_a_confirmed').notNull().default(false),
+  user_b_confirmed: boolean('user_b_confirmed').notNull().default(false),
+  minted_at: timestamp('minted_at'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});

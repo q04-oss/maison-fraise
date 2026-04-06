@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { reservationOffers, reservationBookings, businesses, users } from '../db/schema';
+import { reservationOffers, reservationBookings, businesses, users, eveningTokens, messages } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { sendPushNotification } from '../lib/push';
 import { logger } from '../lib/logger';
@@ -201,6 +201,27 @@ router.post('/bookings/:bookingId/respond', requireUser, async (req: Request, re
     // Notify both guests and remind shop about strawberries
     confirmBookingAsync(booking).catch(() => {});
 
+    // For platform_match mode, activate the evening token window
+    (async () => {
+      try {
+        const [offer] = await db.select({
+          mode: reservationOffers.mode,
+          business_id: reservationOffers.business_id,
+          reservation_date: reservationOffers.reservation_date,
+        }).from(reservationOffers).where(eq(reservationOffers.id, booking.offer_id));
+        if (offer?.mode === 'platform_match' && booking.guest_user_id) {
+          await activateEveningTokenWindow(
+            bookingId,
+            booking.offer_id,
+            booking.initiator_user_id,
+            booking.guest_user_id,
+            offer.business_id,
+            offer.reservation_date ?? null,
+          );
+        }
+      } catch { /* non-fatal */ }
+    })();
+
     res.json({ ok: true, status: 'confirmed' });
   } catch (err) {
     logger.error(`Booking respond error: ${String(err)}`);
@@ -283,6 +304,11 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
       slots_total: slots,
       slots_remaining: slots,
     }).returning();
+
+    if (created.mode === 'platform_match') {
+      dispatchDinnerInvites(created.id, userId, user.business_id).catch(() => {});
+    }
+
     res.status(201).json(created);
   } catch (err) {
     logger.error(`Offer create error: ${String(err)}`);
@@ -339,7 +365,17 @@ router.post('/:id/join', requireUser, async (req: Request, res: Response) => {
             ));
         });
 
-        if (confirmed) confirmBookingAsync({ ...confirmed, guest_user_id: userId }).catch(() => {});
+        if (confirmed) {
+          confirmBookingAsync({ ...confirmed, guest_user_id: userId }).catch(() => {});
+          activateEveningTokenWindow(
+            waiting.id,
+            offerId,
+            waiting.initiator_user_id,
+            userId,
+            offer.business_id,
+            offer.reservation_date ?? null,
+          ).catch(() => {});
+        }
         res.json({ status: 'confirmed', booking_id: waiting.id });
       } else {
         // No match yet — join the pool
@@ -409,6 +445,136 @@ router.patch('/:id', requireUser, async (req: Request, res: Response) => {
 });
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
+
+async function dispatchDinnerInvites(offerId: number, shopUserId: number, businessId: number) {
+  try {
+    const existingInvites = await db.select({ recipient_id: messages.recipient_id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.type, 'dinner_invite'),
+          sql`(${messages.metadata}->>'offer_id')::int = ${offerId}`
+        )
+      );
+    const alreadyInvited = new Set(existingInvites.map(r => r.recipient_id));
+
+    const [offer] = await db.select({
+      title: reservationOffers.title,
+      reservation_date: reservationOffers.reservation_date,
+      reservation_time: reservationOffers.reservation_time,
+      value_cents: reservationOffers.value_cents,
+    }).from(reservationOffers).where(eq(reservationOffers.id, offerId));
+    if (!offer) return;
+
+    const [biz] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, businessId));
+
+    const batch = await db.select({ id: users.id, push_token: users.push_token })
+      .from(users)
+      .where(
+        and(
+          eq(users.portal_opted_in, true),
+          sql`${users.id} != ${shopUserId}`,
+        )
+      )
+      .limit(10);
+
+    const toInvite = batch.filter(u => !alreadyInvited.has(u.id)).slice(0, 6);
+
+    for (const user of toInvite) {
+      const metadata = {
+        offer_id: offerId,
+        offer_title: offer.title,
+        business_name: biz?.name ?? 'The restaurant',
+        reservation_date: offer.reservation_date ?? null,
+        reservation_time: offer.reservation_time ?? null,
+        value_cents: offer.value_cents,
+        status: 'pending',
+        booking_id: null,
+        companion_name: null,
+        window_closes_at: null,
+      };
+      await db.insert(messages).values({
+        sender_id: shopUserId,
+        recipient_id: user.id,
+        body: `You're invited to an evening at ${biz?.name ?? 'a restaurant'}.`,
+        type: 'dinner_invite',
+        metadata,
+      });
+
+      if (user.push_token) {
+        sendPushNotification(user.push_token, {
+          title: `An evening at ${biz?.name ?? 'a restaurant'}`,
+          body: `${offer.title}${offer.reservation_date ? ' · ' + offer.reservation_date : ''}. Dinner for two, fully hosted.`,
+          data: { screen: 'messages' },
+        }).catch(() => {});
+      }
+    }
+  } catch { /* non-fatal */ }
+}
+
+async function activateEveningTokenWindow(
+  bookingId: number,
+  offerId: number,
+  userAId: number,
+  userBId: number,
+  businessId: number,
+  reservationDate: string | null,
+) {
+  let windowClosesAt: Date;
+  if (reservationDate) {
+    windowClosesAt = new Date(reservationDate);
+    windowClosesAt.setDate(windowClosesAt.getDate() + 2);
+  } else {
+    windowClosesAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+  }
+
+  await db.insert(eveningTokens).values({
+    booking_id: bookingId,
+    user_a_id: userAId,
+    user_b_id: userBId,
+    business_id: businessId,
+    offer_id: offerId,
+    window_closes_at: windowClosesAt,
+  }).onConflictDoNothing();
+
+  const [userA] = await db.select({ display_name: users.display_name, user_code: users.user_code }).from(users).where(eq(users.id, userAId));
+  const [userB] = await db.select({ display_name: users.display_name, user_code: users.user_code }).from(users).where(eq(users.id, userBId));
+
+  const nameA = userA?.display_name ?? userA?.user_code ?? 'your companion';
+  const nameB = userB?.display_name ?? userB?.user_code ?? 'your companion';
+
+  // Update userA's card: companion is B
+  await db.execute(sql`
+    UPDATE messages SET metadata = jsonb_set(jsonb_set(jsonb_set(jsonb_set(
+      metadata,
+      '{status}', '"confirmed"'::jsonb
+    ), '{companion_name}', ${JSON.stringify(nameB)}::jsonb
+    ), '{booking_id}', ${bookingId}::jsonb
+    ), '{window_closes_at}', ${JSON.stringify(windowClosesAt.toISOString())}::jsonb
+    )
+    WHERE type = 'dinner_invite'
+      AND (metadata->>'offer_id')::int = ${offerId}
+      AND recipient_id = ${userAId}
+      AND (metadata->>'status') IN ('pending', 'accepted')
+  `);
+
+  // Update userB's card: companion is A
+  await db.execute(sql`
+    UPDATE messages SET metadata = jsonb_set(jsonb_set(jsonb_set(jsonb_set(
+      metadata,
+      '{status}', '"confirmed"'::jsonb
+    ), '{companion_name}', ${JSON.stringify(nameA)}::jsonb
+    ), '{booking_id}', ${bookingId}::jsonb
+    ), '{window_closes_at}', ${JSON.stringify(windowClosesAt.toISOString())}::jsonb
+    )
+    WHERE type = 'dinner_invite'
+      AND (metadata->>'offer_id')::int = ${offerId}
+      AND recipient_id = ${userBId}
+      AND (metadata->>'status') IN ('pending', 'accepted')
+  `);
+}
+
+export { activateEveningTokenWindow };
 
 async function confirmBookingAsync(booking: {
   offer_id: number;

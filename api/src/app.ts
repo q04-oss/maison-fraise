@@ -51,6 +51,7 @@ import menuItemsRouter from './routes/menu-items';
 import reservationOffersRouter from './routes/reservation-offers';
 import portraitTokensRouter from './routes/portrait-tokens';
 import portraitLicensesRouter from './routes/portrait-licenses';
+import eveningTokensRouter from './routes/evening-tokens';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -140,6 +141,7 @@ app.use('/api/menu-items', menuItemsRouter);
 app.use('/api/reservation-offers', reservationOffersRouter);
 app.use('/api/portrait-tokens', portraitTokensRouter);
 app.use('/api/portrait-licenses', portraitLicensesRouter);
+app.use('/api/evening-tokens', eveningTokensRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

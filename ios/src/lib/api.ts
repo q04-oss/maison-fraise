@@ -2547,3 +2547,36 @@ export async function declineLicenseRequest(id: number): Promise<any> {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
   return r.json();
 }
+
+export async function acceptDinnerInvite(messageId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/dinner-invite/${messageId}/accept`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) throw new Error((await r.json()).error ?? 'accept failed');
+  return r.json();
+}
+
+export async function declineDinnerInvite(messageId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/dinner-invite/${messageId}/decline`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) throw new Error((await r.json()).error ?? 'decline failed');
+}
+
+export async function confirmEveningToken(bookingId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/evening-tokens/${bookingId}/confirm`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) throw new Error((await r.json()).error ?? 'confirm failed');
+  return r.json();
+}
+
+export async function fetchEveningTokens(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/evening-tokens/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}

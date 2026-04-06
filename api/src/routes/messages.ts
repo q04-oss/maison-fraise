@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, or, and, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
-import { messages, users, nfcConnections, orders, varieties, timeSlots } from '../db/schema';
+import { messages, users, nfcConnections, orders, varieties, timeSlots, eveningTokens, reservationOffers, reservationBookings, businesses } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { sendPushNotification } from '../lib/push';
 import { stripe } from '../lib/stripe';
@@ -78,6 +78,195 @@ router.get('/conversations', requireUser, async (req: Request, res: Response) =>
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/messages/dinner-invite/:messageId/accept
+router.post('/dinner-invite/:messageId/accept', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const messageId = parseInt(req.params.messageId, 10);
+  if (isNaN(messageId)) { res.status(400).json({ error: 'invalid id' }); return; }
+
+  try {
+    const [message] = await db.select().from(messages).where(eq(messages.id, messageId));
+    if (!message || message.type !== 'dinner_invite') { res.status(404).json({ error: 'not found' }); return; }
+    if (message.recipient_id !== userId) { res.status(403).json({ error: 'not your invite' }); return; }
+    const meta = message.metadata as any;
+    if (meta?.status !== 'pending') { res.status(409).json({ error: 'invite not in pending state' }); return; }
+
+    const offerId = meta.offer_id as number;
+
+    // Atomically mark as accepted
+    await db.update(messages)
+      .set({ metadata: { ...meta, status: 'accepted' } })
+      .where(and(eq(messages.id, messageId), sql`(${messages.metadata}->>'status') = 'pending'`));
+
+    // Check if another user has already accepted for this offer
+    const [otherInvite] = await db.select({
+      id: messages.id,
+      sender_id: messages.sender_id,
+      recipient_id: messages.recipient_id,
+    })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.type, 'dinner_invite'),
+          sql`(${messages.metadata}->>'offer_id')::int = ${offerId}`,
+          sql`(${messages.metadata}->>'status') = 'accepted'`,
+          sql`${messages.recipient_id} != ${userId}`,
+        )
+      )
+      .limit(1);
+
+    if (!otherInvite) {
+      res.json({ status: 'accepted' });
+      return;
+    }
+
+    // Pair found — create confirmed booking in a transaction
+    const otherUserId = otherInvite.recipient_id;
+
+    const [offer] = await db.select().from(reservationOffers).where(eq(reservationOffers.id, offerId));
+    if (!offer || offer.status !== 'active' || offer.slots_remaining <= 0) {
+      res.json({ status: 'accepted' });
+      return;
+    }
+
+    let bookingId: number | null = null;
+    try {
+      await db.transaction(async (tx) => {
+        // Create confirmed booking: initiator = other user, guest = current user
+        const [created] = await tx.insert(reservationBookings).values({
+          offer_id: offerId,
+          initiator_user_id: otherUserId,
+          guest_user_id: userId,
+          status: 'confirmed',
+          confirmed_at: new Date(),
+        }).returning();
+        bookingId = created.id;
+
+        await tx.update(reservationOffers)
+          .set({ slots_remaining: sql`${reservationOffers.slots_remaining} - 1` })
+          .where(eq(reservationOffers.id, offerId));
+
+        await tx.update(users)
+          .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${offer.value_cents}` })
+          .where(and(
+            eq(users.is_shop, true),
+            eq(users.business_id, offer.business_id),
+            sql`${users.ad_balance_cents} >= ${offer.value_cents}`,
+          ));
+      });
+    } catch {
+      // Race — just return accepted and let other path handle it
+      res.json({ status: 'accepted' });
+      return;
+    }
+
+    if (bookingId !== null) {
+      // Compute window and mint evening token record
+      let windowClosesAt: Date;
+      if (offer.reservation_date) {
+        windowClosesAt = new Date(offer.reservation_date);
+        windowClosesAt.setDate(windowClosesAt.getDate() + 2);
+      } else {
+        windowClosesAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+      }
+
+      await db.insert(eveningTokens).values({
+        booking_id: bookingId,
+        user_a_id: otherUserId,
+        user_b_id: userId,
+        business_id: offer.business_id,
+        offer_id: offerId,
+        window_closes_at: windowClosesAt,
+      }).onConflictDoNothing();
+
+      // Get companion names
+      const [userA] = await db.select({ display_name: users.display_name, user_code: users.user_code }).from(users).where(eq(users.id, otherUserId));
+      const [userB] = await db.select({ display_name: users.display_name, user_code: users.user_code }).from(users).where(eq(users.id, userId));
+      const nameA = userA?.display_name ?? userA?.user_code ?? 'your companion';
+      const nameB = userB?.display_name ?? userB?.user_code ?? 'your companion';
+
+      const windowIso = windowClosesAt.toISOString();
+      const bId = bookingId;
+
+      // Update both cards to confirmed
+      await db.execute(sql`
+        UPDATE messages SET metadata = jsonb_set(jsonb_set(jsonb_set(jsonb_set(
+          metadata,
+          '{status}', '"confirmed"'::jsonb
+        ), '{companion_name}', ${JSON.stringify(nameB)}::jsonb
+        ), '{booking_id}', ${bId}::jsonb
+        ), '{window_closes_at}', ${JSON.stringify(windowIso)}::jsonb
+        )
+        WHERE type = 'dinner_invite'
+          AND (metadata->>'offer_id')::int = ${offerId}
+          AND recipient_id = ${otherUserId}
+          AND (metadata->>'status') IN ('pending', 'accepted')
+      `);
+
+      await db.execute(sql`
+        UPDATE messages SET metadata = jsonb_set(jsonb_set(jsonb_set(jsonb_set(
+          metadata,
+          '{status}', '"confirmed"'::jsonb
+        ), '{companion_name}', ${JSON.stringify(nameA)}::jsonb
+        ), '{booking_id}', ${bId}::jsonb
+        ), '{window_closes_at}', ${JSON.stringify(windowIso)}::jsonb
+        )
+        WHERE type = 'dinner_invite'
+          AND (metadata->>'offer_id')::int = ${offerId}
+          AND recipient_id = ${userId}
+          AND (metadata->>'status') IN ('pending', 'accepted')
+      `);
+
+      // Notify both users
+      (async () => {
+        try {
+          const [biz] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, offer.business_id));
+          const dateStr = [offer.reservation_date, offer.reservation_time].filter(Boolean).join(' at ') || 'date TBC';
+          for (const [uid, companionName] of [[otherUserId, nameA], [userId, nameB]] as [number, string][]) {
+            const [u] = await db.select({ push_token: users.push_token }).from(users).where(eq(users.id, uid));
+            if (u?.push_token) {
+              sendPushNotification(u.push_token, {
+                title: `Dinner confirmed — ${biz?.name ?? 'The restaurant'}`,
+                body: `${offer.title} — ${dateStr}. Your companion is ${companionName}.`,
+                data: { screen: 'messages' },
+              }).catch(() => {});
+            }
+          }
+        } catch { /* non-fatal */ }
+      })();
+
+      res.json({ status: 'confirmed', booking_id: bookingId });
+    } else {
+      res.json({ status: 'accepted' });
+    }
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/messages/dinner-invite/:messageId/decline
+router.post('/dinner-invite/:messageId/decline', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const messageId = parseInt(req.params.messageId, 10);
+  if (isNaN(messageId)) { res.status(400).json({ error: 'invalid id' }); return; }
+
+  try {
+    const [message] = await db.select().from(messages).where(eq(messages.id, messageId));
+    if (!message || message.type !== 'dinner_invite') { res.status(404).json({ error: 'not found' }); return; }
+    if (message.recipient_id !== userId) { res.status(403).json({ error: 'not your invite' }); return; }
+    const meta = message.metadata as any;
+    if (meta?.status !== 'pending') { res.status(409).json({ error: 'invite not in pending state' }); return; }
+
+    await db.update(messages)
+      .set({ metadata: { ...meta, status: 'declined' } })
+      .where(and(eq(messages.id, messageId), sql`(${messages.metadata}->>'status') = 'pending'`));
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
   }
 });
 
