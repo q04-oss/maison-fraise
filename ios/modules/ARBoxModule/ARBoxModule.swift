@@ -33,6 +33,15 @@ class ARBoxModule: NSObject {
       arVC.onTastingRating = { rating, notes in
         if !resolved { resolved = true; resolve(["rating": rating, "notes": notes as Any]) }
       }
+      arVC.onFarmVisitTap = {
+        if !resolved { resolved = true; resolve(["farm_visit_tapped": true]) }
+      }
+      arVC.onLeaveNote = { body, color in
+        resolve(["note_body": body, "note_color": color])
+      }
+      arVC.onQuantityConfirm = { counted in
+        resolve(["quantity_confirmed": counted])
+      }
       arVC.modalPresentationStyle = .fullScreen
       topVC.present(arVC, animated: true)
     }

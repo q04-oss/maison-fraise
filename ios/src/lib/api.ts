@@ -3395,3 +3395,62 @@ export async function saveTastingRating(varietyId: number, rating: number, notes
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'save_failed'); }
 }
 
+// AR Expanded 4: nearby AR sticky notes
+export async function fetchNearbyArNotes(lat: number, lng: number): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ar-notes/nearby?lat=${lat}&lng=${lng}`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json().catch(() => []);
+}
+
+// AR Expanded 4: post an AR sticky note
+export async function postArNote(lat: number, lng: number, body: string, color: string): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ar-notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ lat, lng, body, color }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'post_failed'); }
+}
+
+// AR Expanded 4: open farm visits for a farm (by name fragment)
+export async function fetchOpenFarmVisits(farmName: string): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/farm-visits/open-for-farm?farm_name=${encodeURIComponent(farmName)}`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json().catch(() => []);
+}
+
+// AR Expanded 4: staff quantity confirm
+export async function confirmOrderQuantity(orderId: number, counted: number, pin: string): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/staff/orders/${orderId}/quantity-confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ counted, pin }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'confirm_failed'); }
+}
+
+// AR Expanded 4: compute unlocked achievements from scan data (client-side)
+export function computeUnlockedAchievements(params: {
+  orderCount: number;
+  varietyId: number;
+  farmName: string | null;
+  isWinterVariety: boolean;
+  streakWeeks: number;
+  seenFarms: string[];
+}): string[] {
+  const { orderCount, isWinterVariety, streakWeeks, seenFarms } = params;
+  const unlocked: string[] = [];
+  const milestones: Array<[number, string]> = [[10,'order_10'],[25,'order_25'],[50,'order_50']];
+  for (const [threshold, id] of milestones) {
+    if (orderCount === threshold) unlocked.push(id);
+  }
+  if (isWinterVariety) unlocked.push('first_winter');
+  if (seenFarms.length >= 3) unlocked.push('three_farms');
+  if (streakWeeks >= 12) unlocked.push('full_season');
+  return unlocked;
+}
+

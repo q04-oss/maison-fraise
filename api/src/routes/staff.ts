@@ -181,4 +181,23 @@ router.post('/orders/:id/flag', requireStaff, async (req: Request, res: Response
   }
 });
 
+db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity_confirmed integer`).catch(() => {});
+db.execute(sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity_confirmed_at timestamptz`).catch(() => {});
+
+// POST /api/staff/orders/:id/quantity-confirm — record physically counted quantity
+router.post('/orders/:id/quantity-confirm', requireStaff, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { counted } = req.body as { counted?: number };
+  if (typeof counted !== 'number') { res.status(400).json({ error: 'counted (number) required' }); return; }
+  try {
+    await db.execute(sql`
+      UPDATE orders SET quantity_confirmed = ${counted}, quantity_confirmed_at = now() WHERE id = ${id}
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 export default router;

@@ -36,6 +36,11 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
   // AR Expanded 3: tasting journal callback
   var onTastingRating: ((Int, String?) -> Void)?
 
+  // AR Expanded 4: new callbacks
+  var onFarmVisitTap: (() -> Void)?
+  var onLeaveNote: ((String, String) -> Void)?
+  var onQuantityConfirm: ((Int) -> Void)?
+
   init(varietyData: NSDictionary, onDismiss: @escaping () -> Void) {
     self.varietyData = varietyData
     self.onDismiss = onDismiss
@@ -254,6 +259,82 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
 
       // Share button
       setupShareButton()
+
+      // ─ ar-expanded-4 features ─
+
+      // Unboxing animation (first-time variety)
+      if (varietyData["is_first_variety"] as? NSNumber)?.boolValue == true {
+        ARUnboxingAnimator.animate(in: sceneView.scene)
+      }
+
+      // Nutrition rings (when HealthKit data present)
+      let vitaminC = (varietyData["vitamin_c_today_mg"] as? NSNumber)?.doubleValue ?? 0
+      let fiber = (varietyData["fiber_today_g"] as? NSNumber)?.doubleValue ?? 0
+      let calories = (varietyData["calories_today_kcal"] as? NSNumber)?.doubleValue ?? 0
+      if vitaminC > 0 || calories > 0 {
+        setupNutritionRings(vitaminC: vitaminC, fiber: fiber, calories: calories)
+      }
+
+      // Allergy flag (brief banner if allergens present)
+      let allergens = varietyData["allergy_flags"] as? [String] ?? []
+      if !allergens.isEmpty {
+        setupAllergyFlag(allergens: allergens)
+      }
+
+      // Achievement badges
+      let achievements = varietyData["unlocked_achievements"] as? [String] ?? []
+      if !achievements.isEmpty {
+        setupAchievementBadges(achievementIds: achievements)
+      }
+
+      // Collectif milestone confetti
+      let milestonePct = (varietyData["collectif_milestone_pct"] as? NSNumber)?.intValue ?? 0
+      if milestonePct >= 50 {
+        setupMilestoneConfetti(pct: milestonePct)
+      }
+
+      // Price history sparkline
+      let priceHistoryJson = varietyData["price_history_json"] as? String
+      if priceHistoryJson != nil {
+        setupPriceHistory(json: priceHistoryJson)
+      }
+
+      // Carbon footprint card
+      if let co2 = (varietyData["co2_grams"] as? NSNumber)?.intValue {
+        setupCarbonFootprint(
+          co2Grams: co2,
+          offsetProgram: varietyData["carbon_offset_program"] as? String
+        )
+      }
+
+      // Sunlight hours bar
+      if let sun = (varietyData["sunlight_hours"] as? NSNumber)?.doubleValue {
+        setupSunlightHours(hours: sun)
+      }
+
+      // Farm visit CTA
+      if let visitData = varietyData["open_farm_visit"] as? NSDictionary {
+        let visitDate = (visitData["visit_date"] as? String) ?? ""
+        let spotsLeft = (visitData["spots_left"] as? NSNumber)?.intValue ?? 0
+        setupFarmVisitCTA(visitDate: visitDate, spotsLeft: spotsLeft)
+      }
+
+      // Sticky notes nearby
+      if let notesRaw = varietyData["nearby_ar_notes"] as? [[String: Any]], !notesRaw.isEmpty {
+        setupStickyNotes(notesRaw: notesRaw)
+      }
+
+      // "Leave a note" button (always in user mode)
+      setupLeaveNoteButton()
+
+      // Constellation button
+      setupConstellationButton()
+    }
+
+    // Staff: quantity counter
+    if staffMode && !batchScanMode, let sd = staffData {
+      let qty = (sd["quantity"] as? NSNumber)?.intValue ?? 0
+      if qty > 0 { setupQuantityCounter(expectedQty: qty) }
     }
 
     NotificationCenter.default.addObserver(
@@ -628,6 +709,222 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
     let b = SCNBillboardConstraint()
     b.freeAxes = .Y
     return b
+  }
+
+  // MARK: - ar-expanded-4 setups
+
+  private func setupNutritionRings(vitaminC: Double, fiber: Double, calories: Double) {
+    let size = CGSize(width: 260, height: 260)
+    let v = ARNutritionRingsView(vitaminCMg: vitaminC, fiberG: fiber, caloriesKcal: calories)
+    v.frame = CGRect(origin: .zero, size: size)
+    v.layoutIfNeeded()
+    let node = makePlaneNode(view: v, size: size, scnSize: (0.18, 0.18))
+    node.position = SCNVector3(0.28, -0.20, -0.60)
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  private func setupAllergyFlag(allergens: [String]) {
+    let v = ARAllergyFlagView(allergens: allergens)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 60),
+      v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+      v.heightAnchor.constraint(equalToConstant: 52),
+    ])
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { v.animateInAndRemove() }
+  }
+
+  private func setupAchievementBadges(achievementIds: [String]) {
+    let badge = ARAchievementBadgeView(achievementIds: achievementIds)
+    badge.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(badge)
+    NSLayoutConstraint.activate([
+      badge.centerXAnchor.constraint(equalTo: view.centerXAnchor, constant: 80),
+      badge.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+      badge.widthAnchor.constraint(equalToConstant: 140),
+      badge.heightAnchor.constraint(equalToConstant: 140),
+    ])
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { badge.animateAndRemove() }
+  }
+
+  private func setupMilestoneConfetti(pct: Int) {
+    let system = SCNParticleSystem()
+    system.particleColor = UIColor(red: 0.788, green: 0.592, blue: 0.227, alpha: 1)
+    system.particleColorVariation = SCNVector4(0.3, 0.3, 0.0, 0.0)
+    system.emissionDuration = 1.5
+    system.birthRate = 120
+    system.particleLifeSpan = 3.0
+    system.particleVelocity = 0.4
+    system.particleVelocityVariation = 0.2
+    system.spreadingAngle = 60
+    system.particleSize = 0.004
+    system.particleSizeVariation = 0.002
+    system.acceleration = SCNVector3(0, -0.15, 0)
+    system.isAffectedByGravity = true
+    let emitter = SCNNode()
+    emitter.position = SCNVector3(0, 0.30, -0.55)
+    emitter.addParticleSystem(system)
+    sceneView.scene.rootNode.addChildNode(emitter)
+    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { emitter.removeFromParentNode() }
+  }
+
+  private func setupPriceHistory(json: String?) {
+    let history = ARPriceHistoryView.parsePriceHistory(from: json)
+    guard !history.isEmpty else { return }
+    let size = CGSize(width: 300, height: 110)
+    let v = ARPriceHistoryView(priceHistory: history)
+    v.frame = CGRect(origin: .zero, size: size)
+    v.layoutIfNeeded()
+    let node = makePlaneNode(view: v, size: size, scnSize: (0.24, 0.088))
+    node.position = SCNVector3(0.0, -0.50, -0.65)
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  private func setupCarbonFootprint(co2Grams: Int, offsetProgram: String?) {
+    let size = CGSize(width: 280, height: 110)
+    let v = ARCarbonFootprintView(co2Grams: co2Grams, offsetProgram: offsetProgram)
+    v.frame = CGRect(origin: .zero, size: size)
+    v.layoutIfNeeded()
+    let node = makePlaneNode(view: v, size: size, scnSize: (0.22, 0.087))
+    node.position = SCNVector3(-0.28, -0.22, -0.62)
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  private func setupSunlightHours(hours: Double) {
+    let size = CGSize(width: 260, height: 80)
+    let v = ARSunlightHoursView(sunlightHours: hours)
+    v.frame = CGRect(origin: .zero, size: size)
+    v.layoutIfNeeded()
+    let node = makePlaneNode(view: v, size: size, scnSize: (0.205, 0.063))
+    node.position = SCNVector3(0.28, 0.06, -0.60)
+    sceneView.scene.rootNode.addChildNode(node)
+  }
+
+  private func setupFarmVisitCTA(visitDate: String, spotsLeft: Int) {
+    let v = ARFarmVisitCTAView(visitDate: visitDate, spotsLeft: spotsLeft)
+    v.translatesAutoresizingMaskIntoConstraints = false
+    v.onTap = { [weak self] in
+      self?.handleDismiss()
+      self?.onFarmVisitTap?()
+    }
+    view.addSubview(v)
+    NSLayoutConstraint.activate([
+      v.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+      v.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+      v.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -70),
+      v.heightAnchor.constraint(equalToConstant: 64),
+    ])
+    v.animateIn()
+  }
+
+  private func setupStickyNotes(notesRaw: [[String: Any]]) {
+    for (i, d) in notesRaw.prefix(5).enumerated() {
+      guard let body = d["body"] as? String else { continue }
+      let author = d["author_name"] as? String ?? "?"
+      let color = d["color"] as? String ?? "amber"
+      let createdAtStr = d["created_at"] as? String ?? ""
+      let date = ISO8601DateFormatter().date(from: createdAtStr) ?? Date()
+      let size = CGSize(width: 220, height: 160)
+      let v = ARStickyNoteView(body: body, authorName: author, color: color, createdAt: date)
+      v.frame = CGRect(origin: .zero, size: size)
+      v.layoutIfNeeded()
+      let xOffset = Float(i % 3) * 0.22 - 0.22
+      let yOffset = Float(i / 3) * 0.20 + 0.45
+      let node = makePlaneNode(view: v, size: size, scnSize: (0.16, 0.115))
+      node.position = SCNVector3(xOffset, yOffset, -0.70)
+      let bb = SCNBillboardConstraint(); bb.freeAxes = .all
+      node.constraints = [bb]
+      sceneView.scene.rootNode.addChildNode(node)
+    }
+  }
+
+  private func setupLeaveNoteButton() {
+    let btn = UIButton(type: .system)
+    btn.setTitle("📌 Note", for: .normal)
+    btn.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+    btn.setTitleColor(UIColor(red: 0.788, green: 0.592, blue: 0.227, alpha: 1), for: .normal)
+    btn.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+    btn.layer.cornerRadius = 18
+    btn.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+    btn.translatesAutoresizingMaskIntoConstraints = false
+    btn.addTarget(self, action: #selector(handleLeaveNote), for: .touchUpInside)
+    view.addSubview(btn)
+    NSLayoutConstraint.activate([
+      btn.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      btn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
+    ])
+  }
+
+  @objc private func handleLeaveNote() {
+    let composer = ARStickyNoteComposer()
+    composer.translatesAutoresizingMaskIntoConstraints = false
+    composer.onPost = { [weak self] body, color in
+      self?.onLeaveNote?(body, color)
+      composer.removeFromSuperview()
+    }
+    composer.onCancel = { composer.removeFromSuperview() }
+    view.addSubview(composer)
+    NSLayoutConstraint.activate([
+      composer.topAnchor.constraint(equalTo: view.topAnchor),
+      composer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      composer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      composer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+    ])
+    composer.animateIn()
+  }
+
+  private func setupConstellationButton() {
+    let btn = UIButton(type: .system)
+    btn.setTitle("✦", for: .normal)
+    btn.titleLabel?.font = UIFont.systemFont(ofSize: 20)
+    btn.setTitleColor(UIColor(red: 0.788, green: 0.592, blue: 0.227, alpha: 1), for: .normal)
+    btn.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+    btn.layer.cornerRadius = 22
+    btn.translatesAutoresizingMaskIntoConstraints = false
+    btn.addTarget(self, action: #selector(handleConstellation), for: .touchUpInside)
+    view.addSubview(btn)
+    NSLayoutConstraint.activate([
+      btn.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      btn.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
+      btn.widthAnchor.constraint(equalToConstant: 44),
+      btn.heightAnchor.constraint(equalToConstant: 44),
+    ])
+  }
+
+  @objc private func handleConstellation() {
+    guard let starsRaw = varietyData["scanned_varieties"] as? [[String: Any]] else { return }
+    let currentName = (varietyData["variety_name"] as? String) ?? ""
+    let stars = starsRaw.compactMap { d -> ARConstellationViewController.ConstellationStar? in
+      guard let name = d["variety_name"] as? String else { return nil }
+      let count = (d["order_count"] as? NSNumber)?.intValue ?? 1
+      return ARConstellationViewController.ConstellationStar(
+        varietyName: name,
+        orderCount: count,
+        isCurrentVariety: name == currentName
+      )
+    }
+    guard !stars.isEmpty else { return }
+    let vc = ARConstellationViewController(stars: stars, currentVarietyName: currentName)
+    vc.modalPresentationStyle = .fullScreen
+    present(vc, animated: true)
+  }
+
+  private func setupQuantityCounter(expectedQty: Int) {
+    let overlay = ARQuantityCounterOverlay(expectedQty: expectedQty)
+    overlay.translatesAutoresizingMaskIntoConstraints = false
+    overlay.onConfirm = { [weak self] counted in
+      self?.onQuantityConfirm?(counted)
+      overlay.removeFromSuperview()
+    }
+    view.addSubview(overlay)
+    NSLayoutConstraint.activate([
+      overlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      overlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      overlay.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+      overlay.heightAnchor.constraint(equalToConstant: 200),
+    ])
   }
 
   // MARK: - Card setups
