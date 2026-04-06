@@ -16,6 +16,59 @@ async function requireVerified(userId: number, res: Response): Promise<boolean> 
   return true;
 }
 
+// Startup migrations for new columns
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS expires_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS renewal_notified_30_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS renewal_notified_60_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS tier text DEFAULT 'standard'`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS gifted_by_user_id integer REFERENCES users(id)`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS recipient_email text`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS gift_message text`).catch(() => {});
+db.execute(sql`ALTER TABLE standing_orders ADD COLUMN IF NOT EXISTS is_gift_standing_order boolean NOT NULL DEFAULT false`).catch(() => {});
+
+// GET /api/standing-orders/renewal-status — literal before parameterized
+router.get('/renewal-status', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT so.id, so.expires_at, so.status, so.quantity, v.name AS variety_name, v.price_cents
+      FROM standing_orders so
+      JOIN varieties v ON v.id = so.variety_id
+      WHERE so.sender_id = ${userId} AND so.status = 'active'
+      ORDER BY so.id DESC LIMIT 1
+    `);
+    const row = ((rows as any).rows ?? rows)[0];
+    if (!row) { res.json(null); return; }
+
+    const expiresAt = row.expires_at ? new Date(row.expires_at) : null;
+    const daysUntilExpiry = expiresAt
+      ? Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : null;
+    const canRenew = expiresAt ? daysUntilExpiry !== null && daysUntilExpiry <= 60 : false;
+
+    res.json({ ...row, days_until_expiry: daysUntilExpiry, can_renew: canRenew });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/standing-orders/gift — literal before parameterized
+router.post('/gift', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const { recipient_email, gift_message } = req.body;
+  if (!recipient_email) { res.status(400).json({ error: 'recipient_email required' }); return; }
+  try {
+    const pi = await stripe.paymentIntents.create({
+      amount: 29500,
+      currency: 'cad',
+      metadata: { type: 'standing_order_gift', recipient_email, gifted_by_user_id: String(userId) },
+    });
+    res.json({ client_secret: pi.client_secret });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // POST /api/standing-orders
 router.post('/', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
@@ -177,6 +230,33 @@ router.post('/:id/pay-from-balance', requireUser, async (req: Request, res: Resp
     res.json({ ok: true, order_id: order.id, next_order_date: nextDate.toISOString() });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/standing-orders/:id/renew
+router.post('/:id/renew', requireUser, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT so.id, so.quantity, v.price_cents
+      FROM standing_orders so
+      JOIN varieties v ON v.id = so.variety_id
+      WHERE so.id = ${id} AND so.sender_id = ${userId} AND so.status = 'active'
+    `);
+    const so = ((rows as any).rows ?? rows)[0];
+    if (!so) { res.status(404).json({ error: 'not_found' }); return; }
+
+    const amount = so.price_cents * so.quantity;
+    const pi = await stripe.paymentIntents.create({
+      amount,
+      currency: 'cad',
+      metadata: { type: 'standing_order_renewal', standing_order_id: String(id), user_id: String(userId) },
+    });
+    res.json({ client_secret: pi.client_secret });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
   }
 });
 

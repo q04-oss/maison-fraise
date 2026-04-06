@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel, Variety } from '../../context/PanelContext';
-import { fetchVarieties } from '../../lib/api';
+import { fetchVarieties, fetchTodayStats } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES } from '../../data/seed';
 
@@ -36,6 +36,7 @@ export default function HomePanel() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [todayStats, setTodayStats] = useState<{ pickups_today: number; active_locations: number; varieties_today: number } | null>(null);
   const isCollapsed = sheetHeight < 110;
   const hasFetched = useRef(false);
 
@@ -66,7 +67,10 @@ export default function HomePanel() {
     }
   };
 
-  useEffect(() => { loadVarieties(); }, []);
+  useEffect(() => {
+    loadVarieties();
+    fetchTodayStats().then(setTodayStats).catch(() => {});
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -130,6 +134,11 @@ export default function HomePanel() {
               <Text style={[styles.emptyTitle, { color: c.text }]}>Maison Fraise</Text>
               <Text style={[styles.emptyDate, { color: c.muted }]}>{todayLabel}</Text>
               <Text style={[styles.emptySeason, { color: c.muted }]}>{season}</Text>
+              {todayStats && todayStats.pickups_today > 0 && (
+                <Text style={[styles.emptyHint, { color: c.accent }]}>
+                  {todayStats.pickups_today} pickups today · {todayStats.active_locations} locations · {todayStats.varieties_today} {todayStats.varieties_today === 1 ? 'variety' : 'varieties'}
+                </Text>
+              )}
               <Text style={[styles.emptyHint, { color: c.muted }]}>tap a location on the map</Text>
               <TouchableOpacity
                 onPress={() => showPanel('market')}
@@ -172,6 +181,30 @@ export default function HomePanel() {
               </TouchableOpacity>
               <TouchableOpacity onPress={() => showPanel('staff-orders')} activeOpacity={0.7}>
                 <Text style={[styles.collectifLinkText, { color: c.muted }]}>staff →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('standing-order-renewal')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>renewal →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('waitlist')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>waitlist →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('drops')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>drops →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('variety-passport')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>passport →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('fraise-chat-inbox')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>inbox →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('leaderboard')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>leaderboard →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('farm-visits')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>farm visits →</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => showPanel('seasonal-calendar')} activeOpacity={0.7}>
+                <Text style={[styles.collectifLinkText, { color: c.muted }]}>seasons →</Text>
               </TouchableOpacity>
             </View>
 

@@ -3,8 +3,29 @@ import { eq, sql, asc } from 'drizzle-orm';
 import { db } from '../db';
 import { varieties } from '../db/schema';
 import { logger } from '../lib/logger';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
+
+// GET /api/varieties/passport — literal before parameterized
+router.get('/passport', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT DISTINCT v.id, v.name, v.source_farm, v.harvest_date, MIN(o.created_at) AS first_tried
+      FROM orders o
+      JOIN varieties v ON v.id = o.variety_id
+      JOIN users u ON u.apple_user_id = o.apple_id
+      WHERE u.id = ${userId} AND o.status = 'collected'
+      GROUP BY v.id, v.name, v.source_farm, v.harvest_date
+      ORDER BY first_tried ASC
+    `);
+    const list = (rows as any).rows ?? rows;
+    res.json({ varieties: list, total: list.length });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
 
 router.get('/', async (_req: Request, res: Response) => {
   try {

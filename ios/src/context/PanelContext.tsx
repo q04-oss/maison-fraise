@@ -64,7 +64,25 @@ export type PanelId =
   | 'market-orders'
   | 'market-vendor'
   | 'ar-box'
-  | 'staff-orders';
+  | 'staff-orders'
+  | 'standing-order-renewal'
+  | 'waitlist'
+  | 'standing-order-gift'
+  | 'transfers'
+  | 'drops'
+  | 'drop-detail'
+  | 'preorders'
+  | 'bundles'
+  | 'corporate'
+  | 'referral'
+  | 'leaderboard'
+  | 'farm-visits'
+  | 'variety-passport'
+  | 'seasonal-calendar'
+  | 'supplier-harvest'
+  | 'nutrition-dashboard'
+  | 'fraise-chat-inbox'
+  | 'webhooks';
 
 export interface OrderState {
   variety_id: number | null;

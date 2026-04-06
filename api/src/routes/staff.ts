@@ -1,8 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, users, varieties, timeSlots } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
+import { fireWebhook } from '../lib/webhooks';
 
 const router = Router();
 
@@ -127,6 +128,18 @@ router.post('/orders/:id/ready', requireStaff, async (req: Request, res: Respons
         body: 'Come pick up your strawberries.',
         data: { order_id: id },
       }).catch(() => {});
+    }
+    // Fire webhook for order.ready — look up user_id via apple_id
+    const orderRows = await db.execute(sql`
+      SELECT u.id AS user_id FROM orders o
+      JOIN users u ON u.apple_user_id = o.apple_id
+      WHERE o.id = ${id} LIMIT 1
+    `).catch(() => null);
+    if (orderRows) {
+      const orderRow = ((orderRows as any).rows ?? orderRows)[0];
+      if (orderRow?.user_id) {
+        fireWebhook(orderRow.user_id, 'order.ready', { order_id: id }).catch(() => {});
+      }
     }
 
     res.json({ ok: true });

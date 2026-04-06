@@ -2967,3 +2967,370 @@ export async function fetchMarketStallAR(stallId: string): Promise<any> {
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'fetch_failed'); }
   return r.json();
 }
+
+// Standing order renewal
+export async function fetchRenewalStatus(): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-orders/renewal-status`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function renewStandingOrder(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-orders/${id}/renew`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'renew_failed'); }
+}
+
+export async function giftStandingOrder(body: { recipient_email: string; note?: string }): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-orders/gift`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gift_failed'); }
+}
+
+// Waitlist
+export async function fetchWaitlistPosition(): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-waitlist/position`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function joinWaitlist(referral_code?: string): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-waitlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ referral_code }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'join_failed'); }
+  return r.json();
+}
+
+export async function claimWaitlistSlot(): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-waitlist/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'claim_failed'); }
+}
+
+// Transfers
+export async function fetchIncomingTransfers(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-transfers/incoming`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function acceptTransfer(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-transfers/${id}/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'accept_failed'); }
+}
+
+export async function cancelTransfer(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/standing-order-transfers/${id}/cancel`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'cancel_failed'); }
+}
+
+// Drops
+export async function fetchDrops(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/drops`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function claimDrop(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/drops/${id}/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'claim_failed'); }
+  return r.json();
+}
+
+export async function joinDropWaitlist(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/drops/${id}/waitlist`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'join_failed'); }
+}
+
+export async function leaveDropWaitlist(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/drops/${id}/waitlist`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'leave_failed'); }
+}
+
+// Pre-orders
+export async function fetchPreorders(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/preorders`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function createPreorder(variety_id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/preorders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ variety_id }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function cancelPreorder(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/preorders/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'cancel_failed'); }
+}
+
+// Bundles
+export async function fetchBundles(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/bundles`);
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function orderBundle(bundle_id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/bundles/order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ bundle_id }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'order_failed'); }
+  return r.json();
+}
+
+// Corporate
+export async function fetchCorporateAccount(): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/corporate/me`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function fetchCorporateMembers(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/corporate/members`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function createCorporateAccount(company_name: string): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/corporate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ company_name }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function inviteCorporateMember(email: string): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/corporate/invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ email }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'invite_failed'); }
+}
+
+export async function removeCorporateMember(targetUserId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/corporate/members/${targetUserId}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'remove_failed'); }
+}
+
+// Referrals
+export async function fetchReferralCode(): Promise<{ code: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/referrals/my-code`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+// Collectif leaderboard
+export async function fetchCollectifLeaderboard(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/collectifs/leaderboard`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+// Farm visits
+export async function fetchFarmVisits(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/farm-visits`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function bookFarmVisit(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/farm-visits/${id}/book`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'book_failed'); }
+}
+
+export async function cancelFarmVisitBooking(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/farm-visits/${id}/book`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'cancel_failed'); }
+}
+
+// Variety passport
+export async function fetchVarietyPassport(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/varieties/passport`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+// Seasons
+export async function fetchSeasons(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/seasons`);
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+// Supplier harvest logs
+export async function fetchHarvestLogs(): Promise<any[]> {
+  const auth = await authHeader();
+  const pin = await AsyncStorage.getItem('supplier_pin') ?? '';
+  const r = await fetch(`${BASE_URL}/api/supplier/harvests`, {
+    headers: { 'x-supplier-pin': pin, ...auth },
+  });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function createHarvestLog(body: { variety_id: number; kg_harvested: number; notes?: string }): Promise<any> {
+  const auth = await authHeader();
+  const pin = await AsyncStorage.getItem('supplier_pin') ?? '';
+  const r = await fetch(`${BASE_URL}/api/supplier/harvests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-supplier-pin': pin, ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function deleteHarvestLog(id: number): Promise<void> {
+  const auth = await authHeader();
+  const pin = await AsyncStorage.getItem('supplier_pin') ?? '';
+  const r = await fetch(`${BASE_URL}/api/supplier/harvests/${id}`, {
+    method: 'DELETE',
+    headers: { 'x-supplier-pin': pin, ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'delete_failed'); }
+}
+
+// fraise.chat inbox
+export async function fetchFraiseMessages(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/fraise-chat/messages`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function markMessageRead(id: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/fraise-chat/messages/${id}/read`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+}
+
+export async function deleteFraiseMessage(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/fraise-chat/messages/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'delete_failed'); }
+}
+
+// Webhooks
+export async function fetchWebhooks(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/webhooks`, { headers: auth });
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function createWebhook(body: { url: string; events: string[] }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/webhooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
+  return r.json();
+}
+
+export async function deleteWebhook(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/webhooks/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'delete_failed'); }
+}
+
+export async function testWebhook(id: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/webhooks/${id}/test`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'test_failed'); }
+}
+
+// Social proof stats
+export async function fetchTodayStats(): Promise<{ pickups_today: number; active_locations: number; varieties_today: number }> {
+  const r = await fetch(`${BASE_URL}/api/stats/today`);
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}

@@ -65,6 +65,24 @@ import MarketOrdersPanel from './panels/market/MarketOrdersPanel';
 import VendorPanel from './panels/market/VendorPanel';
 import ARBoxPanel from './panels/ARBoxPanel';
 import StaffOrdersPanel from './panels/StaffOrdersPanel';
+import StandingOrderRenewalPanel from './panels/StandingOrderRenewalPanel';
+import WaitlistPanel from './panels/WaitlistPanel';
+import StandingOrderGiftPanel from './panels/StandingOrderGiftPanel';
+import TransfersPanel from './panels/TransfersPanel';
+import DropsPanel from './panels/DropsPanel';
+import DropDetailPanel from './panels/DropDetailPanel';
+import PreordersPanel from './panels/PreordersPanel';
+import BundlesPanel from './panels/BundlesPanel';
+import CorporatePanel from './panels/CorporatePanel';
+import ReferralPanel from './panels/ReferralPanel';
+import LeaderboardPanel from './panels/LeaderboardPanel';
+import FarmVisitsPanel from './panels/FarmVisitsPanel';
+import VarietyPassportPanel from './panels/VarietyPassportPanel';
+import SeasonalCalendarPanel from './panels/SeasonalCalendarPanel';
+import SupplierHarvestPanel from './panels/SupplierHarvestPanel';
+import NutritionDashboardPanel from './panels/NutritionDashboardPanel';
+import FraiseChatInboxPanel from './panels/FraiseChatInboxPanel';
+import WebhooksPanel from './panels/WebhooksPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -129,6 +147,24 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'market-vendor': VendorPanel,
   'ar-box': ARBoxPanel,
   'staff-orders': StaffOrdersPanel,
+  'standing-order-renewal': StandingOrderRenewalPanel,
+  'waitlist': WaitlistPanel,
+  'standing-order-gift': StandingOrderGiftPanel,
+  'transfers': TransfersPanel,
+  'drops': DropsPanel,
+  'drop-detail': DropDetailPanel,
+  'preorders': PreordersPanel,
+  'bundles': BundlesPanel,
+  'corporate': CorporatePanel,
+  'referral': ReferralPanel,
+  'leaderboard': LeaderboardPanel,
+  'farm-visits': FarmVisitsPanel,
+  'variety-passport': VarietyPassportPanel,
+  'seasonal-calendar': SeasonalCalendarPanel,
+  'supplier-harvest': SupplierHarvestPanel,
+  'nutrition-dashboard': NutritionDashboardPanel,
+  'fraise-chat-inbox': FraiseChatInboxPanel,
+  'webhooks': WebhooksPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -171,6 +207,24 @@ const FULL_HEIGHT_PANELS = new Set([
   'market-home', 'market-cart', 'market-orders', 'market-vendor',
   'ar-box',
   'staff-orders',
+  'standing-order-renewal',
+  'waitlist',
+  'standing-order-gift',
+  'transfers',
+  'drops',
+  'drop-detail',
+  'preorders',
+  'bundles',
+  'corporate',
+  'referral',
+  'leaderboard',
+  'farm-visits',
+  'variety-passport',
+  'seasonal-calendar',
+  'supplier-harvest',
+  'nutrition-dashboard',
+  'fraise-chat-inbox',
+  'webhooks',
 ]);
 
 export default function PanelNavigator() {

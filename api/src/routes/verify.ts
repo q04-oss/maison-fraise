@@ -5,6 +5,7 @@ import { db } from '../db';
 import { orders, users, legitimacyEvents, varieties, standingOrders } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
+import { fireWebhook } from '../lib/webhooks';
 
 const router = Router();
 
@@ -199,6 +200,13 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       nextStandingOrder = { variety_name: standingRow.variety_name, days_until: daysUntil };
     }
 
+    // Webhook: pickup.completed
+    fireWebhook(user_id, 'pickup.completed', {
+      variety_name: variety?.name ?? null,
+      farm: variety?.source_farm ?? null,
+      quantity: order.quantity,
+    }).catch(() => {});
+
     // Feature D: collectif member display names (up to 3)
     const collectifNameRows = await db.execute(sql`
       SELECT u.display_name
@@ -239,6 +247,53 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Order split migration
+db.execute(sql`CREATE TABLE IF NOT EXISTS order_splits (
+  id serial PRIMARY KEY,
+  order_id integer NOT NULL REFERENCES orders(id),
+  split_user_id integer NOT NULL REFERENCES users(id),
+  split_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(order_id, split_user_id)
+)`).catch(() => {});
+
+// POST /api/verify/split
+router.post('/split', requireUser, async (req: Request, res: Response) => {
+  const user_id = (req as any).userId as number;
+  const { nfc_token } = req.body;
+  if (!nfc_token) { res.status(400).json({ error: 'nfc_token required' }); return; }
+  try {
+    const [order] = await db.select().from(orders).where(eq(orders.nfc_token, nfc_token));
+    if (!order || !order.nfc_token_used) {
+      res.status(404).json({ error: 'order_not_found' }); return;
+    }
+
+    // Verify both users share a collectif
+    const sharedRows = await db.execute(sql`
+      SELECT 1 FROM collectif_commitments cc1
+      JOIN collectif_commitments cc2 ON cc2.collectif_id = cc1.collectif_id AND cc2.user_id = ${user_id}
+      JOIN users u ON u.id = cc1.user_id AND u.apple_user_id = ${order.apple_id ?? ''}
+      WHERE cc1.status = 'captured' AND cc2.status = 'captured'
+      LIMIT 1
+    `);
+    if (!((sharedRows as any).rows ?? sharedRows)[0]) {
+      res.status(403).json({ error: 'not_same_collectif' }); return;
+    }
+
+    await db.execute(sql`
+      INSERT INTO order_splits (order_id, split_user_id) VALUES (${order.id}, ${user_id})
+      ON CONFLICT DO NOTHING
+    `);
+    await db.insert(legitimacyEvents).values({ user_id, event_type: 'split_pickup', weight: 1 });
+
+    const [variety] = await db.select({ name: varieties.name, source_farm: varieties.source_farm })
+      .from(varieties).where(eq(varieties.id, order.variety_id));
+
+    res.json({ split: true, variety_name: variety?.name ?? null, farm: variety?.source_farm ?? null, quantity: order.quantity });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
   }
 });
 
