@@ -42,6 +42,7 @@ import contentTokensRouter from './routes/content-tokens';
 import tournamentsRouter from './routes/tournaments';
 import venturesRouter from './routes/ventures';
 import payoutsRouter from './routes/payouts';
+import adsRouter from './routes/ads';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -122,6 +123,7 @@ app.use('/api/content-tokens', contentTokensRouter);
 app.use('/api/tournaments', tournamentsRouter);
 app.use('/api/ventures', venturesRouter);
 app.use('/api/payouts', payoutsRouter);
+app.use('/api/ads', adsRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

@@ -1966,3 +1966,97 @@ export async function requestPayout(): Promise<{ ok: boolean; transferred_cents:
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'payout_failed'); }
   return r.json();
 }
+
+// ─── Ad network ───────────────────────────────────────────────────────────────
+
+export async function fetchAdConnectStatus(): Promise<{ has_account: boolean; onboarded: boolean }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/connect/status`, { headers: auth });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function createAdConnectOnboarding(): Promise<{ url: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/connect/onboard`, { method: 'POST', headers: auth });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchAdCampaigns(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/campaigns`, { headers: auth });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function createAdCampaign(body: { title: string; body: string; type: string; value_cents: number }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/campaigns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function toggleAdCampaign(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/campaigns/${id}/toggle`, { method: 'PATCH', headers: auth });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fundAdCampaign(id: number, amount_cents: number): Promise<{ client_secret: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/campaigns/${id}/fund`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ amount_cents }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function broadcastAdCampaign(id: number): Promise<{ sent: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/campaigns/${id}/broadcast`, { method: 'POST', headers: auth });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchProximityAdCampaign(businessId: number): Promise<any | null> {
+  const r = await fetch(`${BASE_URL}/api/ads/proximity/${businessId}`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function createAdImpression(campaign_id: number): Promise<{ impression_id: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/impressions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ campaign_id }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function respondToAdImpression(impressionId: number, accepted: boolean): Promise<{ ok: boolean; new_balance_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/impressions/${impressionId}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ accepted }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchAdBalance(): Promise<{ ad_balance_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/ads/balance`, { headers: auth });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}

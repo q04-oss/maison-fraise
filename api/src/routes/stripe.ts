@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -807,6 +807,15 @@ router.post('/webhook', async (req: Request, res: Response) => {
             }).catch(() => {});
           }
           logger.info(`Tournament entry paid: tournament ${tournamentId}, user ${userId}`);
+        }
+      } else if (type === 'ad_budget') {
+        const campaignId = parseInt(pi.metadata?.campaign_id ?? '', 10);
+        const amountCents = pi.amount_received ?? pi.amount;
+        if (!isNaN(campaignId) && amountCents > 0) {
+          await db.update(adCampaigns)
+            .set({ budget_cents: sql`${adCampaigns.budget_cents} + ${amountCents}` })
+            .where(eq(adCampaigns.id, campaignId));
+          logger.info(`Ad campaign ${campaignId} funded: +${amountCents} cents`);
         }
       }
     }

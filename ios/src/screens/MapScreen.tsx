@@ -218,6 +218,18 @@ export default function MapScreen() {
       }
       setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
     }
+    if (pendingScreen === 'ad-offer') {
+      clearPendingScreen();
+      if (pendingData?.impression_id) {
+        showPanel('ad-offer', {
+          impression_id: pendingData.impression_id,
+          title: pendingData.title,
+          body: pendingData.body,
+          value_cents: pendingData.value_cents,
+        });
+        setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+      }
+    }
   }, [pendingScreen, businesses]);
 
   const loadBusinesses = () => {

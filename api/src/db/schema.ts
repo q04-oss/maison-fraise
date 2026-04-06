@@ -177,6 +177,7 @@ export const users = pgTable('users', {
   business_id: integer('business_id').references(() => businesses.id),
   stripe_connect_account_id: text('stripe_connect_account_id'),
   stripe_connect_onboarded: boolean('stripe_connect_onboarded').notNull().default(false),
+  ad_balance_cents: integer('ad_balance_cents').notNull().default(0),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -979,5 +980,30 @@ export const earningsLedger = pgTable('earnings_ledger', {
   type: text('type').notNull(),      // 'credit' | 'debit'
   description: text('description'),
   stripe_transfer_id: text('stripe_transfer_id'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ─── Ad network ───────────────────────────────────────────────────────────────
+
+export const adCampaigns = pgTable('ad_campaigns', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  type: text('type').notNull().default('proximity'), // 'proximity' | 'remote'
+  value_cents: integer('value_cents').notNull(),     // payout per accepted impression
+  budget_cents: integer('budget_cents').notNull().default(0),
+  spent_cents: integer('spent_cents').notNull().default(0),
+  active: boolean('active').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const adImpressions = pgTable('ad_impressions', {
+  id: serial('id').primaryKey(),
+  campaign_id: integer('campaign_id').notNull().references(() => adCampaigns.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  accepted: boolean('accepted'),       // null = pending, true = accepted, false = denied
+  payout_cents: integer('payout_cents').notNull(),
+  responded_at: timestamp('responded_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });

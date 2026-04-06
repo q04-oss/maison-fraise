@@ -94,6 +94,16 @@ export default function App() {
         setPendingScreen('tournaments');
         setPendingData(tournamentId ? { tournament_id: tournamentId } : null);
       }
+      if (screen === 'ad-offer') {
+        const data = response.notification.request.content.data;
+        setPendingScreen('ad-offer');
+        setPendingData({
+          impression_id: data?.impression_id,
+          title: response.notification.request.content.title,
+          body: response.notification.request.content.body,
+          value_cents: data?.value_cents,
+        });
+      }
     });
     return () => sub.remove();
   }, []);

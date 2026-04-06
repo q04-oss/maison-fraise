@@ -16,7 +16,7 @@ import {
   demoLogin, updateDisplayName,
   createOrder, confirmOrder, operatorLogin,
   startIdentityVerification, fetchMyVentures,
-  fetchMyMarketOrders, collectMarketOrder,
+  fetchMyMarketOrders, collectMarketOrder, fetchAdBalance,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES, getDateOptions } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -51,6 +51,7 @@ export default function TerminalPanel() {
   const [idVerifyAttested, setIdVerifyAttested] = useState(false);
   const [myVentures, setMyVentures] = useState<any[]>([]);
   const [marketOrders, setMarketOrders] = useState<any[]>([]);
+  const [adBalanceCents, setAdBalanceCents] = useState(0);
 const nameInputRef = useRef<TextInput>(null);
 
   // Inline order state
@@ -155,6 +156,7 @@ const nameInputRef = useRef<TextInput>(null);
           .catch(() => {});
         fetchMyVentures().then(setMyVentures).catch(() => {});
         fetchMyMarketOrders().then(setMarketOrders).catch(() => {});
+        fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
       }
     }).finally(() => setLoading(false));
   }, []);
@@ -499,6 +501,11 @@ const nameInputRef = useRef<TextInput>(null);
                   <Text style={[styles.label, { color: c.accent }]}>→</Text>
                 </TouchableOpacity>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('ad-campaigns')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>AD CAMPAIGNS</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
               </View>
             ) : (
             <>
@@ -527,6 +534,11 @@ const nameInputRef = useRef<TextInput>(null);
                   <Text style={[styles.chatEmail, { color: c.muted }]}>{fraiseChatEmail}</Text>
                 </TouchableOpacity>
               ) : null}
+              {adBalanceCents > 0 && (
+                <Text style={[styles.chatEmail, { color: c.muted }]}>
+                  ad earnings: CA${(adBalanceCents / 100).toFixed(2)}
+                </Text>
+              )}
             </View>
 
             {/* ORDER section */}
