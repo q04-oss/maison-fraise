@@ -495,7 +495,19 @@ router.post('/collect', requireUser, async (req: Request, res: Response) => {
       FROM market_order_items WHERE order_id = ${order_id}
     `);
     const items = (itemRows as any).rows ?? itemRows;
-    res.json({ ok: true, order_id, items });
+
+    const vendorRows = await db.execute(sql`
+      SELECT mv.name AS vendor_name, mv.description AS vendor_description,
+             mv.instagram_handle, ml.name AS listing_name, ml.tags
+      FROM market_order_items moi
+      JOIN market_listings ml ON ml.id = moi.listing_id
+      JOIN market_vendors mv ON mv.id = ml.vendor_id
+      WHERE moi.order_id = ${order_id}
+      LIMIT 1
+    `);
+    const vendorInfo = ((vendorRows as any).rows ?? vendorRows)[0] ?? null;
+
+    res.json({ ok: true, order_id, items, vendor_info: vendorInfo });
   } catch (err) {
     logger.error('[market] POST /collect', err);
     res.status(500).json({ error: 'internal' });

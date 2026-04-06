@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { eq, and } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { orders, users, legitimacyEvents, varieties } from '../db/schema';
 import { requireUser } from '../lib/auth';
@@ -128,6 +129,34 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
+    // Feature 3: Collectif pickups today (via collectif_commitments as membership proxy)
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const collectifRows = await db.execute(sql`
+      SELECT COUNT(DISTINCT le.user_id)::int AS pickup_count
+      FROM legitimacy_events le
+      JOIN collectif_commitments cc_self ON cc_self.user_id = ${user_id}
+      JOIN collectif_commitments cc_other ON cc_other.collectif_id = cc_self.collectif_id
+        AND cc_other.user_id = le.user_id
+        AND cc_other.user_id != ${user_id}
+      WHERE le.event_type = 'nfc_verified'
+        AND le.created_at >= ${todayStart}
+    `);
+    const collectifData = ((collectifRows as any).rows ?? collectifRows)[0];
+    const collectifPickupsToday = (collectifData ?? {}).pickup_count ?? 0;
+
+    // Feature 5: Variety streak — count collected orders for this variety by this user
+    const countRows = await db.execute(sql`
+      SELECT COUNT(*)::int AS order_count
+      FROM orders o
+      JOIN users u ON u.apple_id = o.apple_id
+      WHERE u.id = ${user_id}
+        AND o.variety_id = ${order.variety_id}
+        AND o.status = 'collected'
+    `);
+    const orderCount = (((countRows as any).rows ?? countRows)[0]?.order_count) ?? 0;
+
     res.json({
       variety_id: order.variety_id,
       variety_name: variety?.name ?? null,
@@ -137,6 +166,13 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       finish: order.finish,
       quantity: order.quantity,
       location_id: order.location_id,
+      // Feature 3
+      collectif_pickups_today: collectifPickupsToday,
+      // Feature 4
+      is_gift: order.is_gift ?? false,
+      gift_note: order.is_gift ? (order.gift_note ?? null) : null,
+      // Feature 5
+      order_count: orderCount,
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

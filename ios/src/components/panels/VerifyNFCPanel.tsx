@@ -7,7 +7,7 @@ import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
 import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
-import { logStrawberries, requestHealthKitPermissions } from '../../lib/HealthKitService';
+import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
 type State = 'scanning' | 'success' | 'error';
 
@@ -25,9 +25,25 @@ export default function VerifyNFCPanel() {
       const token = await readNfcToken();
 
       if (token === 'fraise.market') {
-        await collectMarketOrderByNfc(token);
+        const marketResult = await collectMarketOrderByNfc(token);
         setState('success');
-        setTimeout(() => showPanel('market-orders'), 600);
+        if (marketResult.vendor_info) {
+          const marketPayload: ARVarietyData = {
+            variety_id: 0,
+            variety_name: marketResult.vendor_info.listing_name,
+            farm: marketResult.vendor_info.vendor_name,
+            harvest_date: null,
+            quantity: 0,
+            chocolate: '',
+            finish: '',
+            card_type: 'market',
+            vendor_description: marketResult.vendor_info.vendor_description ?? null,
+            vendor_instagram: marketResult.vendor_info.instagram_handle ?? null,
+            vendor_tags: marketResult.vendor_info.tags ?? [],
+          };
+          await ARBoxModule.presentAR(marketPayload);
+        }
+        showPanel('market-orders');
         return;
       }
 
@@ -35,6 +51,11 @@ export default function VerifyNFCPanel() {
 
       if (alreadyVerified) {
         const reorderData = await verifyNfcReorder(token);
+
+        // Feature 1: read HealthKit data fire-and-forget before building payload
+        let healthCtx: any = null;
+        try { healthCtx = await getTodayHealthContext(); } catch { /* ignore */ }
+
         const arPayload: ARVarietyData = {
           variety_id: reorderData.variety_id,
           variety_name: reorderData.variety_name ?? null,
@@ -43,6 +64,16 @@ export default function VerifyNFCPanel() {
           quantity: reorderData.quantity,
           chocolate: reorderData.chocolate,
           finish: reorderData.finish,
+          // Feature 1: HealthKit nutrition
+          vitamin_c_today_mg: (healthCtx as any)?.dietaryVitaminC ?? null,
+          calories_today_kcal: (healthCtx as any)?.dietaryEnergyConsumed ?? null,
+          // Feature 3: Collectif social layer
+          collectif_pickups_today: reorderData.collectif_pickups_today ?? 0,
+          // Feature 4: Gift reveal
+          is_gift: reorderData.is_gift ?? false,
+          gift_note: reorderData.gift_note ?? null,
+          // Feature 5: Variety streak
+          order_count: reorderData.order_count ?? 0,
         };
         setState('success');
         await ARBoxModule.presentAR(arPayload);

@@ -2780,7 +2780,18 @@ export async function placeMarketOrder(
 
 export async function collectMarketOrderByNfc(
   nfc_token: string
-): Promise<{ ok: boolean; order_id: number; items: any[] }> {
+): Promise<{
+  ok: boolean;
+  order_id: number;
+  items: any[];
+  vendor_info?: {
+    vendor_name: string;
+    vendor_description: string | null;
+    instagram_handle: string | null;
+    listing_name: string;
+    tags: string[];
+  } | null;
+}> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/market/collect`, {
     method: 'POST',
@@ -2853,6 +2864,10 @@ export async function verifyNfcReorder(nfc_token: string): Promise<{
   finish: string;
   quantity: number;
   location_id: number | null;
+  collectif_pickups_today?: number;
+  is_gift?: boolean;
+  gift_note?: string | null;
+  order_count?: number;
 }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/verify/reorder`, {
