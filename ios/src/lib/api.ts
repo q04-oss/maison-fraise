@@ -2580,3 +2580,15 @@ export async function fetchEveningTokens(): Promise<any[]> {
   if (!r.ok) return [];
   return r.json();
 }
+
+export async function fetchBusinessSocial(businessId: number): Promise<{ evening_count: number; portrait_license_count: number; has_menu: boolean; recent_evening_at: string | null }> {
+  const r = await fetch(`${BASE_URL}/api/businesses/${businessId}/social`);
+  if (!r.ok) return { evening_count: 0, portrait_license_count: 0, has_menu: false, recent_evening_at: null };
+  return r.json();
+}
+
+export async function fetchDiscovery(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/discovery`);
+  if (!r.ok) return [];
+  return r.json();
+}

@@ -7,15 +7,21 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchEveningTokens } from '../../lib/api';
 
 export default function EveningTokensPanel() {
-  const { goBack } = usePanel();
+  const { goBack, showPanel } = usePanel();
   const c = useColors();
   const [tokens, setTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [myId, setMyId] = useState<number | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('user_db_id').then(v => { if (v) setMyId(parseInt(v, 10)); });
+  }, []);
 
   useEffect(() => {
     fetchEveningTokens()
@@ -70,6 +76,20 @@ export default function EveningTokensPanel() {
               <Text style={[styles.companion, { color: c.accent }]}>
                 with {token.companion_name}
               </Text>
+              {myId !== null && (
+                <TouchableOpacity
+                  style={[styles.messageBtn, { borderColor: c.border }]}
+                  onPress={() => showPanel('messageThread', {
+                    userId: token.user_a_id === myId ? token.user_b_id : token.user_a_id,
+                    displayName: token.companion_name,
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.messageBtnText, { color: c.accent }]}>
+                    message {token.companion_name} →
+                  </Text>
+                </TouchableOpacity>
+              )}
               {token.minted_at ? (
                 <Text style={[styles.mintedAt, { color: c.muted }]}>
                   remembered {new Date(token.minted_at).toLocaleDateString('en-CA', {
@@ -162,4 +182,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     marginTop: 2,
   },
+  messageBtn: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  messageBtnText: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5 },
 });

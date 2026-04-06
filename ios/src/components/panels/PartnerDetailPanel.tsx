@@ -4,7 +4,7 @@ import {
   StyleSheet, ActivityIndicator, Linking, Platform, Alert,
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
-import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip, fetchNearbyJobs, JobPosting, fetchToiletReviews } from '../../lib/api';
+import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip, fetchNearbyJobs, JobPosting, fetchToiletReviews, fetchBusinessSocial } from '../../lib/api';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
@@ -33,6 +33,7 @@ export default function PartnerDetailPanel() {
   const [tipAmount, setTipAmount] = useState<number | null>(null);
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [toiletReviews, setToiletReviews] = useState<{ avg_rating: number | null; review_count: number; reviews: any[] } | null>(null);
+  const [social, setSocial] = useState<{ evening_count: number; portrait_license_count: number; has_menu: boolean; recent_evening_at: string | null } | null>(null);
 
   const biz = activeLocation;
 
@@ -44,11 +45,13 @@ export default function PartnerDetailPanel() {
       fetchBusinessVisitCount(biz.id).catch(() => null),
       fetchNearbyJobs(biz.id).catch(() => []),
       toiletPromise,
-    ]).then(([p, v, j, t]) => {
+      fetchBusinessSocial(biz.id).catch(() => null),
+    ]).then(([p, v, j, t, s]) => {
       setPortraits(p as any[]);
       setVisitCount(v ? (v as any).visit_count : null);
       setJobs((j as JobPosting[]).filter(job => job.active));
       if (t) setToiletReviews(t as any);
+      setSocial(s as any);
     }).finally(() => { setLoading(false); if (isRefresh) setRefreshing(false); });
   };
 
@@ -154,6 +157,34 @@ export default function PartnerDetailPanel() {
             <Text style={[styles.placedText, { color: '#7A5C1E' }]}>
               {biz.placed_user_name} is here right now
             </Text>
+          </View>
+        )}
+
+        {/* Social stats */}
+        {(social && (social.evening_count > 0 || social.portrait_license_count > 0 || social.has_menu)) && (
+          <View style={[styles.socialRow, { borderBottomColor: c.border }]}>
+            {social.evening_count > 0 && (
+              <View style={styles.socialStat}>
+                <Text style={[styles.socialStatNum, { color: c.text }]}>{social.evening_count}</Text>
+                <Text style={[styles.socialStatLabel, { color: c.muted }]}>
+                  {social.evening_count === 1 ? 'EVENING' : 'EVENINGS'}
+                </Text>
+              </View>
+            )}
+            {social.portrait_license_count > 0 && (
+              <View style={styles.socialStat}>
+                <Text style={[styles.socialStatNum, { color: c.text }]}>{social.portrait_license_count}</Text>
+                <Text style={[styles.socialStatLabel, { color: c.muted }]}>
+                  {social.portrait_license_count === 1 ? 'PORTRAIT' : 'PORTRAITS'}
+                </Text>
+              </View>
+            )}
+            {social.has_menu && (
+              <View style={styles.socialStat}>
+                <Text style={[styles.socialStatNum, { color: c.accent }]}>✓</Text>
+                <Text style={[styles.socialStatLabel, { color: c.muted }]}>MENU</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -427,6 +458,17 @@ const styles = StyleSheet.create({
   },
   placedDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#C9973A' },
   placedText: { fontSize: 13, fontFamily: fonts.dmSans },
+
+  socialRow: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.lg,
+  },
+  socialStat: { alignItems: 'center', minWidth: 48 },
+  socialStatNum: { fontSize: 22, fontFamily: fonts.playfair },
+  socialStatLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginTop: 2 },
 
   infoBlock: {
     paddingHorizontal: SPACING.md,

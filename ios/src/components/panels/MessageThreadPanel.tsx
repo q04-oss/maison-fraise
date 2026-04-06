@@ -13,7 +13,7 @@ import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearby
 import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
-  const { goBack, panelData, setPanelData, jumpToPanel, businesses, setActiveLocation, setOrder } = usePanel();
+  const { goBack, panelData, setPanelData, jumpToPanel, businesses, setActiveLocation, setOrder, showPanel } = usePanel();
   const { pushToken } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
@@ -381,9 +381,27 @@ export default function MessageThreadPanel() {
                   )}
 
                   {status === 'minted' && (
-                    <Text style={[styles.offerDetail, { color: c.accent, marginTop: 8, letterSpacing: 1 }]}>
-                      evening remembered · #{String(meta.booking_id).padStart(4, '0')}
-                    </Text>
+                    <View style={styles.mintedRow}>
+                      <Text style={[styles.offerDetail, { color: c.accent, letterSpacing: 1 }]}>
+                        evening remembered · #{String(meta.booking_id).padStart(4, '0')}
+                      </Text>
+                      {meta.companion_user_id && meta.companion_name && (
+                        <TouchableOpacity
+                          style={[styles.offerBtn, { borderColor: c.accent, marginTop: 8, alignSelf: 'flex-start' }]}
+                          onPress={() => {
+                            showPanel('messageThread', {
+                              userId: meta.companion_user_id,
+                              displayName: meta.companion_name,
+                            });
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.offerBtnText, { color: c.accent }]}>
+                            message {meta.companion_name} →
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   )}
 
                   {status === 'expired' && (
@@ -524,4 +542,5 @@ const styles = StyleSheet.create({
   jobDesc: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20 },
   jobApplyBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start', marginTop: 4 },
   jobApplyText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  mintedRow: { gap: 4 },
 });

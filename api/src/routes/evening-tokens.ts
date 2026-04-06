@@ -122,6 +122,20 @@ router.post('/:bookingId/confirm', requireUser, async (req: Request, res: Respon
           AND (metadata->>'booking_id')::int = ${bookingId}
       `);
 
+      // Set companion_user_id on each card so iOS can navigate to the message thread
+      await db.execute(sql`
+        UPDATE messages SET metadata = jsonb_set(metadata, '{companion_user_id}', to_jsonb(${token.user_b_id}::int))
+        WHERE type = 'dinner_invite'
+          AND (metadata->>'booking_id')::int = ${bookingId}
+          AND recipient_id = ${token.user_a_id}
+      `);
+      await db.execute(sql`
+        UPDATE messages SET metadata = jsonb_set(metadata, '{companion_user_id}', to_jsonb(${token.user_a_id}::int))
+        WHERE type = 'dinner_invite'
+          AND (metadata->>'booking_id')::int = ${bookingId}
+          AND recipient_id = ${token.user_b_id}
+      `);
+
       res.json({ status: 'minted' });
     } else {
       res.json({ status: 'confirmed', waiting_for_companion: true });

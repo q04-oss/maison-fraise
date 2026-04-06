@@ -73,6 +73,47 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/businesses/:id/social — public social stats for a business
+router.get('/:id/social', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
+  try {
+    // Count minted evening tokens for this business
+    const [eveningRow] = await db.execute<{ count: string }>(sql`
+      SELECT COUNT(*)::text as count FROM evening_tokens
+      WHERE business_id = ${id} AND minted_at IS NOT NULL
+    `);
+    const eveningCount = parseInt((eveningRow as any).count ?? '0', 10);
+
+    // Count portrait licenses where this business appears in requesting_businesses
+    const [portraitRow] = await db.execute<{ count: string }>(sql`
+      SELECT COUNT(*)::text as count
+      FROM portrait_licenses pl
+      JOIN portrait_license_requests plr ON pl.request_id = plr.id
+      WHERE plr.requesting_businesses @> ${JSON.stringify([{ id }])}::jsonb
+    `);
+    const portraitLicenseCount = parseInt((portraitRow as any).count ?? '0', 10);
+
+    // Has menu items
+    const [menuRow] = await db.execute<{ count: string }>(sql`
+      SELECT COUNT(*)::text as count FROM business_menu_items WHERE business_id = ${id}
+    `);
+    const hasMenu = parseInt((menuRow as any).count ?? '0', 10) > 0;
+
+    // Most recent evening date
+    const [recentRow] = await db.execute<{ minted_at: string | null }>(sql`
+      SELECT minted_at FROM evening_tokens
+      WHERE business_id = ${id} AND minted_at IS NOT NULL
+      ORDER BY minted_at DESC LIMIT 1
+    `);
+    const recentEveningAt = (recentRow as any)?.minted_at ?? null;
+
+    res.json({ evening_count: eveningCount, portrait_license_count: portraitLicenseCount, has_menu: hasMenu, recent_evening_at: recentEveningAt });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // GET /api/businesses/:id/portraits
 router.get('/:id/portraits', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);

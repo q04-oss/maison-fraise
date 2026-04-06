@@ -52,7 +52,8 @@ export type PanelId =
   | 'portrait-tokens'
   | 'portrait-token-detail'
   | 'portrait-licensing'
-  | 'evening-tokens';
+  | 'evening-tokens'
+  | 'discovery';
 
 export interface OrderState {
   variety_id: number | null;
