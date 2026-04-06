@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, and, desc, ilike, or } from 'drizzle-orm';
 import { db } from '../db';
 import { editorialPieces, users, earningsLedger } from '../db/schema';
-import { currentBankSeconds, tierFromBalance, tierCommissionRate } from '../lib/socialTier';
+import { currentBankSeconds, tierFromBalance, effectiveTier, tierCommissionRate } from '../lib/socialTier';
 import { requireUser } from '../lib/auth';
 
 const router = Router();
@@ -115,6 +115,7 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
       .select({
         social_time_bank_seconds: users.social_time_bank_seconds,
         social_time_bank_updated_at: users.social_time_bank_updated_at,
+        social_tier: users.social_tier,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -124,7 +125,7 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
       user?.social_time_bank_seconds ?? 0,
       user?.social_time_bank_updated_at ?? null,
     );
-    const tier = tierFromBalance(balance);
+    const tier = effectiveTier(tierFromBalance(balance), user?.social_tier ?? null);
 
     if (!tier) {
       res.status(403).json({ error: 'social_access_required', message: 'Tap a box to unlock social access.' });
@@ -353,6 +354,7 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
       .select({
         social_time_bank_seconds: users.social_time_bank_seconds,
         social_time_bank_updated_at: users.social_time_bank_updated_at,
+        social_tier: users.social_tier,
       })
       .from(users)
       .where(eq(users.id, piece.author_user_id))
@@ -361,7 +363,7 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
       author?.social_time_bank_seconds ?? 0,
       author?.social_time_bank_updated_at ?? null,
     );
-    const rate = tierCommissionRate(tierFromBalance(authorBalance));
+    const rate = tierCommissionRate(effectiveTier(tierFromBalance(authorBalance), author?.social_tier ?? null));
 
     await db
       .update(editorialPieces)

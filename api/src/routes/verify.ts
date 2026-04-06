@@ -6,7 +6,7 @@ import { orders, users, legitimacyEvents, varieties, standingOrders } from '../d
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 import { fireWebhook } from '../lib/webhooks';
-import { currentBankSeconds, tierFromBalance } from '../lib/socialTier';
+import { currentBankSeconds, tierFromBalance, effectiveTier } from '../lib/socialTier';
 
 const router = Router();
 
@@ -32,12 +32,13 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj }).from(users).where(eq(users.id, user_id));
     const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
 
-    // Read variety's time credits before transaction
+    // Read variety's time credits and tier ceiling before transaction
     const [varietyRow] = await db
-      .select({ time_credits_days: varieties.time_credits_days })
+      .select({ time_credits_days: varieties.time_credits_days, social_tier: varieties.social_tier })
       .from(varieties).where(eq(varieties.id, order.variety_id));
     const creditsDays = varietyRow?.time_credits_days ?? 30;
     const creditsSeconds = creditsDays * 86400;
+    const varietyCeiling = varietyRow?.social_tier ?? null;
 
     // Read current bank balance before transaction (drain elapsed time first)
     const [bankRow] = await db
@@ -74,6 +75,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
           social_time_bank_seconds: Math.round(newBalance),
           social_time_bank_updated_at: now,
           social_lifetime_credits_seconds: Math.round(newLifetime),
+          social_tier: varietyCeiling, // ceiling = grade of the box just tapped
           ...(fraiseChatEmail ? { fraise_chat_email: fraiseChatEmail } : {}),
         })
         .where(eq(users.id, user_id));
@@ -107,7 +109,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
-    const tier = tierFromBalance(newBalance);
+    const tier = effectiveTier(tierFromBalance(newBalance), varietyCeiling);
     res.json({
       verified: true, user_id,
       fraise_chat_email: fraiseChatEmail,

@@ -1,5 +1,21 @@
 export type SocialTier = 'standard' | 'reserve' | 'estate' | null;
 
+const TIER_RANK: Record<string, number> = { standard: 1, reserve: 2, estate: 3 };
+
+export function tierRank(tier: SocialTier): number {
+  return TIER_RANK[tier ?? ''] ?? 0;
+}
+
+/** Effective tier = min(balance_tier, ceiling). */
+export function effectiveTier(balanceTier: SocialTier, ceiling: SocialTier): SocialTier {
+  if (!balanceTier || !ceiling) return null;
+  return tierRank(balanceTier) <= tierRank(ceiling) ? balanceTier : ceiling;
+}
+
+export function tierMeets(tier: SocialTier, required: SocialTier): boolean {
+  return tierRank(tier) >= tierRank(required);
+}
+
 const ESTATE_THRESHOLD_DAYS = 75;
 const RESERVE_THRESHOLD_DAYS = 30;
 
@@ -13,7 +29,7 @@ export function currentBankSeconds(
   return Math.max(0, bankSeconds - elapsed);
 }
 
-/** Derive access tier from a live bank balance (in seconds). */
+/** Derive tier purely from balance (before ceiling is applied). */
 export function tierFromBalance(balanceSeconds: number): SocialTier {
   const days = balanceSeconds / 86400;
   if (days >= ESTATE_THRESHOLD_DAYS) return 'estate';

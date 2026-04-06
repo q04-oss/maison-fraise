@@ -97,6 +97,7 @@ import ProposalsPanel from './panels/ProposalsPanel';
 import ARVideoFeedPanel from './panels/ARVideoFeedPanel';
 import ARVideoDetailPanel from './panels/ARVideoDetailPanel';
 import SubmitARVideoPanel from './panels/SubmitARVideoPanel';
+import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -298,7 +299,9 @@ export default function PanelNavigator() {
         }),
       }],
     }]}>
-      <CurrentComponent />
+      <TierGate required={PANEL_TIER_REQUIREMENTS[currentPanel] ?? null} panelName={currentPanel}>
+        <CurrentComponent />
+      </TierGate>
     </Animated.View>
   );
 }

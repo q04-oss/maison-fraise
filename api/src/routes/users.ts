@@ -8,7 +8,7 @@ import {
 } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
-import { currentBankSeconds, tierFromBalance } from '../lib/socialTier';
+import { currentBankSeconds, tierFromBalance, effectiveTier } from '../lib/socialTier';
 
 const router = Router();
 
@@ -45,6 +45,7 @@ router.get('/me/social-access', requireUser, async (req: Request, res: Response)
         social_time_bank_seconds: users.social_time_bank_seconds,
         social_time_bank_updated_at: users.social_time_bank_updated_at,
         social_lifetime_credits_seconds: users.social_lifetime_credits_seconds,
+        social_tier: users.social_tier,
       })
       .from(users)
       .where(eq(users.id, user_id))
@@ -53,7 +54,7 @@ router.get('/me/social-access', requireUser, async (req: Request, res: Response)
       user?.social_time_bank_seconds ?? 0,
       user?.social_time_bank_updated_at ?? null,
     );
-    const tier = tierFromBalance(balance);
+    const tier = effectiveTier(tierFromBalance(balance), user?.social_tier ?? null);
     res.json({
       active: balance > 0,
       tier,
