@@ -2073,6 +2073,55 @@ export async function initiateToiletVisit(business_id: number, payment_method: '
   return r.json();
 }
 
+export async function initiatePersonalToiletVisit(personal_toilet_id: number, payment_method: 'stripe' | 'ad_balance'): Promise<{ visit_id: number; client_secret?: string; access_code?: string; fee_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/toilets/personal-visit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ personal_toilet_id, payment_method }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function upsertPersonalToilet(data: { title: string; description?: string; price_cents: number; address: string; lat?: number; lng?: number; instagram_handle?: string }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/toilets/personal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function togglePersonalToilet(): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/toilets/personal/toggle`, { method: 'PATCH', headers: auth });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchMyPersonalToilet(): Promise<any | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/toilets/personal/mine`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function fetchPersonalToilets(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/toilets/personal`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchPersonalToiletReviews(id: number): Promise<{ avg_rating: number | null; review_count: number; reviews: any[] }> {
+  const r = await fetch(`${BASE_URL}/api/toilets/personal/${id}/reviews`);
+  if (!r.ok) return { avg_rating: null, review_count: 0, reviews: [] };
+  return r.json();
+}
+
 export async function confirmToiletVisit(visit_id: number): Promise<{ access_code: string }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/toilets/visits/${visit_id}/confirm`, { method: 'POST', headers: auth });

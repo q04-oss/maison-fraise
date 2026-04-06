@@ -222,15 +222,31 @@ export const businesses = pgTable('businesses', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+export const personalToilets = pgTable('personal_toilets', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  price_cents: integer('price_cents').notNull(),
+  address: text('address').notNull(),
+  latitude: decimal('latitude', { precision: 10, scale: 7 }),
+  longitude: decimal('longitude', { precision: 10, scale: 7 }),
+  instagram_handle: text('instagram_handle'),
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 export const toiletVisits = pgTable('toilet_visits', {
   id: serial('id').primaryKey(),
   user_id: integer('user_id').notNull().references(() => users.id),
-  business_id: integer('business_id').notNull().references(() => businesses.id),
+  business_id: integer('business_id').references(() => businesses.id), // nullable — either business or personal
+  personal_toilet_id: integer('personal_toilet_id').references(() => personalToilets.id),
   fee_cents: integer('fee_cents').notNull(),
   payment_method: text('payment_method').notNull(), // 'stripe' | 'ad_balance'
   stripe_payment_intent_id: text('stripe_payment_intent_id'),
   paid: boolean('paid').notNull().default(false),
   access_code: text('access_code'),
+  access_code_expires_at: timestamp('access_code_expires_at'), // hardware-ready expiry
   rating: integer('rating'), // 1-5
   review_note: text('review_note'),
   reviewed_at: timestamp('reviewed_at'),

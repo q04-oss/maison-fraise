@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -821,9 +821,36 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const visitId = parseInt(pi.metadata?.visit_id ?? '', 10);
         if (!isNaN(visitId)) {
           const code = String(Math.floor(1000 + Math.random() * 9000));
-          await db.update(toiletVisits).set({ paid: true, access_code: code })
+          const expires = new Date(Date.now() + 15 * 60 * 1000);
+          await db.update(toiletVisits).set({ paid: true, access_code: code, access_code_expires_at: expires })
             .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)));
           logger.info(`Toilet visit ${visitId} paid via Stripe`);
+        }
+      } else if (type === 'personal_toilet_visit') {
+        const visitId = parseInt(pi.metadata?.visit_id ?? '', 10);
+        const hostUserId = parseInt(pi.metadata?.host_user_id ?? '', 10);
+        const listingTitle = pi.metadata?.listing_title ?? 'your toilet';
+        const amountCents = pi.amount_received ?? pi.amount;
+        if (!isNaN(visitId) && !isNaN(hostUserId)) {
+          const code = String(Math.floor(1000 + Math.random() * 9000));
+          const expires = new Date(Date.now() + 15 * 60 * 1000);
+          await db.update(toiletVisits).set({ paid: true, access_code: code, access_code_expires_at: expires })
+            .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)));
+          // Credit host
+          await db.update(users)
+            .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${amountCents}` })
+            .where(eq(users.id, hostUserId));
+          // Notify host
+          const [host] = await db.select({ push_token: users.push_token })
+            .from(users).where(eq(users.id, hostUserId));
+          if (host?.push_token) {
+            sendPushNotification(host.push_token, {
+              title: 'Someone is visiting your toilet',
+              body: `CA$${(amountCents / 100).toFixed(2)} earned from "${listingTitle}"`,
+              data: { screen: 'terminal' },
+            }).catch(() => {});
+          }
+          logger.info(`Personal toilet visit ${visitId} paid, host ${hostUserId} credited ${amountCents}c`);
         }
       }
     }

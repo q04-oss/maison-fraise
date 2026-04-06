@@ -12,7 +12,7 @@ import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
 import BeaconNudge from '../components/BeaconNudge';
 import { loadAndMonitorBeacons } from '../lib/beaconService';
-import { fetchBusinesses, fetchVarieties, updatePushToken, deleteAuthToken } from '../lib/api';
+import { fetchBusinesses, fetchVarieties, updatePushToken, deleteAuthToken, fetchPersonalToilets } from '../lib/api';
 import { STRAWBERRIES } from '../data/seed';
 import { useColors, fonts, SPACING } from '../theme';
 import { useApp } from '../../App';
@@ -124,6 +124,8 @@ export default function MapScreen() {
   const userCoords = useRef<{ latitude: number; longitude: number } | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [portalOptedIn, setPortalOptedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [personalToilets, setPersonalToilets] = useState<any[]>([]);
 
   // Strawberry FAB three-tier long-press refs
   const strawberryHapticLevel = useRef<0 | 1 | 2>(0);
@@ -131,9 +133,10 @@ export default function MapScreen() {
   const strawberryTimer2 = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const syncVerifiedState = useCallback(() => {
-    AsyncStorage.multiGet(['verified', 'portal_opted_in']).then(([v, p]) => {
+    AsyncStorage.multiGet(['verified', 'portal_opted_in', 'user_db_id']).then(([v, p, u]) => {
       if (v[1] === 'true') setIsVerified(true);
       if (p[1] === 'true') setPortalOptedIn(true);
+      setIsLoggedIn(!!u[1]);
     });
   }, []);
 
@@ -249,12 +252,21 @@ export default function MapScreen() {
       .catch(() => {});
   };
 
-  useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); loadAndMonitorBeacons(); }, []);
+  const loadPersonalToiletsIfLoggedIn = useCallback(() => {
+    AsyncStorage.getItem('user_db_id').then(id => {
+      if (!id) return;
+      fetchPersonalToilets()
+        .then((data: any[]) => setPersonalToilets(data.filter((t: any) => t.lat && t.lng)))
+        .catch(() => {});
+    });
+  }, []);
+
+  useEffect(() => { loadBusinesses(); loadVarietiesIfNeeded(); loadAndMonitorBeacons(); loadPersonalToiletsIfLoggedIn(); }, []);
 
   // Refresh businesses + portal flag when app comes to foreground
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') { loadBusinesses(); syncVerifiedState(); }
+      if (state === 'active') { loadBusinesses(); syncVerifiedState(); loadPersonalToiletsIfLoggedIn(); }
     });
     return () => sub.remove();
   }, [syncVerifiedState]);
@@ -541,6 +553,37 @@ export default function MapScreen() {
             </Callout>
           </Marker>
         ))}
+
+        {personalToilets.map(t => (
+          <Marker
+            key={`pt-${t.id}`}
+            coordinate={{ latitude: t.lat, longitude: t.lng }}
+            tracksViewChanges={false}
+            onPress={() => {
+              showPanel('toilet', {
+                personal_toilet: {
+                  id: t.id,
+                  title: t.title,
+                  host_name: t.display_name,
+                  instagram_handle: t.instagram_handle,
+                  price_cents: t.price_cents,
+                  description: t.description,
+                },
+              });
+              setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+            }}
+          >
+            <View style={styles.pinPersonalToilet} />
+            <Callout tooltip>
+              <View style={[styles.callout, { backgroundColor: c.card }]}>
+                <Text style={[styles.calloutName, { color: c.text }]}>{t.title}</Text>
+                {!!t.address && (
+                  <Text style={[styles.calloutAddress, { color: c.muted }]}>{t.address}</Text>
+                )}
+              </View>
+            </Callout>
+          </Marker>
+        ))}
       </MapView>
 
       <TrueSheet
@@ -699,6 +742,13 @@ const styles = StyleSheet.create({
     width: 7, height: 7, borderRadius: 4,
     backgroundColor: '#5B8DB8',
     borderWidth: 1.5, borderColor: '#fff',
+  },
+  pinPersonalToilet: {
+    width: 12, height: 12, borderRadius: 6,
+    backgroundColor: '#5B8DB8',
+    borderWidth: 2, borderColor: '#fff',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
   },
   bizLoadingIndicator: { position: 'absolute', alignSelf: 'center' },
   bizErrorBanner: {

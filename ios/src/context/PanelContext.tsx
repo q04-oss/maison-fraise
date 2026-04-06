@@ -38,7 +38,8 @@ export type PanelId =
   | 'vendor-stall'
   | 'market-admin'
   | 'ad-campaigns'
-  | 'toilet';
+  | 'toilet'
+  | 'personal-toilet';
 
 export interface OrderState {
   variety_id: number | null;
