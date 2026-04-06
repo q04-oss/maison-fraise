@@ -85,7 +85,11 @@ export type PanelId =
   | 'webhooks'
   | 'editorial-feed'
   | 'editorial-piece'
-  | 'write-piece';
+  | 'write-piece'
+  | 'dj-offer'
+  | 'nomination'
+  | 'nomination-history'
+  | 'campaign-commission';
 
 export interface OrderState {
   variety_id: number | null;

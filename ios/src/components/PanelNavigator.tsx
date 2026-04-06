@@ -86,6 +86,10 @@ import WebhooksPanel from './panels/WebhooksPanel';
 import EditorialFeedPanel from './panels/EditorialFeedPanel';
 import EditorialPiecePanel from './panels/EditorialPiecePanel';
 import WritePiecePanel from './panels/WritePiecePanel';
+import DjOfferPanel from './panels/DjOfferPanel';
+import NominationPanel from './panels/NominationPanel';
+import NominationHistoryPanel from './panels/NominationHistoryPanel';
+import CampaignCommissionPanel from './panels/CampaignCommissionPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -171,6 +175,10 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'editorial-feed': EditorialFeedPanel,
   'editorial-piece': EditorialPiecePanel,
   'write-piece': WritePiecePanel,
+  'dj-offer': DjOfferPanel,
+  'nomination': NominationPanel,
+  'nomination-history': NominationHistoryPanel,
+  'campaign-commission': CampaignCommissionPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -234,6 +242,10 @@ const FULL_HEIGHT_PANELS = new Set([
   'editorial-feed',
   'editorial-piece',
   'write-piece',
+  'dj-offer',
+  'nomination',
+  'nomination-history',
+  'campaign-commission',
 ]);
 
 export default function PanelNavigator() {
