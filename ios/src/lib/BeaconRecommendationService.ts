@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
 import { getTodayHealthContext } from './HealthKitService';
-import { startBeaconMonitoring } from './beaconService';
+import { setOnNearbyShop } from './beaconService';
 import { fetchMenuRecommendation } from './api';
 
 // PushNotificationIOS is used if available; Alert.alert is the TestFlight fallback
@@ -12,25 +12,22 @@ try {
   // Not available — will fall back to Alert
 }
 
-export function initBeaconRecommendations(
-  getBusinessByBeaconUUID: (uuid: string) => { id: number; name: string } | null,
-): void {
-  startBeaconMonitoring(async (businessBeaconUUID: string) => {
-    const business = getBusinessByBeaconUUID(businessBeaconUUID);
-    if (!business) return;
-
+// Hooks into the existing beacon monitoring system (loadAndMonitorBeacons).
+// Must be called after loadAndMonitorBeacons() has started.
+export function initBeaconRecommendations(): void {
+  setOnNearbyShop(async (_shopUserId: number, businessName: string, businessId: number) => {
     try {
       const healthContext = await getTodayHealthContext();
-      const recommendations = await fetchMenuRecommendation(business.id, healthContext);
+      const recommendations = await fetchMenuRecommendation(businessId, healthContext);
 
       if (recommendations.length === 0) return;
 
       const top = recommendations[0];
-      const title = `Welcome to ${business.name}`;
+      const title = `Welcome to ${businessName}`;
       const body = `${top.name} — ${top.reason}`;
       const userInfo = {
         screen: 'partner-detail',
-        business_id: business.id,
+        business_id: businessId,
         recommendation: top,
       };
 

@@ -77,37 +77,3 @@ export function stopMonitoring() {
   monitoring = false;
 }
 
-// ─── HealthKit beacon recommendation exports ──────────────────────────────────
-// Used by BeaconRecommendationService to monitor a single platform-wide region
-// and trigger personalised menu recommendations on venue entry.
-
-// Platform UUID used for all Maison Fraise beacons
-export const MAISON_FRAISE_BEACON_UUID = 'E2C56DB5-DFFB-48D2-B060-D0F5A71096E0';
-
-import { DeviceEventEmitter, EmitterSubscription } from 'react-native';
-
-let recommendationRegionSubscription: EmitterSubscription | null = null;
-
-export function startBeaconMonitoring(onEnterRegion: (businessBeaconUUID: string) => void): void {
-  Beacons.requestAlwaysAuthorization();
-  Beacons.startMonitoringForRegion({
-    identifier: 'maison-fraise',
-    uuid: MAISON_FRAISE_BEACON_UUID,
-  });
-
-  recommendationRegionSubscription = DeviceEventEmitter.addListener('regionDidEnter', (region: any) => {
-    const uuid: string = region?.identifier ?? region?.uuid ?? '';
-    onEnterRegion(uuid);
-  });
-}
-
-export function stopBeaconMonitoring(): void {
-  if (recommendationRegionSubscription) {
-    recommendationRegionSubscription.remove();
-    recommendationRegionSubscription = null;
-  }
-  Beacons.stopMonitoringForRegion({
-    identifier: 'maison-fraise',
-    uuid: MAISON_FRAISE_BEACON_UUID,
-  });
-}
