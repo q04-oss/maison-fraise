@@ -41,6 +41,10 @@ import MarketAdminPanel from './panels/MarketAdminPanel';
 import AdCampaignsPanel from './panels/AdCampaignsPanel';
 import ToiletPanel from './panels/ToiletPanel';
 import PersonalToiletPanel from './panels/PersonalToiletPanel';
+import ItineraryPanel from './panels/ItineraryPanel';
+import ItineraryDetailPanel from './panels/ItineraryDetailPanel';
+import HealthProfilePanel from './panels/HealthProfilePanel';
+import PersonalizedMenuPanel from './panels/PersonalizedMenuPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -81,6 +85,10 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'ad-campaigns': AdCampaignsPanel,
   'toilet': ToiletPanel,
   'personal-toilet': PersonalToiletPanel,
+  'itinerary': ItineraryPanel,
+  'itinerary-detail': ItineraryDetailPanel,
+  'health-profile': HealthProfilePanel,
+  'personalized-menu': PersonalizedMenuPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -102,6 +110,10 @@ const FULL_HEIGHT_PANELS = new Set([
   'ad-campaigns',
   'toilet',
   'personal-toilet',
+  'itinerary',
+  'itinerary-detail',
+  'health-profile',
+  'personalized-menu',
 ]);
 
 export default function PanelNavigator() {

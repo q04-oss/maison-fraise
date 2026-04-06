@@ -956,6 +956,16 @@ const nameInputRef = useRef<TextInput>(null);
               <Text style={[styles.label, { color: c.muted }]}>MY TOILET</Text>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('itinerary')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>ITINERARIES</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('health-profile')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>HEALTH PROFILE</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
             {isShop && (
               <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market-admin')} activeOpacity={0.7}>
                 <Text style={[styles.label, { color: c.muted }]}>MARKET ADMIN</Text>

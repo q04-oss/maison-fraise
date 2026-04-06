@@ -300,6 +300,20 @@ export default function PartnerDetailPanel() {
           </View>
         )}
 
+        {/* Personalized menu — restaurant/spa properties */}
+        {biz.type !== 'popup' && (
+          <TouchableOpacity
+            style={[styles.menuCard, { borderColor: c.accent }]}
+            onPress={() => showPanel('personalized-menu', { businessId: biz.id, businessName: biz.name })}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.menuCardLabel, { color: c.accent }]}>DOROTKA MENU</Text>
+            <Text style={[styles.menuCardText, { color: c.text }]}>
+              Build a tasting menu calibrated to your biometrics →
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Commission a campaign CTA */}
         <TouchableOpacity
           style={[styles.commissionCard, { borderColor: c.border }]}
@@ -472,6 +486,14 @@ const styles = StyleSheet.create({
   toiletReviewRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 3 },
   toiletReviewStars: { fontSize: 12, letterSpacing: 1 },
   toiletReviewNote: { fontSize: 12, fontFamily: fonts.dmSans },
+
+  menuCard: {
+    marginHorizontal: SPACING.md, marginTop: SPACING.md,
+    borderRadius: 10, borderWidth: 1,
+    padding: SPACING.md, gap: 6,
+  },
+  menuCardLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 2 },
+  menuCardText: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20 },
 
   commissionCard: {
     marginHorizontal: SPACING.md,

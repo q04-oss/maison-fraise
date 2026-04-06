@@ -253,6 +253,93 @@ export const toiletVisits = pgTable('toilet_visits', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Health profiles (Dorotka toilet biometric data) ─────────────────────────
+export const healthProfiles = pgTable('health_profiles', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id).unique(),
+  // Dietary
+  dietary_restrictions: text('dietary_restrictions').array().notNull().default([]),
+  allergens: jsonb('allergens').$type<Record<string, boolean>>().default({}),
+  // Dorotka biometric readings (0–1 scale, from home toilet analysis)
+  biometric_markers: jsonb('biometric_markers').$type<{
+    gut_microbiome_diversity?: number;   // 0=low, 1=high
+    hydration?: number;                  // 0=dehydrated, 1=optimal
+    inflammation_markers?: number;       // 0=none, 1=high
+    digestive_speed?: number;            // 0=slow, 1=fast
+    stress_indicators?: number;          // 0=none, 1=high
+  }>().default({}),
+  flavor_profile: jsonb('flavor_profile').$type<{
+    umami?: number;   // preference 0–1
+    sweet?: number;   // tolerance 0–1
+    sour?: number;    // tolerance 0–1
+    bitter?: number;  // tolerance 0–1
+    spicy?: number;   // tolerance 0–1
+    rich?: number;    // preference 0–1 (fat/cream/butter)
+  }>().default({}),
+  caloric_needs: integer('caloric_needs'),   // daily kcal estimate
+  dorotka_note: text('dorotka_note'),        // Dorotka's plain-language summary
+  last_reading_at: timestamp('last_reading_at'),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// ─── Itineraries ──────────────────────────────────────────────────────────────
+export const itineraries = pgTable('itineraries', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: text('status').notNull().default('active'), // 'active' | 'completed'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const itineraryDestinations = pgTable('itinerary_destinations', {
+  id: serial('id').primaryKey(),
+  itinerary_id: integer('itinerary_id').notNull().references(() => itineraries.id, { onDelete: 'cascade' }),
+  business_id: integer('business_id').references(() => businesses.id), // platform property if known
+  place_name: text('place_name').notNull(),
+  city: text('city').notNull(),
+  country: text('country').notNull(),
+  lat: decimal('lat', { precision: 10, scale: 7 }),
+  lng: decimal('lng', { precision: 10, scale: 7 }),
+  arrival_date: text('arrival_date'),   // ISO date 'YYYY-MM-DD'
+  departure_date: text('departure_date'),
+  notes: text('notes'),
+  sort_order: integer('sort_order').notNull().default(0),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// Bespoke presence proposals — a property bids on a user's attendance
+export const itineraryProposals = pgTable('itinerary_proposals', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  itinerary_id: integer('itinerary_id').references(() => itineraries.id),
+  destination_id: integer('destination_id').references(() => itineraryDestinations.id),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  value_cents: integer('value_cents').notNull(),   // what the property pays the user to show up
+  status: text('status').notNull().default('pending'), // 'pending' | 'accepted' | 'declined'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  responded_at: timestamp('responded_at'),
+  visit_confirmed_at: timestamp('visit_confirmed_at'), // biometric check-in (future)
+});
+
+// ─── Personalized menus (Dorotka-generated per user per restaurant) ───────────
+export const personalizedMenus = pgTable('personalized_menus', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  courses: jsonb('courses').notNull().$type<Array<{
+    course: string;
+    dish: string;
+    rationale: string;
+  }>>(),
+  health_snapshot: jsonb('health_snapshot'), // copy of profile at generation time
+  generated_at: timestamp('generated_at').notNull().defaultNow(),
+  valid_until: timestamp('valid_until'),
+});
+
 export const campaigns = pgTable('campaigns', {
   id: serial('id').primaryKey(),
   title: text('title').notNull(),

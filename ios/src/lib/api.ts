@@ -2170,3 +2170,128 @@ export async function fetchToiletReviews(businessId: number): Promise<{ avg_rati
   if (!r.ok) return { avg_rating: null, review_count: 0, reviews: [] };
   return r.json();
 }
+
+// ─── Health profile ───────────────────────────────────────────────────────────
+
+export async function fetchHealthProfile(): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/health-profile`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function updateHealthProfile(data: {
+  dietary_restrictions?: string[];
+  allergens?: Record<string, boolean>;
+  biometric_markers?: Record<string, number>;
+  flavor_profile?: Record<string, number>;
+  caloric_needs?: number;
+  dorotka_note?: string;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/health-profile`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('Failed to update health profile');
+  return r.json();
+}
+
+// ─── Itineraries ──────────────────────────────────────────────────────────────
+
+export async function fetchItineraries(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function createItinerary(data: { title: string; description?: string }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchItineraryDetail(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries/${id}`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function updateItinerary(id: number, data: { title?: string; description?: string; status?: string }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function deleteItinerary(id: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/itineraries/${id}`, { method: 'DELETE', headers: auth });
+}
+
+export async function addDestination(itineraryId: number, data: {
+  place_name: string; city: string; country: string;
+  lat?: number; lng?: number; arrival_date?: string; departure_date?: string; notes?: string; business_id?: number;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries/${itineraryId}/destinations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function removeDestination(itineraryId: number, destId: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/itineraries/${itineraryId}/destinations/${destId}`, { method: 'DELETE', headers: auth });
+}
+
+export async function fetchMyProposals(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries/proposals/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function respondToProposal(id: number, accept: boolean): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/itineraries/proposals/${id}/${accept ? 'accept' : 'decline'}`, {
+    method: 'PATCH', headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+// ─── Personalized menus ───────────────────────────────────────────────────────
+
+export async function generatePersonalizedMenu(business_id: number, party_user_ids?: number[]): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menus/personalized`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ business_id, party_user_ids }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchLatestPersonalizedMenu(business_id: number): Promise<any | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menus/personalized/latest?business_id=${business_id}`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
