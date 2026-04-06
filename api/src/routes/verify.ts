@@ -71,7 +71,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'] });
+    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity });
   } catch (err: any) {
     if (err?.code === 'already_used') {
       res.status(403).json({ error: 'This token is invalid or has already been used.' });

@@ -6,6 +6,7 @@ import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
 import { verifyNfc } from '../../lib/api';
+import { logStrawberries } from '../../lib/HealthKitService';
 
 type State = 'scanning' | 'success' | 'error';
 
@@ -25,6 +26,9 @@ export default function VerifyNFCPanel() {
       await AsyncStorage.setItem('verified', 'true');
       if (result.fraise_chat_email) {
         await AsyncStorage.setItem('fraise_chat_email', result.fraise_chat_email);
+      }
+      if (result.quantity) {
+        logStrawberries(result.quantity).catch(() => {});
       }
       setState('success');
       setTimeout(() => showPanel('verified'), 600);
