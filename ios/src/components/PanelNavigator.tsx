@@ -49,6 +49,9 @@ import BusinessMenuPanel from './panels/BusinessMenuPanel';
 import ReservationOffersPanel from './panels/ReservationOffersPanel';
 import ReservationDiscoveryPanel from './panels/ReservationDiscoveryPanel';
 import ReservationBookingPanel from './panels/ReservationBookingPanel';
+import PortraitTokensPanel from './panels/PortraitTokensPanel';
+import PortraitTokenDetailPanel from './panels/PortraitTokenDetailPanel';
+import PortraitLicenseRequestPanel from './panels/PortraitLicenseRequestPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -97,6 +100,9 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'reservation-offers': ReservationOffersPanel,
   'reservation-discovery': ReservationDiscoveryPanel,
   'reservation-booking': ReservationBookingPanel,
+  'portrait-tokens': PortraitTokensPanel,
+  'portrait-token-detail': PortraitTokenDetailPanel,
+  'portrait-licensing': PortraitLicenseRequestPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -126,6 +132,9 @@ const FULL_HEIGHT_PANELS = new Set([
   'reservation-offers',
   'reservation-discovery',
   'reservation-booking',
+  'portrait-tokens',
+  'portrait-token-detail',
+  'portrait-licensing',
 ]);
 
 export default function PanelNavigator() {

@@ -967,6 +967,11 @@ const nameInputRef = useRef<TextInput>(null);
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
             <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('portrait-tokens')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>PORTRAIT TOKENS</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
             <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('reservation-discovery')} activeOpacity={0.7}>
               <Text style={[styles.label, { color: c.muted }]}>SPONSORED DINNERS</Text>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
@@ -984,6 +989,10 @@ const nameInputRef = useRef<TextInput>(null);
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('reservation-offers')} activeOpacity={0.7}>
                   <Text style={[styles.label, { color: c.muted }]}>SPONSORED DINNERS ↑</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('portrait-licensing')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>PORTRAIT LICENSING</Text>
                   <Text style={[styles.label, { color: c.accent }]}>→</Text>
                 </TouchableOpacity>
               </>

@@ -2428,3 +2428,122 @@ export async function respondToBookingInvite(bookingId: number, accept: boolean)
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
   return r.json();
 }
+
+// ─── Portrait tokens ──────────────────────────────────────────────────────────
+
+export async function fetchMyPortraitTokens(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchPortraitTokenDetail(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/${id}`, { headers: auth });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchAvailablePortraitTokens(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/available`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function updatePortraitToken(id: number, patch: { open_to_licensing?: boolean; handle_visible?: boolean }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function listPortraitToken(id: number, asking_price_cents: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/${id}/list`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ asking_price_cents }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function delistPortraitToken(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/${id}/list`, {
+    method: 'DELETE',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function buyPortraitTokenListing(listingId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-tokens/listings/${listingId}/buy`, {
+    method: 'POST',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+// ─── Portrait licenses ────────────────────────────────────────────────────────
+
+export async function createPortraitLicenseRequest(body: {
+  token_id: number;
+  scope: string;
+  duration_months: number;
+  business_contributions: Array<{ id: number | null; contribution_cents: number }>;
+  handle_visible?: boolean;
+  message?: string;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-licenses/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchIncomingLicenseRequests(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-licenses/incoming`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchSentLicenseRequests(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-licenses/sent`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function acceptLicenseRequest(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-licenses/${id}/accept`, {
+    method: 'PATCH',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function declineLicenseRequest(id: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/portrait-licenses/${id}/decline`, {
+    method: 'PATCH',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
