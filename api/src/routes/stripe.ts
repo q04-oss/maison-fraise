@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, membershipFunds, fundContributions, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
@@ -354,6 +354,36 @@ router.post('/webhook', async (req: Request, res: Response) => {
             data: { screen: 'membership' },
           }).catch(() => {});
         }
+      } else if (type === 'membership_renewal') {
+        const { tier, user_id, credit_applied_cents } = pi.metadata;
+        const userId = parseInt(user_id, 10);
+        const creditApplied = credit_applied_cents ? parseInt(credit_applied_cents, 10) : 0;
+        const now = new Date();
+        const renews = new Date(now);
+        renews.setFullYear(renews.getFullYear() + 1);
+        await db.update(memberships).set({
+          status: 'active',
+          started_at: now,
+          renews_at: renews,
+          stripe_payment_intent_id: pi.id,
+        }).where(and(eq(memberships.user_id, userId), eq(memberships.status, 'pending')));
+        // Debit any earnings credit that was applied to reduce the charge
+        if (creditApplied > 0) {
+          await db.insert(earningsLedger).values({
+            user_id: userId,
+            amount_cents: creditApplied,
+            type: 'debit',
+            description: `Applied to ${tier} membership renewal`,
+          });
+        }
+        const [user] = await db.select({ push_token: users.push_token }).from(users).where(eq(users.id, userId));
+        if (user?.push_token) {
+          sendPushNotification(user.push_token, {
+            title: 'Membership renewed',
+            body: `Your ${TIER_LABELS[tier] ?? tier} membership has been renewed.`,
+            data: { screen: 'membership' },
+          }).catch(() => {});
+        }
       } else if (type === 'fund_contribution') {
         const toUserId = parseInt(pi.metadata.to_user_id, 10);
         const fromUserId = pi.metadata.from_user_id ? parseInt(pi.metadata.from_user_id, 10) : null;
@@ -372,22 +402,22 @@ router.post('/webhook', async (req: Request, res: Response) => {
             stripe_payment_intent_id: pi.id,
             note,
           });
-          await db.execute(sql`
-            INSERT INTO membership_funds (user_id, balance_cents, cycle_start, updated_at)
-            VALUES (${toUserId}, ${amount}, NOW(), NOW())
-            ON CONFLICT (user_id) DO UPDATE SET balance_cents = membership_funds.balance_cents + ${amount}, updated_at = NOW()
-          `);
+          // Single fund: credit earningsLedger directly
+          await db.insert(earningsLedger).values({
+            user_id: toUserId,
+            amount_cents: amount,
+            type: 'credit',
+            description: fromUserId ? 'Membership contribution received' : 'Anonymous membership contribution',
+          });
           const [recipient] = await db.select({ push_token: users.push_token, display_name: users.display_name }).from(users).where(eq(users.id, toUserId));
           if (recipient?.push_token) {
             const fromLabel = fromUserId ? 'Someone' : 'An anonymous member';
             sendPushNotification(recipient.push_token, {
               title: 'Membership contribution',
-              body: `${fromLabel} contributed CA$${(amount / 100).toFixed(2)} to your membership fund.`,
+              body: `${fromLabel} contributed CA$${(amount / 100).toFixed(2)} to your fund.`,
               data: { screen: 'membership' },
             }).catch(() => {});
           }
-          // Check if fund now covers membership — trigger auto-order if so
-          checkAndTriggerAutoOrder(toUserId, db).catch(() => {});
         }
       } else if (type === 'patronage_claim') {
         const patronageId = parseInt(pi.metadata.patronage_id, 10);

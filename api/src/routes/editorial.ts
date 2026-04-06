@@ -1,8 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, desc, ilike, or } from 'drizzle-orm';
-import { sql } from 'drizzle-orm';
 import { db } from '../db';
-import { editorialPieces, memberships, users, earningsLedger, membershipFunds } from '../db/schema';
+import { editorialPieces, memberships, users, earningsLedger } from '../db/schema';
 import { requireUser } from '../lib/auth';
 
 const router = Router();
@@ -352,25 +351,6 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
         type: 'credit',
         description: `Editorial commission — piece #${id}`,
       });
-
-      const [fund] = await db
-        .select({ id: membershipFunds.id })
-        .from(membershipFunds)
-        .where(eq(membershipFunds.user_id, piece.author_user_id))
-        .limit(1);
-
-      if (fund) {
-        await db
-          .update(membershipFunds)
-          .set({ balance_cents: sql`balance_cents + ${commission_cents}` })
-          .where(eq(membershipFunds.user_id, piece.author_user_id));
-      } else {
-        await db.insert(membershipFunds).values({
-          user_id: piece.author_user_id,
-          balance_cents: commission_cents,
-          cycle_start: new Date(),
-        });
-      }
     }
 
     res.json({ ok: true });

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { eq, and, desc, asc, isNull, isNotNull, lte, gte, or } from 'drizzle-orm';
+import { eq, and, desc, asc, isNull, isNotNull, lte, gte, or, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { memberships, membershipFunds, membershipWaitlist, users, fundContributions, editorialPieces } from '../db/schema';
+import { memberships, membershipWaitlist, users, fundContributions, editorialPieces, earningsLedger } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
 import { TIER_AMOUNTS, STRIPE_PAYABLE_TIERS } from '../lib/membership';
@@ -77,15 +77,16 @@ membershipsRouter.get('/me', requireUser, async (req: Request, res: Response) =>
       .where(and(eq(memberships.user_id, userId), eq(memberships.status, 'active')))
       .limit(1);
 
-    const [fund] = await db
-      .select({ balance_cents: membershipFunds.balance_cents, cycle_start: membershipFunds.cycle_start })
-      .from(membershipFunds)
-      .where(eq(membershipFunds.user_id, userId))
-      .limit(1);
+    const [balance] = await db
+      .select({
+        available: sql<number>`COALESCE(SUM(CASE WHEN type = 'credit' THEN amount_cents ELSE -amount_cents END), 0)::integer`,
+      })
+      .from(earningsLedger)
+      .where(eq(earningsLedger.user_id, userId));
 
     res.json({
       membership: membership ?? null,
-      fund: fund ? { balance_cents: fund.balance_cents, cycle_start: fund.cycle_start } : { balance_cents: 0, cycle_start: null },
+      fund: { balance_cents: balance?.available ?? 0 },
     });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
@@ -185,23 +186,64 @@ membershipsRouter.post('/renew', requireUser, async (req: Request, res: Response
       return;
     }
 
-    const amount_cents = TIER_AMOUNTS[tier];
+    const full_amount_cents = TIER_AMOUNTS[tier];
+
+    // Check available earnings balance
+    const [balance] = await db
+      .select({
+        available: sql<number>`COALESCE(SUM(CASE WHEN type = 'credit' THEN amount_cents ELSE -amount_cents END), 0)::integer`,
+      })
+      .from(earningsLedger)
+      .where(eq(earningsLedger.user_id, userId));
+
+    const available = balance?.available ?? 0;
+    const credit_applied = Math.min(available, full_amount_cents);
+    const charge_amount = full_amount_cents - credit_applied;
+
+    // If earnings fully cover the renewal, activate directly without a payment
+    if (charge_amount === 0) {
+      const now = new Date();
+      const renews = new Date(now);
+      renews.setFullYear(renews.getFullYear() + 1);
+
+      await db.update(memberships).set({
+        status: 'active',
+        started_at: now,
+        renews_at: renews,
+      }).where(and(eq(memberships.user_id, userId), or(eq(memberships.status, 'active'), eq(memberships.status, 'expired'))));
+
+      await db.insert(earningsLedger).values({
+        user_id: userId,
+        amount_cents: credit_applied,
+        type: 'debit',
+        description: `Applied to ${tier} membership renewal`,
+      });
+
+      res.json({ ok: true, credit_applied, charge_amount: 0, fully_covered: true });
+      return;
+    }
 
     const pi = await stripe.paymentIntents.create({
-      amount: amount_cents,
+      amount: charge_amount,
       currency: 'cad',
-      metadata: { type: 'membership_renewal', tier, user_id: String(userId) },
+      metadata: {
+        type: 'membership_renewal',
+        tier,
+        user_id: String(userId),
+        credit_applied_cents: String(credit_applied),
+        full_amount_cents: String(full_amount_cents),
+      },
     });
 
     await db.insert(memberships).values({
       user_id: userId,
       tier: tier as any,
       status: 'pending',
-      amount_cents,
+      amount_cents: full_amount_cents,
       stripe_payment_intent_id: pi.id,
     });
 
-    res.json({ client_secret: pi.client_secret, tier, amount_cents });
+    res.json({ client_secret: pi.client_secret, tier, amount_cents: charge_amount, credit_applied, full_amount_cents });
   } catch (err) {
     res.status(500).json({ error: 'internal_error' });
   }
