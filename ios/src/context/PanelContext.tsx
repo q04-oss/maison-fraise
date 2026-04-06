@@ -39,7 +39,16 @@ export type PanelId =
   | 'market-admin'
   | 'ad-campaigns'
   | 'toilet'
-  | 'personal-toilet'\n  | 'itinerary'\n  | 'itinerary-detail'\n  | 'health-profile'\n  | 'personalized-menu'\n  | 'proposals';
+  | 'personal-toilet'
+  | 'itinerary'
+  | 'itinerary-detail'
+  | 'health-profile'
+  | 'personalized-menu'
+  | 'proposals'
+  | 'business-menu'
+  | 'reservation-offers'
+  | 'reservation-discovery'
+  | 'reservation-booking';
 
 export interface OrderState {
   variety_id: number | null;

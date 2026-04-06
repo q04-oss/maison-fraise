@@ -300,6 +300,20 @@ export default function PartnerDetailPanel() {
           </View>
         )}
 
+        {/* Tonight's picks — restaurant menu recommendations from real menu items */}
+        {biz.type !== 'popup' && (
+          <TouchableOpacity
+            style={[styles.menuCard, { borderColor: c.border }]}
+            onPress={() => showPanel('reservation-discovery')}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.menuCardLabel, { color: c.muted }]}>SPONSORED DINNERS</Text>
+            <Text style={[styles.menuCardText, { color: c.text }]}>
+              See if this restaurant has a hosted dinner available →
+            </Text>
+          </TouchableOpacity>
+        )}
+
         {/* Personalized menu — restaurant/spa properties */}
         {biz.type !== 'popup' && (
           <TouchableOpacity

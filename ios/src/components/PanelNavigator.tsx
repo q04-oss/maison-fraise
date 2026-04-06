@@ -45,6 +45,10 @@ import ItineraryPanel from './panels/ItineraryPanel';
 import ItineraryDetailPanel from './panels/ItineraryDetailPanel';
 import HealthProfilePanel from './panels/HealthProfilePanel';
 import PersonalizedMenuPanel from './panels/PersonalizedMenuPanel';
+import BusinessMenuPanel from './panels/BusinessMenuPanel';
+import ReservationOffersPanel from './panels/ReservationOffersPanel';
+import ReservationDiscoveryPanel from './panels/ReservationDiscoveryPanel';
+import ReservationBookingPanel from './panels/ReservationBookingPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -89,6 +93,10 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'itinerary-detail': ItineraryDetailPanel,
   'health-profile': HealthProfilePanel,
   'personalized-menu': PersonalizedMenuPanel,
+  'business-menu': BusinessMenuPanel,
+  'reservation-offers': ReservationOffersPanel,
+  'reservation-discovery': ReservationDiscoveryPanel,
+  'reservation-booking': ReservationBookingPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -114,6 +122,10 @@ const FULL_HEIGHT_PANELS = new Set([
   'itinerary-detail',
   'health-profile',
   'personalized-menu',
+  'business-menu',
+  'reservation-offers',
+  'reservation-discovery',
+  'reservation-booking',
 ]);
 
 export default function PanelNavigator() {

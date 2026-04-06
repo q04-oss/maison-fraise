@@ -47,6 +47,8 @@ import toiletsRouter from './routes/toilets';
 import healthProfileRouter from './routes/health-profile';
 import itinerariesRouter from './routes/itineraries';
 import menusRouter from './routes/menus';
+import menuItemsRouter from './routes/menu-items';
+import reservationOffersRouter from './routes/reservation-offers';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -132,6 +134,8 @@ app.use('/api/toilets', toiletsRouter);
 app.use('/api/health-profile', healthProfileRouter);
 app.use('/api/itineraries', itinerariesRouter);
 app.use('/api/menus', menusRouter);
+app.use('/api/menu-items', menuItemsRouter);
+app.use('/api/reservation-offers', reservationOffersRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

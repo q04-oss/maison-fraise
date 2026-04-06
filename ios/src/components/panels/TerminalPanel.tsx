@@ -966,6 +966,28 @@ const nameInputRef = useRef<TextInput>(null);
               <Text style={[styles.label, { color: c.muted }]}>HEALTH PROFILE</Text>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('reservation-discovery')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>SPONSORED DINNERS</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('reservation-booking')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>MY BOOKINGS</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            {isShop && (
+              <>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('business-menu')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>RESTAURANT MENU</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('reservation-offers')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>SPONSORED DINNERS ↑</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+              </>
+            )}
             {isShop && (
               <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('market-admin')} activeOpacity={0.7}>
                 <Text style={[styles.label, { color: c.muted }]}>MARKET ADMIN</Text>

@@ -325,6 +325,56 @@ export const itineraryProposals = pgTable('itinerary_proposals', {
   visit_confirmed_at: timestamp('visit_confirmed_at'), // biometric check-in (future)
 });
 
+// ─── Business menu items (what the restaurant actually serves) ───────────────
+export const businessMenuItems = pgTable('business_menu_items', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  price_cents: integer('price_cents'),
+  category: text('category').notNull().default('main'), // amuse/starter/main/dessert/drink/side
+  allergens: jsonb('allergens').$type<Record<string, boolean>>().default({}),
+  tags: text('tags').array().default([]),   // e.g. ['vegan','anti-inflammatory','umami']
+  is_available: boolean('is_available').notNull().default(true),
+  sort_order: integer('sort_order').notNull().default(0),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ─── Reservation offers (restaurant sponsors a full dinner for two) ───────────
+export const reservationOffers = pgTable('reservation_offers', {
+  id: serial('id').primaryKey(),
+  business_id: integer('business_id').notNull().references(() => businesses.id),
+  title: text('title').notNull(),
+  description: text('description'),
+  mode: text('mode').notNull().default('platform_match'), // 'platform_match' | 'user_invite'
+  value_cents: integer('value_cents').notNull(),          // full meal cost — what business pays
+  commission_cents: integer('commission_cents').notNull().default(0), // platform 20%
+  drink_description: text('drink_description'),
+  reservation_date: text('reservation_date'),             // YYYY-MM-DD
+  reservation_time: text('reservation_time'),             // HH:MM
+  slots_total: integer('slots_total').notNull().default(1),
+  slots_remaining: integer('slots_remaining').notNull().default(1),
+  status: text('status').notNull().default('active'),     // 'active' | 'paused' | 'closed'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// ─── Reservation bookings ─────────────────────────────────────────────────────
+export const reservationBookings = pgTable('reservation_bookings', {
+  id: serial('id').primaryKey(),
+  offer_id: integer('offer_id').notNull().references(() => reservationOffers.id),
+  initiator_user_id: integer('initiator_user_id').notNull().references(() => users.id),
+  guest_user_id: integer('guest_user_id').references(() => users.id),
+  // seeking_pair: platform_match, waiting for second guest
+  // pending_invite: user_invite, initiator must pick a contact
+  // pending_guest: contact was invited, awaiting their response
+  // confirmed | cancelled | expired
+  status: text('status').notNull().default('seeking_pair'),
+  invite_expires_at: timestamp('invite_expires_at'),
+  confirmed_at: timestamp('confirmed_at'),
+  strawberry_order_placed: boolean('strawberry_order_placed').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 // ─── Personalized menus (Dorotka-generated per user per restaurant) ───────────
 export const personalizedMenus = pgTable('personalized_menus', {
   id: serial('id').primaryKey(),

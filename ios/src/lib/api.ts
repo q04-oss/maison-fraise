@@ -2295,3 +2295,136 @@ export async function fetchLatestPersonalizedMenu(business_id: number): Promise<
   if (!r.ok) return null;
   return r.json();
 }
+
+// ─── Business menu items ──────────────────────────────────────────────────────
+
+export async function fetchBusinessMenuItems(businessId: number): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/menu-items/${businessId}`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchMyMenuItems(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-items/my`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchMenuRecommendations(businessId: number): Promise<{ items: any[]; recommended: any[] }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-items/${businessId}/recommend`, { headers: auth });
+  if (!r.ok) return { items: [], recommended: [] };
+  return r.json();
+}
+
+export async function createMenuItem(body: {
+  name: string; description?: string; price_cents?: number;
+  category: string; allergens?: Record<string, boolean>; tags?: string[]; sort_order?: number;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function updateMenuItem(id: number, patch: Record<string, any>): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-items/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function deleteMenuItem(id: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/menu-items/${id}`, { method: 'DELETE', headers: auth });
+}
+
+// ─── Reservation offers ───────────────────────────────────────────────────────
+
+export async function fetchReservationOffers(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchMyReservationOffers(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function createReservationOffer(body: {
+  title: string; description?: string; mode: string; value_cents: number;
+  drink_description?: string; reservation_date?: string; reservation_time?: string; slots_total?: number;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function updateReservationOffer(id: number, patch: Record<string, any>): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function joinReservationOffer(offerId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/${offerId}/join`, {
+    method: 'POST', headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+// ─── Reservation bookings ─────────────────────────────────────────────────────
+
+export async function fetchMyReservationBookings(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/bookings/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function inviteToBooking(bookingId: number, guestUserId: number): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/bookings/${bookingId}/invite`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ guest_user_id: guestUserId }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function respondToBookingInvite(bookingId: number, accept: boolean): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/bookings/${bookingId}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ accept }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
