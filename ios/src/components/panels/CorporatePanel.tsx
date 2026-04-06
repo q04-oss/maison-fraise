@@ -13,7 +13,7 @@ export default function CorporatePanel() {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [companyName, setCompanyName] = useState('');
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [inviting, setInviting] = useState(false);
 
@@ -37,11 +37,11 @@ export default function CorporatePanel() {
   };
 
   const handleInvite = async () => {
-    if (!inviteEmail.trim()) return;
+    if (!inviteCode.trim()) return;
     setInviting(true);
     try {
-      await inviteCorporateMember(inviteEmail.trim());
-      setInviteEmail('');
+      await inviteCorporateMember(inviteCode.trim());
+      setInviteCode('');
     } catch { } finally { setInviting(false); }
   };
 
@@ -93,24 +93,23 @@ export default function CorporatePanel() {
       {!loading && account && (
         <>
           <View style={[styles.accountCard, { backgroundColor: c.card, borderColor: c.border }]}>
-            <Text style={[styles.companyName, { color: c.text, fontFamily: fonts.playfair }]}>{account.company_name}</Text>
+            <Text style={[styles.companyName, { color: c.text, fontFamily: fonts.playfair }]}>{account.name}</Text>
             <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>{members.length} members</Text>
           </View>
 
           <View style={styles.inviteRow}>
             <TextInput
               style={[styles.inviteInput, { color: c.text, borderColor: c.border, fontFamily: fonts.dmMono }]}
-              value={inviteEmail}
-              onChangeText={setInviteEmail}
-              placeholder="Invite by email"
+              value={inviteCode}
+              onChangeText={setInviteCode}
+              placeholder="Invite by user code"
               placeholderTextColor={c.muted}
               autoCapitalize="none"
-              keyboardType="email-address"
             />
             <TouchableOpacity
               style={[styles.inviteBtn, { backgroundColor: c.accent }, inviting && { opacity: 0.6 }]}
               onPress={handleInvite}
-              disabled={inviting || !inviteEmail.trim()}
+              disabled={inviting || !inviteCode.trim()}
               activeOpacity={0.8}
             >
               {inviting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={[styles.inviteBtnText, { fontFamily: fonts.dmMono }]}>INVITE</Text>}

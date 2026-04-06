@@ -78,13 +78,13 @@ router.get('/members', requireUser, async (req: Request, res: Response) => {
 router.post('/', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
   const { name, billing_email } = req.body;
-  if (!name?.trim() || !billing_email?.trim()) {
-    res.status(400).json({ error: 'name and billing_email required' }); return;
+  if (!name?.trim()) {
+    res.status(400).json({ error: 'name required' }); return;
   }
   try {
     const result = await db.execute(sql`
       INSERT INTO corporate_accounts (name, billing_email, admin_user_id)
-      VALUES (${name.trim()}, ${billing_email.trim()}, ${userId})
+      VALUES (${name.trim()}, ${billing_email?.trim() ?? ''}, ${userId})
       RETURNING *
     `);
     res.status(201).json(((result as any).rows ?? result)[0]);

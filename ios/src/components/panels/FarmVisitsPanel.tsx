@@ -24,7 +24,7 @@ export default function FarmVisitsPanel() {
     setActing(id);
     try {
       await bookFarmVisit(id);
-      setVisits(vs => vs.map(v => v.id === id ? { ...v, booked: true, spots_left: v.spots_left - 1 } : v));
+      setVisits(vs => vs.map(v => v.id === id ? { ...v, user_booked: true, participant_count: (v.participant_count ?? 0) + 1 } : v));
     } catch { } finally { setActing(null); }
   };
 
@@ -32,7 +32,7 @@ export default function FarmVisitsPanel() {
     setActing(id);
     try {
       await cancelFarmVisitBooking(id);
-      setVisits(vs => vs.map(v => v.id === id ? { ...v, booked: false, spots_left: v.spots_left + 1 } : v));
+      setVisits(vs => vs.map(v => v.id === id ? { ...v, user_booked: false, participant_count: Math.max(0, (v.participant_count ?? 1) - 1) } : v));
     } catch { } finally { setActing(null); }
   };
 
@@ -61,51 +61,55 @@ export default function FarmVisitsPanel() {
           data={visits}
           keyExtractor={item => String(item.id)}
           contentContainerStyle={styles.list}
-          renderItem={({ item }) => (
-            <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.farmName, { color: c.text, fontFamily: fonts.playfair }]}>{item.farm_name ?? 'Farm Visit'}</Text>
-              {item.visit_date && (
-                <Text style={[styles.date, { color: c.muted, fontFamily: fonts.dmMono }]}>
-                  {new Date(item.visit_date).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
-                </Text>
-              )}
-              {item.description ? (
-                <Text style={[styles.desc, { color: c.muted, fontFamily: fonts.dmSans }]} numberOfLines={2}>{item.description}</Text>
-              ) : null}
-              <View style={styles.footer}>
-                <Text style={[styles.spots, { color: item.spots_left === 0 ? '#EF4444' : c.muted, fontFamily: fonts.dmMono }]}>
-                  {item.spots_left > 0 ? `${item.spots_left} spots left` : 'Full'}
-                </Text>
-                {item.booked ? (
-                  <TouchableOpacity
-                    style={[styles.cancelBtn, acting === item.id && { opacity: 0.6 }]}
-                    onPress={() => handleCancel(item.id)}
-                    disabled={acting === item.id}
-                    activeOpacity={0.8}
-                  >
-                    {acting === item.id ? (
-                      <ActivityIndicator color="#EF4444" size="small" />
-                    ) : (
-                      <Text style={[styles.cancelText, { fontFamily: fonts.dmMono }]}>CANCEL</Text>
-                    )}
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={[styles.bookBtn, { backgroundColor: c.accent }, (item.spots_left === 0 || acting === item.id) && { opacity: 0.6 }]}
-                    onPress={() => handleBook(item.id)}
-                    disabled={item.spots_left === 0 || acting === item.id}
-                    activeOpacity={0.8}
-                  >
-                    {acting === item.id ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={[styles.bookText, { fontFamily: fonts.dmMono }]}>BOOK →</Text>
-                    )}
-                  </TouchableOpacity>
+          renderItem={({ item }) => {
+            const spotsLeft = (item.max_participants ?? 0) - (item.participant_count ?? 0);
+            const booked = item.user_booked;
+            return (
+              <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
+                <Text style={[styles.farmName, { color: c.text, fontFamily: fonts.playfair }]}>{item.farm_name ?? 'Farm Visit'}</Text>
+                {item.visit_date && (
+                  <Text style={[styles.date, { color: c.muted, fontFamily: fonts.dmMono }]}>
+                    {new Date(item.visit_date).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' })}
+                  </Text>
                 )}
+                {item.description ? (
+                  <Text style={[styles.desc, { color: c.muted, fontFamily: fonts.dmSans }]} numberOfLines={2}>{item.description}</Text>
+                ) : null}
+                <View style={styles.footer}>
+                  <Text style={[styles.spots, { color: spotsLeft <= 0 ? '#EF4444' : c.muted, fontFamily: fonts.dmMono }]}>
+                    {spotsLeft > 0 ? `${spotsLeft} spots left` : 'Full'}
+                  </Text>
+                  {booked ? (
+                    <TouchableOpacity
+                      style={[styles.cancelBtn, acting === item.id && { opacity: 0.6 }]}
+                      onPress={() => handleCancel(item.id)}
+                      disabled={acting === item.id}
+                      activeOpacity={0.8}
+                    >
+                      {acting === item.id ? (
+                        <ActivityIndicator color="#EF4444" size="small" />
+                      ) : (
+                        <Text style={[styles.cancelText, { fontFamily: fonts.dmMono }]}>CANCEL</Text>
+                      )}
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.bookBtn, { backgroundColor: c.accent }, (spotsLeft <= 0 || acting === item.id) && { opacity: 0.6 }]}
+                      onPress={() => handleBook(item.id)}
+                      disabled={spotsLeft <= 0 || acting === item.id}
+                      activeOpacity={0.8}
+                    >
+                      {acting === item.id ? (
+                        <ActivityIndicator color="#fff" size="small" />
+                      ) : (
+                        <Text style={[styles.bookText, { fontFamily: fonts.dmMono }]}>BOOK →</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
         />
       )}
     </View>

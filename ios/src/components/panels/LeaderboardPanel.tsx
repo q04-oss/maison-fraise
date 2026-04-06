@@ -59,10 +59,10 @@ export default function LeaderboardPanel() {
               <View style={styles.info}>
                 <Text style={[styles.name, { color: c.text, fontFamily: fonts.playfair }]}>{item.name ?? `Collectif #${item.collectif_id}`}</Text>
                 <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>
-                  {item.member_count} members · {item.total_pickups} pickups
+                  {item.member_count} members
                 </Text>
               </View>
-              <Text style={[styles.score, { color: c.accent, fontFamily: fonts.dmMono }]}>{item.score}</Text>
+              <Text style={[styles.score, { color: c.accent, fontFamily: fonts.dmMono }]}>{item.pickup_count}</Text>
             </View>
           )}
         />

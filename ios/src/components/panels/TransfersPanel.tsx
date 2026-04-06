@@ -67,7 +67,7 @@ export default function TransfersPanel() {
             <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
               <Text style={[styles.variety, { color: c.text, fontFamily: fonts.playfair }]}>{item.variety_name ?? 'Standing order'}</Text>
               <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>
-                From {item.sender_email ?? 'someone'} · {item.tier ?? 'standard'}
+                From {item.from_display_name ?? item.from_user_code ?? 'someone'}
               </Text>
               {item.note ? (
                 <Text style={[styles.note, { color: c.muted, fontFamily: fonts.dmSans }]}>{item.note}</Text>

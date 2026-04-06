@@ -3146,23 +3146,23 @@ export async function fetchCorporateMembers(): Promise<any[]> {
   return r.json();
 }
 
-export async function createCorporateAccount(company_name: string): Promise<any> {
+export async function createCorporateAccount(name: string): Promise<any> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/corporate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ company_name }),
+    body: JSON.stringify({ name }),
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'create_failed'); }
   return r.json();
 }
 
-export async function inviteCorporateMember(email: string): Promise<void> {
+export async function inviteCorporateMember(user_code: string): Promise<void> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/corporate/invite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ user_code }),
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'invite_failed'); }
 }

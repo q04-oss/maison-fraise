@@ -336,13 +336,13 @@ router.get('/leaderboard', requireUser, async (_req: Request, res: Response) => 
     monthStart.setHours(0, 0, 0, 0);
 
     const rows = await db.execute(sql`
-      SELECT c.id AS collectif_id, c.name,
+      SELECT c.id AS collectif_id, c.title AS name,
         COUNT(DISTINCT CASE WHEN le.event_type='nfc_verified' AND le.created_at >= ${monthStart} THEN le.user_id END)::int AS pickup_count,
         COUNT(DISTINCT cc.user_id)::int AS member_count
       FROM collectifs c
       JOIN collectif_commitments cc ON cc.collectif_id = c.id AND cc.status = 'captured'
       LEFT JOIN legitimacy_events le ON le.user_id = cc.user_id
-      GROUP BY c.id, c.name
+      GROUP BY c.id, c.title
       HAVING COUNT(DISTINCT CASE WHEN le.event_type='nfc_verified' AND le.created_at >= ${monthStart} THEN le.user_id END) > 0
       ORDER BY pickup_count DESC
       LIMIT 10

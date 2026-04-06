@@ -14,7 +14,7 @@ export default function VarietyPassportPanel() {
 
   useEffect(() => {
     fetchVarietyPassport()
-      .then(setPassport)
+      .then(data => setPassport((data as any)?.varieties ?? data))
       .catch(() => setPassport([]))
       .finally(() => setLoading(false));
   }, []);
@@ -53,16 +53,13 @@ export default function VarietyPassportPanel() {
             contentContainerStyle={styles.list}
             renderItem={({ item }) => (
               <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
-                <View style={styles.cardRow}>
-                  <Text style={[styles.varietyName, { color: c.text, fontFamily: fonts.playfair }]}>{item.variety_name}</Text>
-                  <Text style={[styles.count, { color: c.accent, fontFamily: fonts.dmMono }]}>×{item.order_count}</Text>
-                </View>
+                <Text style={[styles.varietyName, { color: c.text, fontFamily: fonts.playfair }]}>{item.name}</Text>
                 {item.source_farm ? (
                   <Text style={[styles.farm, { color: c.muted, fontFamily: fonts.dmMono }]}>{item.source_farm}</Text>
                 ) : null}
-                {item.first_collected_at ? (
+                {item.first_tried ? (
                   <Text style={[styles.date, { color: c.muted, fontFamily: fonts.dmSans }]}>
-                    First: {new Date(item.first_collected_at).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })}
+                    First tried: {new Date(item.first_tried).toLocaleDateString('en-CA', { month: 'long', year: 'numeric' })}
                   </Text>
                 ) : null}
               </View>
@@ -86,9 +83,7 @@ const styles = StyleSheet.create({
   countLabel: { fontSize: 11, letterSpacing: 2 },
   list: { paddingHorizontal: SPACING.md, paddingBottom: SPACING.md, gap: SPACING.sm },
   card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, padding: SPACING.md, gap: 4 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   varietyName: { fontSize: 20 },
-  count: { fontSize: 16, letterSpacing: 1 },
   farm: { fontSize: 11, letterSpacing: 0.5 },
   date: { fontSize: 12 },
 });
