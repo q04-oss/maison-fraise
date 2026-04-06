@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder } from '../../lib/api';
+import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions } from '../../lib/HealthKitService';
 
 type State = 'scanning' | 'success' | 'error';
@@ -22,23 +23,43 @@ export default function VerifyNFCPanel() {
     setErrorMsg('');
     try {
       const token = await readNfcToken();
+
       if (token === 'fraise.market') {
         await collectMarketOrderByNfc(token);
         setState('success');
         setTimeout(() => showPanel('market-orders'), 600);
         return;
       }
-      const result = await verifyNfc(token);
-      await AsyncStorage.setItem('verified', 'true');
-      if (result.fraise_chat_email) {
-        await AsyncStorage.setItem('fraise_chat_email', result.fraise_chat_email);
+
+      const alreadyVerified = await AsyncStorage.getItem('verified') === 'true';
+
+      if (alreadyVerified) {
+        const reorderData = await verifyNfcReorder(token);
+        const arPayload: ARVarietyData = {
+          variety_id: reorderData.variety_id,
+          variety_name: reorderData.variety_name ?? null,
+          farm: reorderData.farm ?? null,
+          harvest_date: reorderData.harvest_date ?? null,
+          quantity: reorderData.quantity,
+          chocolate: reorderData.chocolate,
+          finish: reorderData.finish,
+        };
+        setState('success');
+        await ARBoxModule.presentAR(arPayload);
+        showPanel('ar-box', arPayload);
+      } else {
+        const result = await verifyNfc(token);
+        await AsyncStorage.setItem('verified', 'true');
+        if (result.fraise_chat_email) {
+          await AsyncStorage.setItem('fraise_chat_email', result.fraise_chat_email);
+        }
+        if (result.quantity) {
+          logStrawberries(result.quantity).catch(() => {});
+        }
+        requestHealthKitPermissions().catch(() => {});
+        setState('success');
+        setTimeout(() => showPanel('verified'), 600);
       }
-      if (result.quantity) {
-        logStrawberries(result.quantity).catch(() => {});
-      }
-      requestHealthKitPermissions().catch(() => {});
-      setState('success');
-      setTimeout(() => showPanel('verified'), 600);
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
       setState('error');

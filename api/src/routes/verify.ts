@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, users, legitimacyEvents } from '../db/schema';
+import { orders, users, legitimacyEvents, varieties } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 
@@ -71,7 +71,14 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity });
+    const [variety] = await db.select({
+      id: varieties.id,
+      name: varieties.name,
+      source_farm: varieties.source_farm,
+      harvest_date: varieties.harvest_date,
+    }).from(varieties).where(eq(varieties.id, order.variety_id));
+
+    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity, variety_id: order.variety_id, variety_name: variety?.name ?? null, farm: variety?.source_farm ?? null, harvest_date: variety?.harvest_date ?? null });
   } catch (err: any) {
     if (err?.code === 'already_used') {
       res.status(403).json({ error: 'This token is invalid or has already been used.' });
@@ -104,8 +111,28 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
+    // Security: verify the requesting user was the one who originally claimed this token
+    const [claimEvent] = await db.select({ id: legitimacyEvents.id })
+      .from(legitimacyEvents)
+      .where(and(eq(legitimacyEvents.user_id, user_id), eq(legitimacyEvents.event_type, 'nfc_verified')));
+
+    if (!claimEvent) {
+      res.status(403).json({ error: 'This token is invalid or has already been used.' });
+      return;
+    }
+
+    const [variety] = await db.select({
+      id: varieties.id,
+      name: varieties.name,
+      source_farm: varieties.source_farm,
+      harvest_date: varieties.harvest_date,
+    }).from(varieties).where(eq(varieties.id, order.variety_id));
+
     res.json({
       variety_id: order.variety_id,
+      variety_name: variety?.name ?? null,
+      farm: variety?.source_farm ?? null,
+      harvest_date: variety?.harvest_date ?? null,
       chocolate: order.chocolate,
       finish: order.finish,
       quantity: order.quantity,

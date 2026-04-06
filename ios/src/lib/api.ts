@@ -2841,3 +2841,32 @@ export async function deleteVendorListing(id: number): Promise<void> {
     headers: auth,
   });
 }
+
+// ─── AR box ───────────────────────────────────────────────────────────────────
+
+export async function verifyNfcReorder(nfc_token: string): Promise<{
+  variety_id: number;
+  variety_name: string | null;
+  farm: string | null;
+  harvest_date: string | null;
+  chocolate: string;
+  finish: string;
+  quantity: number;
+  location_id: number | null;
+}> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/verify/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nfc_token }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'reorder_failed'); }
+  return r.json();
+}
+
+export async function fetchVarietyById(id: number): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/varieties`);
+  if (!r.ok) return null;
+  const list: any[] = await r.json();
+  return list.find((v: any) => v.id === id) ?? null;
+}

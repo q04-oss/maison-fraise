@@ -31,7 +31,7 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Camera access is not used by this app.",
+        "NSCameraUsageDescription": "Used to display augmented reality information about your Maison Fraise order.",
         "NSUserNotificationUsageDescription": "We'll notify you when your order is ready for collection.",
         "NSLocationWhenInUseUsageDescription": "We use your location to show collection points near you.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you when you're near a collection point so you can tap your box.",

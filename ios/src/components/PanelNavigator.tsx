@@ -63,6 +63,7 @@ import MarketHomePanel from './panels/market/MarketHomePanel';
 import MarketCartPanel from './panels/market/MarketCartPanel';
 import MarketOrdersPanel from './panels/market/MarketOrdersPanel';
 import VendorPanel from './panels/market/VendorPanel';
+import ARBoxPanel from './panels/ARBoxPanel';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
   home: HomePanel,
@@ -125,6 +126,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'market-cart': MarketCartPanel,
   'market-orders': MarketOrdersPanel,
   'market-vendor': VendorPanel,
+  'ar-box': ARBoxPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -165,6 +167,7 @@ const FULL_HEIGHT_PANELS = new Set([
   'greenhouse-detail',
   'shop-menu',
   'market-home', 'market-cart', 'market-orders', 'market-vendor',
+  'ar-box',
 ]);
 
 export default function PanelNavigator() {
