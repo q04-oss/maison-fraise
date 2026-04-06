@@ -219,6 +219,8 @@ export const businesses = pgTable('businesses', {
   venture_id: integer('venture_id'), // associated venture (optional)
   has_toilet: boolean('has_toilet').notNull().default(false),
   toilet_fee_cents: integer('toilet_fee_cents').notNull().default(150),
+  // Beacon proximity detection
+  beacon_uuid: text('beacon_uuid').unique(),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -337,6 +339,13 @@ export const businessMenuItems = pgTable('business_menu_items', {
   tags: text('tags').array().default([]),   // e.g. ['vegan','anti-inflammatory','umami']
   is_available: boolean('is_available').notNull().default(true),
   sort_order: integer('sort_order').notNull().default(0),
+  // Nutritional data (optional — for beacon HealthKit recommendation scoring)
+  calories_kcal: integer('calories_kcal'),
+  protein_g: integer('protein_g'),
+  carbs_g: integer('carbs_g'),
+  fat_g: integer('fat_g'),
+  sugar_g: integer('sugar_g'),
+  fiber_g: integer('fiber_g'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

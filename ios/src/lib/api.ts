@@ -2648,3 +2648,46 @@ export async function confirmGift(messageId: number): Promise<{ ok: boolean; nfc
   if (!r.ok) throw new Error((await r.json()).error ?? 'confirm failed');
   return r.json();
 }
+
+export async function fetchMenuRecommendation(
+  businessId: number,
+  healthContext: {
+    active_energy_kcal: number;
+    calories_consumed_kcal: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    sugar_g: number;
+    fiber_g: number;
+    steps: number;
+  },
+): Promise<Array<{
+  id: number;
+  name: string;
+  description: string | null;
+  category: string;
+  price_cents: number | null;
+  tags: string[];
+  score: number;
+  reason: string;
+}>> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-recommendation/${businessId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(healthContext),
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function setBusinessBeacon(beaconUuid: string): Promise<{ ok: boolean }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/menu-recommendation/beacon`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ beacon_uuid: beaconUuid }),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? 'failed to set beacon');
+  return r.json();
+}

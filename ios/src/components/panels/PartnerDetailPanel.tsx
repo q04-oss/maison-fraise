@@ -4,7 +4,8 @@ import {
   StyleSheet, ActivityIndicator, Linking, Platform, Alert,
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
-import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip, fetchNearbyJobs, JobPosting, fetchToiletReviews, fetchBusinessSocial } from '../../lib/api';
+import { fetchBusinessPortraits, fetchBusinessVisitCount, createTip, fetchNearbyJobs, JobPosting, fetchToiletReviews, fetchBusinessSocial, fetchMenuRecommendation } from '../../lib/api';
+import { getTodayHealthContext } from '../../lib/HealthKitService';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
@@ -34,24 +35,39 @@ export default function PartnerDetailPanel() {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [toiletReviews, setToiletReviews] = useState<{ avg_rating: number | null; review_count: number; reviews: any[] } | null>(null);
   const [social, setSocial] = useState<{ evening_count: number; portrait_license_count: number; has_menu: boolean; recent_evening_at: string | null } | null>(null);
+  const [recommendation, setRecommendation] = useState<{ id: number; name: string; description: string | null; category: string; price_cents: number | null; tags: string[]; score: number; reason: string } | null>(null);
 
   const biz = activeLocation;
 
   const loadData = (isRefresh = false) => {
     if (!biz) { setLoading(false); return; }
     const toiletPromise = biz.has_toilet ? fetchToiletReviews(biz.id).catch(() => null) : Promise.resolve(null);
+
+    // Fetch HealthKit context and recommendation in parallel, fail silently
+    const recommendationPromise = (async () => {
+      try {
+        const healthContext = await getTodayHealthContext();
+        const recs = await fetchMenuRecommendation(biz.id, healthContext);
+        return recs.length > 0 ? recs[0] : null;
+      } catch {
+        return null;
+      }
+    })();
+
     Promise.all([
       fetchBusinessPortraits(biz.id).catch(() => []),
       fetchBusinessVisitCount(biz.id).catch(() => null),
       fetchNearbyJobs(biz.id).catch(() => []),
       toiletPromise,
       fetchBusinessSocial(biz.id).catch(() => null),
-    ]).then(([p, v, j, t, s]) => {
+      recommendationPromise,
+    ]).then(([p, v, j, t, s, rec]) => {
       setPortraits(p as any[]);
       setVisitCount(v ? (v as any).visit_count : null);
       setJobs((j as JobPosting[]).filter(job => job.active));
       if (t) setToiletReviews(t as any);
       setSocial(s as any);
+      setRecommendation(rec as any);
     }).finally(() => { setLoading(false); if (isRefresh) setRefreshing(false); });
   };
 
@@ -331,6 +347,27 @@ export default function PartnerDetailPanel() {
           </View>
         )}
 
+        {/* For You Today — beacon + HealthKit personalised recommendation */}
+        {recommendation !== null && (
+          <View style={[styles.forYouCard, { borderColor: c.accent }]}>
+            <Text style={[styles.forYouLabel, { color: c.accent }]}>FOR YOU TODAY</Text>
+            <View style={styles.forYouRow}>
+              <Text style={[styles.forYouName, { color: c.text }]}>{recommendation.name}</Text>
+              {recommendation.price_cents != null && (
+                <Text style={[styles.forYouPrice, { color: c.text }]}>
+                  CA${(recommendation.price_cents / 100).toFixed(2)}
+                </Text>
+              )}
+            </View>
+            <Text style={[styles.forYouReason, { color: c.muted }]}>{recommendation.reason}</Text>
+            <View style={styles.forYouPillRow}>
+              <Text style={[styles.forYouPill, { color: c.accent, borderColor: c.accent }]}>
+                {recommendation.category}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Tonight's picks — restaurant menu recommendations from real menu items */}
         {biz.type !== 'popup' && (
           <TouchableOpacity
@@ -542,6 +579,24 @@ const styles = StyleSheet.create({
   toiletReviewRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 8, gap: 3 },
   toiletReviewStars: { fontSize: 12, letterSpacing: 1 },
   toiletReviewNote: { fontSize: 12, fontFamily: fonts.dmSans },
+
+  forYouCard: {
+    marginHorizontal: SPACING.md, marginTop: SPACING.md,
+    borderRadius: 10, borderWidth: 1,
+    padding: SPACING.md, gap: 6,
+  },
+  forYouLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 2 },
+  forYouRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  forYouName: { fontSize: 16, fontFamily: fonts.playfair, flex: 1 },
+  forYouPrice: { fontSize: 13, fontFamily: fonts.dmMono, marginLeft: 8 },
+  forYouReason: { fontSize: 12, fontFamily: fonts.dmSans, lineHeight: 18 },
+  forYouPillRow: { flexDirection: 'row' },
+  forYouPill: {
+    fontSize: 10, fontFamily: fonts.dmMono,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 3,
+  },
 
   menuCard: {
     marginHorizontal: SPACING.md, marginTop: SPACING.md,
