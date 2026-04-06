@@ -2736,3 +2736,108 @@ export async function deleteMenuItemForShop(itemId: number): Promise<void> {
     headers: auth,
   });
 }
+
+// ─── fraise.market ────────────────────────────────────────────────────────────
+
+export async function fetchMarketListings(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/market/listings`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchMarketListingsForMe(healthContext: {
+  active_energy_kcal: number;
+  calories_consumed_kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  sugar_g: number;
+  fiber_g: number;
+  steps: number;
+}): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/market/listings/for-me`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(healthContext),
+  });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function placeMarketOrder(
+  items: Array<{ listing_id: number; quantity: number }>
+): Promise<{ order_id: number; total_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/market/orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ items }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed to place order'); }
+  return r.json();
+}
+
+export async function collectMarketOrderByNfc(
+  nfc_token: string
+): Promise<{ ok: boolean; order_id: number; items: any[] }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/market/collect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nfc_token }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'collect failed'); }
+  return r.json();
+}
+
+export async function createVendorListing(listing: {
+  name: string;
+  description?: string;
+  category: string;
+  unit_type: string;
+  unit_label: string;
+  price_cents: number;
+  stock_quantity: number;
+  tags?: string[];
+  available_from: string;
+  available_until: string;
+}): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/market/listings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(listing),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed to create listing'); }
+  return r.json();
+}
+
+export async function updateVendorListing(
+  id: number,
+  patch: Partial<{
+    name: string;
+    description: string;
+    price_cents: number;
+    stock_quantity: number;
+    tags: string[];
+    is_available: boolean;
+  }>
+): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/market/listings/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed to update listing'); }
+  return r.json();
+}
+
+export async function deleteVendorListing(id: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/market/listings/${id}`, {
+    method: 'DELETE',
+    headers: auth,
+  });
+}

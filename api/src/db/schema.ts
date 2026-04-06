@@ -1261,3 +1261,50 @@ export const eveningTokens = pgTable('evening_tokens', {
   minted_at: timestamp('minted_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
+
+// ─── fraise.market ────────────────────────────────────────────────────────────
+
+export const marketVendors = pgTable('market_vendors', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id).unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  instagram_handle: text('instagram_handle'),
+  active: boolean('active').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const marketListings = pgTable('market_listings', {
+  id: serial('id').primaryKey(),
+  vendor_id: integer('vendor_id').notNull().references(() => marketVendors.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category').notNull().default('other'), // fruit/vegetable/herb/grain/dairy/other
+  unit_type: text('unit_type').notNull().default('per_item'), // per_item/per_bunch/per_100g/per_kg
+  unit_label: text('unit_label').notNull().default('each'), // 'each', 'bunch', '100g', 'kg'
+  price_cents: integer('price_cents').notNull(),
+  stock_quantity: integer('stock_quantity').notNull().default(0),
+  tags: text('tags').array().default([]), // high-fiber, high-vitamin-c, high-protein, etc.
+  available_from: timestamp('available_from').notNull(),
+  available_until: timestamp('available_until').notNull(),
+  is_available: boolean('is_available').notNull().default(true),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const marketOrders = pgTable('market_orders_v2', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  status: text('status').notNull().default('pending'), // pending/confirmed/collected/cancelled
+  total_cents: integer('total_cents').notNull().default(0),
+  nfc_collected_at: timestamp('nfc_collected_at'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const marketOrderItems = pgTable('market_order_items', {
+  id: serial('id').primaryKey(),
+  order_id: integer('order_id').notNull().references(() => marketOrders.id),
+  listing_id: integer('listing_id').notNull().references(() => marketListings.id),
+  listing_name: text('listing_name').notNull(), // snapshot at time of order
+  quantity: integer('quantity').notNull().default(1),
+  unit_price_cents: integer('unit_price_cents').notNull(),
+});

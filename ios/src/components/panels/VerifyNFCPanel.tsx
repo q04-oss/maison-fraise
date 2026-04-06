@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc } from '../../lib/api';
 import { logStrawberries, requestHealthKitPermissions } from '../../lib/HealthKitService';
 
 type State = 'scanning' | 'success' | 'error';
@@ -22,6 +22,12 @@ export default function VerifyNFCPanel() {
     setErrorMsg('');
     try {
       const token = await readNfcToken();
+      if (token === 'fraise.market') {
+        await collectMarketOrderByNfc(token);
+        setState('success');
+        setTimeout(() => showPanel('market-orders'), 600);
+        return;
+      }
       const result = await verifyNfc(token);
       await AsyncStorage.setItem('verified', 'true');
       if (result.fraise_chat_email) {
