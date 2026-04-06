@@ -127,10 +127,11 @@ const withARBoxModule = (config) => {
       project.addToPbxGroup({ fileRef: arGroupKey, basename: 'ARBoxModule' }, mainGroupKey);
     }
 
-    // Add each file to compile sources
+    // Add each file to compile sources — path is relative to the group,
+    // so pass only the filename (group path 'ARBoxModule' + filename = correct disk path)
     for (const file of MODULE_FILES) {
       project.addSourceFile(
-        path.join('ARBoxModule', file),
+        file,
         { target: targetUuid },
         arGroupKey,
       );
