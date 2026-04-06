@@ -374,6 +374,14 @@ router.post('/:id/nominations', requireUser, async (req: Request, res: Response)
 
     await db.insert(popupNominations).values({ popup_id, nominator_id, nominee_id });
 
+    // Increment nominee's legitimacy score
+    db.insert(legitimacyEvents).values({
+      user_id: nominee_id,
+      event_type: 'nomination_received',
+      weight: 10,
+      business_id: popup_id,
+    }).catch(() => {});
+
     // Notify nominee via push (fire-and-forget)
     if (nominee?.push_token) {
       const name = nominee.display_name ?? nominee.email.split('@')[0];

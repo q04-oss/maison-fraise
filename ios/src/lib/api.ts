@@ -3620,6 +3620,43 @@ export async function fetchArPoem(params: {
   } catch { return null; }
 }
 
+// ─── Missing features additions ──────────────────────────────────────────────
+
+export async function fetchUserProfile(userId: number): Promise<any | null> {
+  const r = await fetch(`${BASE_URL}/api/profiles/${userId}`);
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function fetchTastingJournal(): Promise<any[]> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tasting-journal`, { headers });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function addTastingEntry(variety_id: number, rating: number, notes?: string): Promise<any> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tasting-journal`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ variety_id, rating, notes }),
+  });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const headers = await authHeader();
+  await fetch(`${BASE_URL}/api/notifications/read-all`, { method: 'POST', headers });
+}
+
+export async function fetchMyDjGigs(userId: number): Promise<any[]> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/users/${userId}/dj-gigs`, { headers });
+  if (!r.ok) return [];
+  return r.json();
+}
+
 // AR Expanded 7: real-time solar irradiance from Open-Meteo
 export async function fetchSolarIrradiance(lat: number, lng: number): Promise<{ irradiance_wm2: number; cloud_cover_pct: number; uv_index: number } | null> {
   try {

@@ -80,6 +80,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         title: editorialPieces.title,
         body: editorialPieces.body,
         author_display_name: users.display_name,
+        author_user_id: editorialPieces.author_user_id,
         published_at: editorialPieces.published_at,
         commission_cents: editorialPieces.commission_cents,
         tag: editorialPieces.tag,

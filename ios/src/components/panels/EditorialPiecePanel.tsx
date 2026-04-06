@@ -26,7 +26,7 @@ function formatCents(cents: number) {
 }
 
 export default function EditorialPiecePanel() {
-  const { goBack, panelData } = usePanel();
+  const { goBack, panelData, showPanel, setPanelData } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
@@ -106,11 +106,25 @@ export default function EditorialPiecePanel() {
             {piece.title}
           </Text>
 
-          <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>
-            {[piece.author_display_name, formatDate(piece.published_at ?? piece.created_at)]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
+          <View style={styles.metaRow}>
+            {piece.author_user_id ? (
+              <TouchableOpacity
+                onPress={() => { setPanelData({ userId: piece.author_user_id }); showPanel('user-profile'); }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.metaLink, { color: c.accent, fontFamily: fonts.dmMono }]}>
+                  {piece.author_display_name ?? 'Anonymous'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>
+                {piece.author_display_name ?? 'Anonymous'}
+              </Text>
+            )}
+            <Text style={[styles.meta, { color: c.muted, fontFamily: fonts.dmMono }]}>
+              {' · '}{formatDate(piece.published_at ?? piece.created_at)}
+            </Text>
+          </View>
 
           <View style={styles.badgeRow}>
             {piece.commission_cents != null && (
@@ -166,6 +180,8 @@ const styles = StyleSheet.create({
   },
   pieceTitle: { fontSize: 24, lineHeight: 32 },
   meta: { fontSize: 13, letterSpacing: 0.3 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  metaLink: { fontSize: 13, letterSpacing: 0.3 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, marginTop: 2 },
   commissionBadge: {
     alignSelf: 'flex-start',

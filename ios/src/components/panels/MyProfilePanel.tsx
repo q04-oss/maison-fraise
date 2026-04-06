@@ -1,25 +1,67 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, TextInput, Alert,
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchMyStats } from '../../lib/api';
+import { fetchMyStats, fetchMyMembership, updateDisplayName } from '../../lib/api';
 import { getAverageVitaminCMgPerDay } from '../../lib/HealthKitService';
+
+function formatDate(iso: string | null) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function daysUntil(iso: string | null): number {
+  if (!iso) return 999;
+  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+}
 
 export default function MyProfilePanel() {
   const { goBack, showPanel } = usePanel();
   const c = useColors();
   const [stats, setStats] = useState<any>(null);
+  const [membership, setMembership] = useState<any>(null);
+  const [fundBalance, setFundBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [vitaminCNudge, setVitaminCNudge] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
-    fetchMyStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
+    Promise.all([
+      fetchMyStats().catch(() => null),
+      fetchMyMembership().catch(() => null),
+    ]).then(([s, m]) => {
+      setStats(s);
+      if (m) {
+        setMembership(m.membership);
+        setFundBalance(m.fund?.balance_cents ?? 0);
+      }
+    }).finally(() => setLoading(false));
+
     getAverageVitaminCMgPerDay(7).then(avg => {
       if (avg < 50) setVitaminCNudge(true);
     }).catch(() => {});
   }, []);
+
+  const handleSaveName = async () => {
+    if (!nameInput.trim()) return;
+    setSavingName(true);
+    try {
+      await updateDisplayName(nameInput.trim());
+      setStats((prev: any) => ({ ...prev, display_name: nameInput.trim() }));
+      setEditingName(false);
+    } catch {
+      Alert.alert('Error', 'Could not save name.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const renewalDays = daysUntil(membership?.renews_at ?? null);
+  const showRenewalWarning = membership && renewalDays <= 30;
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -27,23 +69,52 @@ export default function MyProfilePanel() {
         <TouchableOpacity onPress={goBack} activeOpacity={0.7} style={styles.backBtn}>
           <Text style={[styles.backText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]}>PROFILE</Text>
-        <View style={styles.backBtn} />
+        <Text style={[styles.title, { color: c.text, fontFamily: fonts.dmMono }]}>PROFILE</Text>
+        <TouchableOpacity onPress={() => showPanel('notifications')} activeOpacity={0.7} style={styles.backBtn}>
+          <Text style={[styles.notifIcon, { color: c.muted }]}>◉</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
         <ActivityIndicator color={c.accent} style={{ marginTop: 40 }} />
       ) : !stats ? null : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
           {/* Name / handle */}
           <View style={[styles.section, { borderBottomColor: c.border }]}>
-            <Text style={[styles.name, { color: c.text }]}>{stats.display_name ?? stats.user_code}</Text>
+            {editingName ? (
+              <View style={styles.nameEditRow}>
+                <TextInput
+                  style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontFamily: fonts.playfair }]}
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleSaveName}
+                />
+                <TouchableOpacity onPress={handleSaveName} disabled={savingName} activeOpacity={0.7}>
+                  <Text style={[styles.saveBtn, { color: c.accent, fontFamily: fonts.dmMono }]}>
+                    {savingName ? '…' : 'SAVE'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setEditingName(false)} activeOpacity={0.7}>
+                  <Text style={[styles.saveBtn, { color: c.muted, fontFamily: fonts.dmMono }]}>CANCEL</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={() => { setNameInput(stats.display_name ?? ''); setEditingName(true); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.name, { color: c.text }]}>{stats.display_name ?? stats.user_code}</Text>
+              </TouchableOpacity>
+            )}
             {stats.user_code && stats.display_name && (
               <Text style={[styles.code, { color: c.muted }]}>{stats.user_code}</Text>
             )}
-            {stats.membership_tier && (
+            {membership?.tier && (
               <Text style={[styles.tier, { color: c.accent }]}>
-                {stats.membership_tier.charAt(0).toUpperCase() + stats.membership_tier.slice(1)} member
+                {membership.tier.charAt(0).toUpperCase() + membership.tier.slice(1)} member
               </Text>
             )}
           </View>
@@ -64,6 +135,31 @@ export default function MyProfilePanel() {
             </View>
           </View>
 
+          {/* Membership + fund */}
+          <TouchableOpacity
+            style={[styles.section, { borderBottomColor: c.border }]}
+            onPress={() => showPanel('membership')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>FUND BALANCE</Text>
+              <Text style={[styles.chevron, { color: c.accent }]}>→</Text>
+            </View>
+            <Text style={[styles.balance, { color: c.text }]}>
+              CA${(fundBalance / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+            {membership?.renews_at && (
+              <Text style={[styles.renewalLine, { color: showRenewalWarning ? c.accent : c.muted }]}>
+                {showRenewalWarning
+                  ? `Renews in ${renewalDays} day${renewalDays === 1 ? '' : 's'} — tap to manage`
+                  : `Renews ${formatDate(membership.renews_at)}`}
+              </Text>
+            )}
+            {!membership && (
+              <Text style={[styles.renewalLine, { color: c.muted }]}>No active membership — tap to join</Text>
+            )}
+          </TouchableOpacity>
+
           {/* Vitamin C nudge */}
           {vitaminCNudge && (
             <View style={[styles.nudgeCard, { borderColor: c.accent, backgroundColor: c.card }]}>
@@ -74,14 +170,6 @@ export default function MyProfilePanel() {
               </TouchableOpacity>
             </View>
           )}
-
-          {/* Ad balance / earnings */}
-          <View style={[styles.section, { borderBottomColor: c.border }]}>
-            <Text style={[styles.sectionLabel, { color: c.muted }]}>AD EARNINGS BALANCE</Text>
-            <Text style={[styles.balance, { color: c.text }]}>
-              CA${((stats.ad_balance_cents ?? 0) / 100).toFixed(2)}
-            </Text>
-          </View>
 
           {/* Quick nav */}
           <View style={styles.navList}>
@@ -105,6 +193,30 @@ export default function MyProfilePanel() {
                 <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity
+              style={[styles.navRow, { borderBottomColor: c.border }]}
+              onPress={() => showPanel('tasting-journal')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.navLabel, { color: c.text }]}>Tasting Journal</Text>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navRow, { borderBottomColor: c.border }]}
+              onPress={() => showPanel('proposals')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.navLabel, { color: c.text }]}>Proposals</Text>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navRow, { borderBottomColor: c.border }]}
+              onPress={() => showPanel('nomination-history')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.navLabel, { color: c.text }]}>Nomination History</Text>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.navRow, { borderBottomColor: c.border }]}
               onPress={() => showPanel('portrait-feed')}
@@ -137,12 +249,17 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 40 },
   backText: { fontSize: 22 },
-  title: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 1.5 },
+  notifIcon: { fontSize: 18, textAlign: 'right' },
+  title: { fontSize: 11, letterSpacing: 1.5 },
   scroll: { paddingBottom: 60 },
   section: {
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
     borderBottomWidth: StyleSheet.hairlineWidth, gap: 4,
   },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  nameInput: { flex: 1, fontSize: 24, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 4 },
+  saveBtn: { fontSize: 11, letterSpacing: 1 },
   name: { fontFamily: fonts.playfair, fontSize: 28 },
   code: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 1 },
   tier: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1.5, marginTop: 4 },
@@ -155,7 +272,9 @@ const styles = StyleSheet.create({
   statNum: { fontFamily: fonts.playfair, fontSize: 28 },
   statLabel: { fontFamily: fonts.dmMono, fontSize: 9, letterSpacing: 1.5, marginTop: 2 },
   sectionLabel: { fontFamily: fonts.dmMono, fontSize: 9, letterSpacing: 1.5 },
+  chevron: { fontSize: 14 },
   balance: { fontFamily: fonts.playfair, fontSize: 32, marginTop: 4 },
+  renewalLine: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 0.5, marginTop: 2 },
   navList: {},
   navRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -166,8 +285,7 @@ const styles = StyleSheet.create({
   navChevron: { fontSize: 18 },
   nudgeCard: {
     marginHorizontal: SPACING.md, marginVertical: SPACING.sm,
-    borderRadius: 12, borderWidth: 1,
-    padding: SPACING.md, gap: 6,
+    borderRadius: 12, borderWidth: 1, padding: SPACING.md, gap: 6,
   },
   nudgeTitle: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 1.5 },
   nudgeSub: { fontFamily: fonts.dmSans, fontSize: 13, lineHeight: 20 },

@@ -89,7 +89,12 @@ export type PanelId =
   | 'dj-offer'
   | 'nomination'
   | 'nomination-history'
-  | 'campaign-commission';
+  | 'campaign-commission'
+  | 'membership'
+  | 'notifications'
+  | 'user-profile'
+  | 'tasting-journal'
+  | 'proposals';
 
 export interface OrderState {
   variety_id: number | null;
