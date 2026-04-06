@@ -58,7 +58,7 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
     let name = (varietyData["variety_name"] as? String) ?? "Strawberry"
     let farm = (varietyData["farm"] as? String) ?? ""
     let harvestDate = (varietyData["harvest_date"] as? String) ?? ""
-    let quantity = (varietyData["quantity"] as? Int) ?? 0
+    let quantity = (varietyData["quantity"] as? NSNumber)?.intValue ?? 0
     let chocolate = (varietyData["chocolate"] as? String) ?? ""
     let finish = (varietyData["finish"] as? String) ?? ""
 
