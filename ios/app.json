@@ -61,6 +61,7 @@
       "url": "https://u.expo.dev/ec4ad15d-2535-42a4-91a0-70599925e6f5"
     },
     "plugins": [
+      "./plugins/withARBoxModule",
       "expo-updates",
       "expo-font",
       "expo-apple-authentication",
