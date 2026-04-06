@@ -8,20 +8,11 @@ import { fetchMyStats, updateDisplayName } from '../../lib/api';
 import { useSocialAccess } from '../SocialGate';
 import { getAverageVitaminCMgPerDay } from '../../lib/HealthKitService';
 
-function formatDate(iso: string | null) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function daysUntil(iso: string | null): number {
-  if (!iso) return 999;
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
-}
 
 export default function MyProfilePanel() {
   const { goBack, showPanel } = usePanel();
   const c = useColors();
-  const { active: socialActive, tier: socialTier, expires_at: socialExpiry } = useSocialAccess();
+  const { active: socialActive, tier: socialTier, bankDays, lifetimeDays } = useSocialAccess();
   const [stats, setStats] = useState<any>(null);
   const [fundBalance, setFundBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -54,8 +45,7 @@ export default function MyProfilePanel() {
     }
   };
 
-  const accessDaysLeft = daysUntil(socialExpiry);
-  const accessExpiringSoon = socialActive && accessDaysLeft <= 7;
+  const accessExpiringSoon = socialActive && bankDays <= 7;
   const TIER_LABELS: Record<string, string> = { standard: 'Standard', reserve: 'Reserve', estate: 'Estate' };
 
   return (
@@ -138,11 +128,16 @@ export default function MyProfilePanel() {
             <Text style={[styles.balance, { color: c.text }]}>
               CA${(fundBalance / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-            {socialActive && socialExpiry && (
+            {socialActive && (
               <Text style={[styles.renewalLine, { color: accessExpiringSoon ? c.accent : c.muted }]}>
                 {accessExpiringSoon
-                  ? `Access expires in ${accessDaysLeft} day${accessDaysLeft === 1 ? '' : 's'} — tap a new box`
-                  : `Access expires ${formatDate(socialExpiry)}`}
+                  ? `${bankDays}d remaining — tap a new box soon`
+                  : `${bankDays} days remaining`}
+              </Text>
+            )}
+            {socialActive && lifetimeDays > 0 && (
+              <Text style={[styles.renewalLine, { color: c.muted }]}>
+                {lifetimeDays} lifetime days accumulated
               </Text>
             )}
             {!socialActive && (

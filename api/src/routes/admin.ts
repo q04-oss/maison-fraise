@@ -1114,7 +1114,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     // Social access + AR video platform
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_access_expires_at TIMESTAMP`);
 
-    // Grade tier system
+    // Grade tier system (static columns — kept for reference, superseded by time bank)
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_tier') THEN
@@ -1124,6 +1124,12 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     `);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_tier social_tier`);
     await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS social_tier social_tier`);
+
+    // Time bank system — replaces flat social_access_expires_at
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_time_bank_seconds INTEGER NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_time_bank_updated_at TIMESTAMP`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_lifetime_credits_seconds INTEGER NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS time_credits_days INTEGER NOT NULL DEFAULT 30`);
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ar_video_status') THEN

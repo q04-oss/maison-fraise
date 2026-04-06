@@ -3676,10 +3676,15 @@ export async function fetchSolarIrradiance(lat: number, lng: number): Promise<{ 
 
 // ─── Social access ────────────────────────────────────────────────────────────
 
-export async function fetchSocialAccess(): Promise<{ active: boolean; expires_at: string | null; tier: string | null }> {
+export async function fetchSocialAccess(): Promise<{
+  active: boolean;
+  tier: string | null;
+  bank_days: number;
+  lifetime_days: number;
+}> {
   const headers = await authHeader();
   const r = await fetch(`${BASE_URL}/api/users/me/social-access`, { headers });
-  if (!r.ok) return { active: false, expires_at: null, tier: null };
+  if (!r.ok) return { active: false, tier: null, bank_days: 0, lifetime_days: 0 };
   return r.json();
 }
 

@@ -2,9 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { arVideos, users, earningsLedger } from '../db/schema';
-
-const TIER_COMMISSION_RATE: Record<string, number> = { estate: 0.80, reserve: 0.75, standard: 0.70 };
-function tierRate(tier: string | null): number { return TIER_COMMISSION_RATE[tier ?? ''] ?? 0.70; }
+import { currentBankSeconds, tierFromBalance, tierCommissionRate } from '../lib/socialTier';
 import { requireUser } from '../lib/auth';
 import { uploadMedia } from '../lib/upload';
 import { logger } from '../lib/logger';
@@ -104,16 +102,25 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
 
   try {
     const [user] = await db
-      .select({ social_access_expires_at: users.social_access_expires_at, social_tier: users.social_tier })
+      .select({
+        social_time_bank_seconds: users.social_time_bank_seconds,
+        social_time_bank_updated_at: users.social_time_bank_updated_at,
+      })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
 
-    if (!user?.social_access_expires_at || user.social_access_expires_at < new Date()) {
-      res.status(403).json({ error: 'social_access_required', message: 'Tap your next box to unlock social access.' });
+    const balance = currentBankSeconds(
+      user?.social_time_bank_seconds ?? 0,
+      user?.social_time_bank_updated_at ?? null,
+    );
+    const tier = tierFromBalance(balance);
+
+    if (!tier) {
+      res.status(403).json({ error: 'social_access_required', message: 'Tap a box to unlock social access.' });
       return;
     }
-    if (user.social_tier !== 'reserve' && user.social_tier !== 'estate') {
+    if (tier !== 'reserve' && tier !== 'estate') {
       res.status(403).json({ error: 'tier_required', message: 'Reserve or estate grade required to pitch AR videos.' });
       return;
     }
@@ -339,11 +346,18 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
 
     // Read author's current tier to apply commission rate
     const [author] = await db
-      .select({ social_tier: users.social_tier })
+      .select({
+        social_time_bank_seconds: users.social_time_bank_seconds,
+        social_time_bank_updated_at: users.social_time_bank_updated_at,
+      })
       .from(users)
       .where(eq(users.id, v.author_user_id))
       .limit(1);
-    const rate = tierRate(author?.social_tier ?? null);
+    const authorBalance = currentBankSeconds(
+      author?.social_time_bank_seconds ?? 0,
+      author?.social_time_bank_updated_at ?? null,
+    );
+    const rate = tierCommissionRate(tierFromBalance(authorBalance));
 
     await db.update(arVideos).set({
       status: 'published',

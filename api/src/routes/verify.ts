@@ -6,6 +6,7 @@ import { orders, users, legitimacyEvents, varieties, standingOrders } from '../d
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 import { fireWebhook } from '../lib/webhooks';
+import { currentBankSeconds, tierFromBalance } from '../lib/socialTier';
 
 const router = Router();
 
@@ -31,10 +32,28 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj }).from(users).where(eq(users.id, user_id));
     const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
 
-    // Read variety's social tier before transaction
-    const [varietyTierRow] = await db.select({ social_tier: varieties.social_tier })
+    // Read variety's time credits before transaction
+    const [varietyRow] = await db
+      .select({ time_credits_days: varieties.time_credits_days })
       .from(varieties).where(eq(varieties.id, order.variety_id));
-    const varietySocialTier = varietyTierRow?.social_tier ?? null;
+    const creditsDays = varietyRow?.time_credits_days ?? 30;
+    const creditsSeconds = creditsDays * 86400;
+
+    // Read current bank balance before transaction (drain elapsed time first)
+    const [bankRow] = await db
+      .select({
+        social_time_bank_seconds: users.social_time_bank_seconds,
+        social_time_bank_updated_at: users.social_time_bank_updated_at,
+        social_lifetime_credits_seconds: users.social_lifetime_credits_seconds,
+      })
+      .from(users).where(eq(users.id, user_id));
+
+    const currentBalance = currentBankSeconds(
+      bankRow?.social_time_bank_seconds ?? 0,
+      bankRow?.social_time_bank_updated_at ?? null,
+    );
+    const newBalance = currentBalance + creditsSeconds;
+    const newLifetime = (bankRow?.social_lifetime_credits_seconds ?? 0) + creditsSeconds;
 
     await db.transaction(async (tx) => {
       // Atomic claim: only succeeds if nfc_token_used is still false
@@ -47,17 +66,14 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
         throw Object.assign(new Error('already_used'), { code: 'already_used' });
       }
 
-      // Social access window: 30 days from NFC tap; tier from variety grade
-      const socialExpiry = new Date(now);
-      socialExpiry.setDate(socialExpiry.getDate() + 30);
-
       await tx.update(users)
         .set({
           verified: true,
           verified_at: now,
           verified_by: 'nfc',
-          social_access_expires_at: socialExpiry,
-          social_tier: varietySocialTier,
+          social_time_bank_seconds: Math.round(newBalance),
+          social_time_bank_updated_at: now,
+          social_lifetime_credits_seconds: Math.round(newLifetime),
           ...(fraiseChatEmail ? { fraise_chat_email: fraiseChatEmail } : {}),
         })
         .where(eq(users.id, user_id));
@@ -91,7 +107,21 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
-    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, is_dj: currentUser?.is_dj ?? false, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity, variety_id: order.variety_id, variety_name: variety?.name ?? null, farm: variety?.source_farm ?? null, harvest_date: variety?.harvest_date ?? null });
+    const tier = tierFromBalance(newBalance);
+    res.json({
+      verified: true, user_id,
+      fraise_chat_email: fraiseChatEmail,
+      is_dj: currentUser?.is_dj ?? false,
+      unlocked: ['standing_orders', 'campaigns'],
+      quantity: order.quantity,
+      variety_id: order.variety_id, variety_name: variety?.name ?? null,
+      farm: variety?.source_farm ?? null, harvest_date: variety?.harvest_date ?? null,
+      // Time bank
+      tier,
+      bank_days: Math.floor(newBalance / 86400),
+      credits_added_days: creditsDays,
+      lifetime_days: Math.floor(newLifetime / 86400),
+    });
   } catch (err: any) {
     if (err?.code === 'already_used') {
       res.status(403).json({ error: 'This token is invalid or has already been used.' });

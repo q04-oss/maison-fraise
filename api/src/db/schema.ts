@@ -84,6 +84,7 @@ export const varieties = pgTable('varieties', {
   variety_type: text('variety_type').notNull().default('strawberry'), // 'strawberry' | 'chocolate'
   sort_order: integer('sort_order').notNull().default(0),
   social_tier: socialTierEnum('social_tier'),
+  time_credits_days: integer('time_credits_days').notNull().default(30),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -182,8 +183,9 @@ export const users = pgTable('users', {
   stripe_connect_account_id: text('stripe_connect_account_id'),
   stripe_connect_onboarded: boolean('stripe_connect_onboarded').notNull().default(false),
   ad_balance_cents: integer('ad_balance_cents').notNull().default(0),
-  social_access_expires_at: timestamp('social_access_expires_at'),
-  social_tier: socialTierEnum('social_tier'),
+  social_time_bank_seconds: integer('social_time_bank_seconds').notNull().default(0),
+  social_time_bank_updated_at: timestamp('social_time_bank_updated_at'),
+  social_lifetime_credits_seconds: integer('social_lifetime_credits_seconds').notNull().default(0),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

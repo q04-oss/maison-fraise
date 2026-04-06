@@ -1,15 +1,13 @@
 import React, { useEffect, useState, createContext, useContext, ReactNode } from 'react';
-import {
-  View, Text, StyleSheet, ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, fonts, SPACING } from '../theme';
 import { fetchSocialAccess } from '../lib/api';
 
-type SocialTier = 'standard' | 'reserve' | 'estate' | null;
+export type SocialTier = 'standard' | 'reserve' | 'estate' | null;
 
-const TIER_LABELS: Record<string, string> = {
+export const TIER_LABELS: Record<string, string> = {
   standard: 'Standard',
   reserve: 'Reserve',
   estate: 'Estate',
@@ -17,30 +15,33 @@ const TIER_LABELS: Record<string, string> = {
 
 interface SocialAccessCtx {
   active: boolean;
-  expires_at: string | null;
   tier: SocialTier;
+  bankDays: number;
+  lifetimeDays: number;
   loading: boolean;
   refresh: () => void;
 }
 
 const SocialAccessContext = createContext<SocialAccessCtx>({
-  active: false, expires_at: null, tier: null, loading: true, refresh: () => {},
+  active: false, tier: null, bankDays: 0, lifetimeDays: 0, loading: true, refresh: () => {},
 });
 
 export function SocialAccessProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
-  const [expires_at, setExpiresAt] = useState<string | null>(null);
   const [tier, setTier] = useState<SocialTier>(null);
+  const [bankDays, setBankDays] = useState(0);
+  const [lifetimeDays, setLifetimeDays] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const check = async () => {
     try {
       const token = await AsyncStorage.getItem('auth_token');
-      if (!token) { setActive(false); setTier(null); setLoading(false); return; }
+      if (!token) { setActive(false); setTier(null); setBankDays(0); setLoading(false); return; }
       const data = await fetchSocialAccess();
       setActive(data.active);
-      setExpiresAt(data.expires_at);
       setTier((data.tier as SocialTier) ?? null);
+      setBankDays(data.bank_days ?? 0);
+      setLifetimeDays(data.lifetime_days ?? 0);
     } catch {
       setActive(false);
       setTier(null);
@@ -52,7 +53,7 @@ export function SocialAccessProvider({ children }: { children: ReactNode }) {
   useEffect(() => { check(); }, []);
 
   return (
-    <SocialAccessContext.Provider value={{ active, expires_at, tier, loading, refresh: check }}>
+    <SocialAccessContext.Provider value={{ active, tier, bankDays, lifetimeDays, loading, refresh: check }}>
       {children}
     </SocialAccessContext.Provider>
   );
@@ -62,9 +63,9 @@ export function useSocialAccess() {
   return useContext(SocialAccessContext);
 }
 
-// Gate wrapper — shows blocked screen if social access is inactive
+// Gate wrapper — shows blocked screen when bank is empty
 export function SocialGate({ children }: { children: ReactNode }) {
-  const { active, tier, loading } = useSocialAccess();
+  const { active, tier, bankDays, loading } = useSocialAccess();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
@@ -84,7 +85,7 @@ export function SocialGate({ children }: { children: ReactNode }) {
           Tap your next box.
         </Text>
         <Text style={[styles.body, { color: c.muted, fontFamily: fonts.dmSans }]}>
-          Your access has expired.{'\n'}NFC-tap a fresh box to re-unlock.
+          Your time has run out.{'\n'}NFC-tap a fresh box to re-enter.
         </Text>
       </View>
     );
@@ -92,13 +93,14 @@ export function SocialGate({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {tier ? (
-        <View style={[styles.tierBadge, { borderColor: c.accent }]}>
-          <Text style={[styles.tierText, { color: c.accent, fontFamily: fonts.dmMono }]}>
-            {TIER_LABELS[tier] ?? tier}
-          </Text>
-        </View>
-      ) : null}
+      <View style={[styles.tierBar, { borderBottomColor: c.border }]}>
+        <Text style={[styles.tierLabel, { color: c.accent, fontFamily: fonts.dmMono }]}>
+          {tier ? TIER_LABELS[tier] : '—'}
+        </Text>
+        <Text style={[styles.bankDays, { color: c.muted, fontFamily: fonts.dmMono }]}>
+          {bankDays}d
+        </Text>
+      </View>
       {children}
     </>
   );
@@ -109,10 +111,14 @@ const styles = StyleSheet.create({
   kanji: { fontSize: 64, marginBottom: SPACING.lg },
   title: { fontSize: 22, marginBottom: SPACING.sm, textAlign: 'center' },
   body: { fontSize: 14, lineHeight: 22, textAlign: 'center', opacity: 0.7 },
-  tierBadge: {
-    position: 'absolute', top: 0, right: SPACING.md,
-    borderWidth: StyleSheet.hairlineWidth, borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 3, zIndex: 10,
+  tierBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  tierText: { fontSize: 11, letterSpacing: 1 },
+  tierLabel: { fontSize: 11, letterSpacing: 1.5 },
+  bankDays: { fontSize: 11, letterSpacing: 0.5 },
 });

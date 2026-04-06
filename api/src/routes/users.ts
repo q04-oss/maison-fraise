@@ -8,6 +8,7 @@ import {
 } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
+import { currentBankSeconds, tierFromBalance } from '../lib/socialTier';
 
 const router = Router();
 
@@ -40,14 +41,25 @@ router.get('/me/social-access', requireUser, async (req: Request, res: Response)
   const user_id = (req as any).userId as number;
   try {
     const [user] = await db
-      .select({ social_access_expires_at: users.social_access_expires_at, social_tier: users.social_tier })
+      .select({
+        social_time_bank_seconds: users.social_time_bank_seconds,
+        social_time_bank_updated_at: users.social_time_bank_updated_at,
+        social_lifetime_credits_seconds: users.social_lifetime_credits_seconds,
+      })
       .from(users)
       .where(eq(users.id, user_id))
       .limit(1);
-    const expires_at = user?.social_access_expires_at ?? null;
-    const active = expires_at !== null && expires_at > new Date();
-    const tier = active ? (user?.social_tier ?? null) : null;
-    res.json({ active, expires_at, tier });
+    const balance = currentBankSeconds(
+      user?.social_time_bank_seconds ?? 0,
+      user?.social_time_bank_updated_at ?? null,
+    );
+    const tier = tierFromBalance(balance);
+    res.json({
+      active: balance > 0,
+      tier,
+      bank_days: Math.floor(balance / 86400),
+      lifetime_days: Math.floor((user?.social_lifetime_credits_seconds ?? 0) / 86400),
+    });
   } catch {
     res.status(500).json({ error: 'internal_error' });
   }
