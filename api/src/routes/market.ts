@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { sql } from 'drizzle-orm';
+import { sql, eq, and, gt, gte, desc } from 'drizzle-orm';
 import { db } from '../db';
 import { requireUser } from '../lib/auth';
 import { stripe } from '../lib/stripe';
 import { logger } from '../lib/logger';
+import { users, marketVendors, marketListings, marketOrders, marketOrderItems } from '../db/schema';
 
 const router = Router();
 
@@ -65,6 +66,487 @@ db.execute(sql`
     created_at timestamptz NOT NULL DEFAULT now()
   )
 `).catch(() => {});
+
+// ─── fraise.market self-healing tables ───────────────────────────────────────
+
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS market_vendors (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL UNIQUE REFERENCES users(id),
+    name text NOT NULL,
+    description text,
+    instagram_handle text,
+    active boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )
+`).catch(() => {});
+
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS market_listings (
+    id serial PRIMARY KEY,
+    vendor_id integer NOT NULL REFERENCES market_vendors(id),
+    name text NOT NULL,
+    description text,
+    category text NOT NULL DEFAULT 'other',
+    unit_type text NOT NULL DEFAULT 'per_item',
+    unit_label text NOT NULL DEFAULT 'each',
+    price_cents integer NOT NULL,
+    stock_quantity integer NOT NULL DEFAULT 0,
+    tags text[] DEFAULT '{}',
+    available_from timestamptz NOT NULL,
+    available_until timestamptz NOT NULL,
+    is_available boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )
+`).catch(() => {});
+
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS market_orders_v2 (
+    id serial PRIMARY KEY,
+    user_id integer NOT NULL REFERENCES users(id),
+    status text NOT NULL DEFAULT 'pending',
+    total_cents integer NOT NULL DEFAULT 0,
+    nfc_collected_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )
+`).catch(() => {});
+
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS market_order_items (
+    id serial PRIMARY KEY,
+    order_id integer NOT NULL REFERENCES market_orders_v2(id),
+    listing_id integer NOT NULL REFERENCES market_listings(id),
+    listing_name text NOT NULL,
+    quantity integer NOT NULL DEFAULT 1,
+    unit_price_cents integer NOT NULL
+  )
+`).catch(() => {});
+
+// ─── fraise.market scoring ────────────────────────────────────────────────────
+
+interface HealthContext {
+  active_energy_kcal: number;
+  calories_consumed_kcal: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  sugar_g: number;
+  fiber_g: number;
+  steps: number;
+}
+
+function scoreItem(item: any, ctx: HealthContext): { score: number; reason: string } {
+  const proteinGap = Math.max(0, 50 - ctx.protein_g);
+  const sugarExcess = Math.max(0, ctx.sugar_g - 40);
+  const fiberGap = Math.max(0, 25 - ctx.fiber_g);
+  const calorieGap = Math.max(0, 2000 - ctx.calories_consumed_kcal - ctx.active_energy_kcal * 0.3);
+
+  const tags: string[] = Array.isArray(item.tags) ? item.tags : [];
+  let score = 50;
+
+  if (tags.includes('high-protein') && ctx.protein_g < 50) score += 20;
+  if (tags.includes('low-sugar') && ctx.sugar_g > 40) score += 20;
+  if (tags.includes('high-fiber') && ctx.fiber_g < 15) score += 15;
+  if (tags.includes('light') && calorieGap < 200) score += 10;
+  if (tags.includes('indulgent') && ctx.active_energy_kcal > 400) score += 10;
+
+  if (calorieGap > 500 && item.category === 'main') score += 10;
+  if (ctx.sugar_g > 40 && item.category === 'dessert') score -= 20;
+
+  score = Math.max(0, Math.min(100, score));
+
+  let reason = 'Fits well with your day';
+  if (ctx.protein_g < 50 && tags.includes('high-protein')) {
+    reason = "You're low on protein today";
+  } else if (ctx.sugar_g > 40 && tags.includes('low-sugar')) {
+    reason = "You've had plenty of sugar today";
+  } else if (ctx.active_energy_kcal > 400 && item.category === 'main') {
+    reason = "You've been active — you've earned it";
+  } else if (ctx.fiber_g < 15 && tags.includes('high-fiber')) {
+    reason = 'Good source of fiber for today';
+  } else if (tags.includes('high-vitamin-c')) {
+    reason = 'Great source of vitamin C';
+  }
+
+  return { score, reason };
+}
+
+// ─── fraise.market routes (literal routes before parameterized) ───────────────
+
+// 1. GET /listings/for-me
+router.post('/listings/for-me', requireUser, async (req: Request, res: Response) => {
+  const ctx: HealthContext = {
+    active_energy_kcal: Number(req.body.active_energy_kcal) || 0,
+    calories_consumed_kcal: Number(req.body.calories_consumed_kcal) || 0,
+    protein_g: Number(req.body.protein_g) || 0,
+    carbs_g: Number(req.body.carbs_g) || 0,
+    fat_g: Number(req.body.fat_g) || 0,
+    sugar_g: Number(req.body.sugar_g) || 0,
+    fiber_g: Number(req.body.fiber_g) || 0,
+    steps: Number(req.body.steps) || 0,
+  };
+  try {
+    const rows = await db.select({
+      id: marketListings.id,
+      name: marketListings.name,
+      description: marketListings.description,
+      category: marketListings.category,
+      unit_type: marketListings.unit_type,
+      unit_label: marketListings.unit_label,
+      price_cents: marketListings.price_cents,
+      stock_quantity: marketListings.stock_quantity,
+      tags: marketListings.tags,
+      available_from: marketListings.available_from,
+      available_until: marketListings.available_until,
+      vendor_id: marketListings.vendor_id,
+      vendor_name: marketVendors.name,
+    })
+    .from(marketListings)
+    .innerJoin(marketVendors, eq(marketListings.vendor_id, marketVendors.id))
+    .where(and(
+      eq(marketListings.is_available, true),
+      gt(marketListings.available_until, new Date()),
+    ));
+    const listings = (rows as any).rows ?? rows;
+    const scored = listings.map((item: any) => {
+      const { score, reason } = scoreItem(item, ctx);
+      return { ...item, score, reason };
+    });
+    scored.sort((a: any, b: any) => b.score - a.score);
+    res.json(scored);
+  } catch (err) {
+    logger.error('[market] POST /listings/for-me', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 2. GET /listings
+router.get('/listings', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select({
+      id: marketListings.id,
+      name: marketListings.name,
+      description: marketListings.description,
+      category: marketListings.category,
+      unit_type: marketListings.unit_type,
+      unit_label: marketListings.unit_label,
+      price_cents: marketListings.price_cents,
+      stock_quantity: marketListings.stock_quantity,
+      tags: marketListings.tags,
+      available_from: marketListings.available_from,
+      available_until: marketListings.available_until,
+      vendor_id: marketListings.vendor_id,
+      vendor_name: marketVendors.name,
+    })
+    .from(marketListings)
+    .innerJoin(marketVendors, eq(marketListings.vendor_id, marketVendors.id))
+    .where(and(
+      eq(marketListings.is_available, true),
+      gt(marketListings.available_until, new Date()),
+    ))
+    .orderBy(marketListings.category, marketListings.name);
+    const listings = (rows as any).rows ?? rows;
+    res.json(listings);
+  } catch (err) {
+    logger.error('[market] GET /listings', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 3. POST /listings — vendor only
+router.post('/listings', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const [vendor] = await db.select({ id: marketVendors.id })
+      .from(marketVendors)
+      .where(and(eq(marketVendors.user_id, userId), eq(marketVendors.active, true)));
+    if (!vendor) { res.status(403).json({ error: 'not_a_vendor' }); return; }
+    const { name, description, category, unit_type, unit_label, price_cents, stock_quantity, tags, available_from, available_until } = req.body;
+    if (!name || !category || !unit_type || !unit_label || price_cents == null || !available_from || !available_until) {
+      res.status(400).json({ error: 'missing_fields' }); return;
+    }
+    const inserted = await db.insert(marketListings).values({
+      vendor_id: vendor.id,
+      name,
+      description: description ?? null,
+      category,
+      unit_type,
+      unit_label,
+      price_cents,
+      stock_quantity: stock_quantity ?? 0,
+      tags: tags ?? [],
+      available_from: new Date(available_from),
+      available_until: new Date(available_until),
+      is_available: true,
+    }).returning();
+    const result = (inserted as any).rows ?? inserted;
+    res.status(201).json(result[0]);
+  } catch (err) {
+    logger.error('[market] POST /listings', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 4. PATCH /listings/:id — vendor, must own
+router.patch('/listings/:id', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  try {
+    const [vendor] = await db.select({ id: marketVendors.id })
+      .from(marketVendors).where(eq(marketVendors.user_id, userId));
+    if (!vendor) { res.status(403).json({ error: 'not_a_vendor' }); return; }
+    const [listing] = await db.select({ id: marketListings.id, vendor_id: marketListings.vendor_id })
+      .from(marketListings).where(eq(marketListings.id, id));
+    if (!listing || listing.vendor_id !== vendor.id) { res.status(404).json({ error: 'not_found' }); return; }
+    const { name, description, price_cents, stock_quantity, tags, is_available } = req.body;
+    const patch: Record<string, any> = {};
+    if (name !== undefined) patch.name = name;
+    if (description !== undefined) patch.description = description;
+    if (price_cents !== undefined) patch.price_cents = price_cents;
+    if (stock_quantity !== undefined) patch.stock_quantity = stock_quantity;
+    if (tags !== undefined) patch.tags = tags;
+    if (is_available !== undefined) patch.is_available = is_available;
+    const updated = await db.update(marketListings).set(patch).where(eq(marketListings.id, id)).returning();
+    const result = (updated as any).rows ?? updated;
+    res.json(result[0]);
+  } catch (err) {
+    logger.error('[market] PATCH /listings/:id', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 5. DELETE /listings/:id — vendor, must own (soft delete)
+router.delete('/listings/:id', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  try {
+    const [vendor] = await db.select({ id: marketVendors.id })
+      .from(marketVendors).where(eq(marketVendors.user_id, userId));
+    if (!vendor) { res.status(403).json({ error: 'not_a_vendor' }); return; }
+    const [listing] = await db.select({ id: marketListings.id, vendor_id: marketListings.vendor_id })
+      .from(marketListings).where(eq(marketListings.id, id));
+    if (!listing || listing.vendor_id !== vendor.id) { res.status(404).json({ error: 'not_found' }); return; }
+    await db.update(marketListings).set({ is_available: false }).where(eq(marketListings.id, id));
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error('[market] DELETE /listings/:id', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 6. GET /listings/:id
+router.get('/listings/:id', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  try {
+    const [listing] = await db.select({
+      id: marketListings.id,
+      name: marketListings.name,
+      description: marketListings.description,
+      category: marketListings.category,
+      unit_type: marketListings.unit_type,
+      unit_label: marketListings.unit_label,
+      price_cents: marketListings.price_cents,
+      stock_quantity: marketListings.stock_quantity,
+      tags: marketListings.tags,
+      available_from: marketListings.available_from,
+      available_until: marketListings.available_until,
+      is_available: marketListings.is_available,
+      vendor_id: marketListings.vendor_id,
+      vendor_name: marketVendors.name,
+      vendor_instagram: marketVendors.instagram_handle,
+    })
+    .from(marketListings)
+    .innerJoin(marketVendors, eq(marketListings.vendor_id, marketVendors.id))
+    .where(eq(marketListings.id, id));
+    if (!listing) { res.status(404).json({ error: 'not_found' }); return; }
+    res.json(listing);
+  } catch (err) {
+    logger.error('[market] GET /listings/:id', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 7. GET /orders/mine
+router.get('/orders/mine', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const orders = await db.select({
+      id: marketOrders.id,
+      status: marketOrders.status,
+      total_cents: marketOrders.total_cents,
+      nfc_collected_at: marketOrders.nfc_collected_at,
+      created_at: marketOrders.created_at,
+    })
+    .from(marketOrders)
+    .where(eq(marketOrders.user_id, userId))
+    .orderBy(desc(marketOrders.created_at));
+    const orderList = (orders as any).rows ?? orders;
+
+    const result = await Promise.all(orderList.map(async (order: any) => {
+      const items = await db.select({
+        id: marketOrderItems.id,
+        listing_id: marketOrderItems.listing_id,
+        listing_name: marketOrderItems.listing_name,
+        quantity: marketOrderItems.quantity,
+        unit_price_cents: marketOrderItems.unit_price_cents,
+      })
+      .from(marketOrderItems)
+      .where(eq(marketOrderItems.order_id, order.id));
+      const itemRows = (items as any).rows ?? items;
+      return { ...order, items: itemRows };
+    }));
+
+    res.json(result);
+  } catch (err) {
+    logger.error('[market] GET /orders/mine', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 8. POST /orders
+router.post('/orders', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: 'items required' }); return;
+  }
+  try {
+    // Validate all listings
+    const now = new Date();
+    const listingData: any[] = [];
+    for (const item of items) {
+      const [listing] = await db.select()
+        .from(marketListings)
+        .where(eq(marketListings.id, item.listing_id));
+      if (!listing) { res.status(404).json({ error: `listing_not_found:${item.listing_id}` }); return; }
+      if (!listing.is_available) { res.status(409).json({ error: `listing_unavailable:${item.listing_id}` }); return; }
+      if (listing.available_until <= now) { res.status(409).json({ error: `listing_expired:${item.listing_id}` }); return; }
+      if (listing.stock_quantity < item.quantity) { res.status(409).json({ error: `insufficient_stock:${item.listing_id}` }); return; }
+      listingData.push({ listing, quantity: item.quantity });
+    }
+
+    const total_cents = listingData.reduce((sum, { listing, quantity }) => sum + listing.price_cents * quantity, 0);
+
+    // Transaction via raw SQL
+    const insertedOrder = await db.execute(sql`
+      INSERT INTO market_orders_v2 (user_id, status, total_cents)
+      VALUES (${userId}, 'pending', ${total_cents})
+      RETURNING id
+    `);
+    const orderRows = (insertedOrder as any).rows ?? insertedOrder;
+    const order_id = orderRows[0].id;
+
+    const insertedItems: any[] = [];
+    for (const { listing, quantity } of listingData) {
+      await db.execute(sql`
+        INSERT INTO market_order_items (order_id, listing_id, listing_name, quantity, unit_price_cents)
+        VALUES (${order_id}, ${listing.id}, ${listing.name}, ${quantity}, ${listing.price_cents})
+      `);
+      // Decrement stock with guard
+      const decremented = await db.execute(sql`
+        UPDATE market_listings SET stock_quantity = stock_quantity - ${quantity}
+        WHERE id = ${listing.id} AND stock_quantity >= ${quantity}
+        RETURNING id
+      `);
+      const dRows = (decremented as any).rows ?? decremented;
+      if (!dRows.length) {
+        // Roll back order
+        await db.execute(sql`DELETE FROM market_orders_v2 WHERE id = ${order_id}`);
+        res.status(409).json({ error: `stock_depleted:${listing.id}` }); return;
+      }
+      insertedItems.push({ listing_id: listing.id, listing_name: listing.name, quantity, unit_price_cents: listing.price_cents });
+    }
+
+    res.status(201).json({ order_id, total_cents, items: insertedItems });
+  } catch (err) {
+    logger.error('[market] POST /orders', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 9. POST /collect
+router.post('/collect', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const { nfc_token } = req.body;
+  const expected = process.env.MARKET_NFC_TOKEN ?? 'fraise.market';
+  if (nfc_token !== expected) { res.status(403).json({ error: 'invalid_token' }); return; }
+  try {
+    const orderRows = await db.execute(sql`
+      SELECT id FROM market_orders_v2
+      WHERE user_id = ${userId} AND status IN ('pending', 'confirmed')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    const orders = (orderRows as any).rows ?? orderRows;
+    if (!orders.length) { res.status(404).json({ error: 'no_pending_order' }); return; }
+    const order_id = orders[0].id;
+
+    await db.execute(sql`
+      UPDATE market_orders_v2 SET status = 'collected', nfc_collected_at = now()
+      WHERE id = ${order_id}
+    `);
+
+    const itemRows = await db.execute(sql`
+      SELECT listing_id, listing_name, quantity, unit_price_cents
+      FROM market_order_items WHERE order_id = ${order_id}
+    `);
+    const items = (itemRows as any).rows ?? itemRows;
+    res.json({ ok: true, order_id, items });
+  } catch (err) {
+    logger.error('[market] POST /collect', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 10. GET /vendor/orders
+router.get('/vendor/orders', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const [vendor] = await db.select({ id: marketVendors.id })
+      .from(marketVendors).where(eq(marketVendors.user_id, userId));
+    if (!vendor) { res.status(403).json({ error: 'not_a_vendor' }); return; }
+    const rows = await db.execute(sql`
+      SELECT
+        moi.id, moi.listing_id, moi.listing_name, moi.quantity, moi.unit_price_cents,
+        mo.id AS order_id, mo.status AS order_status, mo.created_at AS ordered_at, mo.user_id AS buyer_user_id
+      FROM market_order_items moi
+      JOIN market_listings ml ON ml.id = moi.listing_id
+      JOIN market_orders_v2 mo ON mo.id = moi.order_id
+      WHERE ml.vendor_id = ${vendor.id}
+        AND mo.created_at > now() - interval '7 days'
+      ORDER BY mo.created_at DESC
+    `);
+    const result = (rows as any).rows ?? rows;
+    res.json(result);
+  } catch (err) {
+    logger.error('[market] GET /vendor/orders', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// 11. GET /vendors
+router.get('/vendors', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select({
+      id: marketVendors.id,
+      name: marketVendors.name,
+      description: marketVendors.description,
+      instagram_handle: marketVendors.instagram_handle,
+      created_at: marketVendors.created_at,
+    })
+    .from(marketVendors)
+    .where(eq(marketVendors.active, true))
+    .orderBy(marketVendors.name);
+    const vendors = (rows as any).rows ?? rows;
+    res.json(vendors);
+  } catch (err) {
+    logger.error('[market] GET /vendors', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
 
 // ─── Specific paths must be registered BEFORE /:id ───────────────────────────
 

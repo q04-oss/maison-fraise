@@ -20,7 +20,11 @@ export type PanelId =
   | 'collectif-detail'
   | 'collectif-create'
   | 'market'
-  | 'market-stall';
+  | 'market-stall'
+  | 'market-home'
+  | 'market-cart'
+  | 'market-orders'
+  | 'market-vendor';
 
 export interface OrderState {
   variety_id: number | null;
