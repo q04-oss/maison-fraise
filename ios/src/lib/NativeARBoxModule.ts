@@ -121,6 +121,9 @@ export interface ARVarietyData {
   farm_webcam_url?: string | null;
   ar_poem?: string | null;
   solar_data?: { irradiance_wm2: number; cloud_cover_pct: number; uv_index: number } | null;
+  // Social expanded
+  lot_companions?: Array<{ id: number; display_name: string; portrait_url: string | null; current_streak_weeks: number; social_tier: string | null }>;
+  streak_milestone?: boolean;
 }
 
 // Feature E: Staff AR

@@ -3024,6 +3024,65 @@ router.patch('/card-prints/:id/status', requirePin, async (req: Request, res: Re
   }
 });
 
+// POST /api/admin/migrate/social-expanded — add variety_reviews, tasting_feed_reactions, streak columns, variety_id on ar_videos
+router.post('/migrate/social-expanded', async (_req: Request, res: Response) => {
+  try {
+    // Streak columns on users
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS current_streak_weeks integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS longest_streak_weeks integer NOT NULL DEFAULT 0`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_tap_week text`);
+
+    // variety_id on ar_videos
+    await db.execute(sql`ALTER TABLE ar_videos ADD COLUMN IF NOT EXISTS variety_id integer REFERENCES varieties(id)`);
+
+    // variety_reviews
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS variety_reviews (
+        id serial PRIMARY KEY,
+        user_id integer NOT NULL REFERENCES users(id),
+        variety_id integer NOT NULL REFERENCES varieties(id),
+        rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
+        note text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (user_id, variety_id)
+      )
+    `);
+
+    // tasting_entries public flag
+    await db.execute(sql`ALTER TABLE tasting_entries ADD COLUMN IF NOT EXISTS public boolean NOT NULL DEFAULT false`);
+
+    // tasting_feed_reactions
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS tasting_feed_reactions (
+        id serial PRIMARY KEY,
+        entry_id integer NOT NULL REFERENCES tasting_entries(id) ON DELETE CASCADE,
+        user_id integer NOT NULL REFERENCES users(id),
+        emoji text NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        UNIQUE (entry_id, user_id, emoji)
+      )
+    `);
+
+    res.json({ ok: true, message: 'Social expanded migration complete' });
+  } catch (err) {
+    logger.error('[admin] migrate/social-expanded', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/admin/ar-videos/:id/variety — assign variety to an AR video
+router.patch('/ar-videos/:id/variety', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { variety_id } = req.body;
+  try {
+    await db.execute(sql`UPDATE ar_videos SET variety_id = ${variety_id ?? null} WHERE id = ${id}`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/admin/market-dates — create a market date
 router.post('/market-dates', requirePin, async (req: Request, res: Response) => {
   const { name, location, address, starts_at, ends_at, notes } = req.body;

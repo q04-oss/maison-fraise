@@ -4,7 +4,7 @@ import {
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchMyStats, updateDisplayName } from '../../lib/api';
+import { fetchMyStats, updateDisplayName, fetchBoxWall } from '../../lib/api';
 import { useSocialAccess } from '../SocialGate';
 import { getAverageVitaminCMgPerDay } from '../../lib/HealthKitService';
 
@@ -16,6 +16,7 @@ export default function MyProfilePanel() {
   const [stats, setStats] = useState<any>(null);
   const [fundBalance, setFundBalance] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [boxWallCount, setBoxWallCount] = useState<number | null>(null);
   const [vitaminCNudge, setVitaminCNudge] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -24,6 +25,9 @@ export default function MyProfilePanel() {
   useEffect(() => {
     fetchMyStats().catch(() => null).then(s => {
       setStats(s);
+      if (s?.id) {
+        fetchBoxWall(s.id).then(wall => setBoxWallCount(Array.isArray(wall) ? wall.length : 0)).catch(() => {});
+      }
     }).finally(() => setLoading(false));
 
     getAverageVitaminCMgPerDay(7).then(avg => {
@@ -145,6 +149,19 @@ export default function MyProfilePanel() {
             )}
           </View>
 
+          {/* Streak */}
+          {stats?.current_streak_weeks != null && stats.current_streak_weeks > 0 && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>STREAK</Text>
+              <Text style={[styles.balance, { color: c.text }]}>{stats.current_streak_weeks}w</Text>
+              <Text style={[styles.renewalLine, { color: c.muted }]}>
+                {stats.longest_streak_weeks > stats.current_streak_weeks
+                  ? `Personal best: ${stats.longest_streak_weeks} weeks`
+                  : 'Current personal best'}
+              </Text>
+            </View>
+          )}
+
           {/* Vitamin C nudge */}
           {vitaminCNudge && (
             <View style={[styles.nudgeCard, { borderColor: c.accent, backgroundColor: c.card }]}>
@@ -158,6 +175,24 @@ export default function MyProfilePanel() {
 
           {/* Quick nav */}
           <View style={styles.navList}>
+            {boxWallCount != null && boxWallCount > 0 && (
+              <TouchableOpacity
+                style={[styles.navRow, { borderBottomColor: c.border }]}
+                onPress={() => showPanel('user-profile', { userId: stats.id })}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.navLabel, { color: c.text }]}>Box Wall  ·  {boxWallCount}</Text>
+                <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.navRow, { borderBottomColor: c.border }]}
+              onPress={() => showPanel('tasting-feed')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.navLabel, { color: c.text }]}>Tasting Feed</Text>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
             {stats.evening_count > 0 && (
               <TouchableOpacity
                 style={[styles.navRow, { borderBottomColor: c.border }]}

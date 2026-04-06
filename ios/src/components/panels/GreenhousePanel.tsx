@@ -28,7 +28,9 @@ export default function GreenhousePanel() {
           <Text style={[styles.backText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: c.text }]}>GREENHOUSES</Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity onPress={() => showPanel('ar-video-feed')} activeOpacity={0.7} style={styles.backBtn}>
+          <Text style={{ color: c.accent, fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5, textAlign: 'right' }}>AR ▶</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (

@@ -71,11 +71,14 @@ router.get('/me/stats', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
   try {
     const [user] = await db.select({
+      id: users.id,
       ad_balance_cents: users.ad_balance_cents,
       display_name: users.display_name,
       user_code: users.user_code,
       portal_opted_in: users.portal_opted_in,
       verified: users.verified,
+      current_streak_weeks: users.current_streak_weeks,
+      longest_streak_weeks: users.longest_streak_weeks,
     }).from(users).where(eq(users.id, userId));
     if (!user) { res.status(404).json({ error: 'not_found' }); return; }
 
@@ -99,11 +102,14 @@ router.get('/me/stats', requireUser, async (req: Request, res: Response) => {
       .limit(1);
 
     res.json({
+      id: userId,
       ad_balance_cents: user.ad_balance_cents,
       display_name: user.display_name,
       user_code: user.user_code,
       portal_opted_in: user.portal_opted_in,
       verified: user.verified,
+      current_streak_weeks: user.current_streak_weeks ?? 0,
+      longest_streak_weeks: user.longest_streak_weeks ?? 0,
       evening_count: parseInt((eveningRow as any).count ?? '0', 10),
       portrait_count: parseInt((portraitRow as any).count ?? '0', 10),
       nfc_connection_count: parseInt((nfcRow as any).count ?? '0', 10),

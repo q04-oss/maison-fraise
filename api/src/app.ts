@@ -79,6 +79,7 @@ import collectifChallengesRouter from './routes/collectif-challenges';
 import coScansRouter from './routes/co-scans';
 import notificationsRouter from './routes/notifications';
 import arVideosRouter from './routes/ar-videos';
+import socialRouter from './routes/social';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, notifications } from './db/schema';
@@ -196,6 +197,7 @@ app.use('/api/collectif-challenges', collectifChallengesRouter);
 app.use('/api/co-scans', coScansRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/ar-videos', arVideosRouter);
+app.use('/api/social', socialRouter);
 app.use('/api/ar-poem', arPoemRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)

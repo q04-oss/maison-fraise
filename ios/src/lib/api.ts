@@ -3758,3 +3758,67 @@ export async function uploadARVideo(
   if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'upload_failed'); }
   return r.json();
 }
+
+// ─── Social feed ─────────────────────────────────────────────────────────────
+
+export async function fetchVarietyReviews(varietyId: number): Promise<{
+  reviews: any[];
+  avg_rating: number | null;
+  review_count: number;
+}> {
+  const r = await fetch(`${BASE_URL}/api/social/varieties/${varietyId}/reviews`);
+  if (!r.ok) return { reviews: [], avg_rating: null, review_count: 0 };
+  return r.json();
+}
+
+export async function submitVarietyReview(varietyId: number, rating: number, note?: string): Promise<void> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/social/varieties/${varietyId}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ rating, note: note ?? null }),
+  });
+  if (!r.ok) { const e = await r.json(); throw { status: r.status, ...e }; }
+}
+
+export async function fetchVarietyARVideos(varietyId: number): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/social/varieties/${varietyId}/ar-videos`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchLotCompanions(varietyId: number): Promise<any[]> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/social/varieties/${varietyId}/companions`, { headers });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchTastingFeed(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/social/tasting-feed`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function reactToTastingEntry(entryId: number, emoji: string): Promise<{ reacted: boolean }> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/social/tasting-feed/${entryId}/react`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ emoji }),
+  });
+  if (!r.ok) throw new Error('react_failed');
+  return r.json();
+}
+
+export async function fetchBoxWall(userId: number): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/social/users/${userId}/box-wall`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchHarvestDispatches(): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/social/harvest-dispatches`);
+  if (!r.ok) return [];
+  return r.json();
+}
