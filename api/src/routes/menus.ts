@@ -82,6 +82,8 @@ function generateMenu(profile: HealthProfile): Course[] {
   // Main
   if (isVegan) {
     courses.push({ course: 'Main', dish: 'Koji-aged celeriac steak, black garlic jus, compressed pear, watercress, ' + (noNuts ? 'toasted pumpkin seed' : 'walnut'), rationale: 'Koji fermentation produces the same glutamate density as aged meat without animal protein. Black garlic provides 2x the allicin of raw garlic alongside prebiotic fructans. This is the course where the meal earns its depth.' });
+  } else if (isVegetarian && highStress) {
+    courses.push({ course: 'Main', dish: 'Stress-optimised mushroom & miso pot, silken tofu, ' + (isGlutenFree ? 'buckwheat soba' : 'soba') + ' noodles, pickled ginger, nori, sesame oil', rationale: 'Magnesium-dense silken tofu and L-theanine in the dashi directly counter cortisol load. Ginger\'s gingerols reduce the inflammatory component of the stress response. For vegetarian guests with high stress markers, recovery takes precedence over the Wellington\'s structural richness.' });
   } else if (isVegetarian) {
     courses.push({ course: 'Main', dish: 'Wild mushroom & chestnut Wellington' + (isGlutenFree ? ' (GF pastry)' : '') + ', celeriac purée, pickled walnut jus' + (noNuts ? ' (omit walnut, add tamarind jus)' : ''), rationale: 'Mixed mushroom proteins alongside chestnut provide complete amino acid coverage unusual in vegetarian mains. The Wellington format is structurally satisfying — the meal\'s centre of gravity.' });
   } else if (highStress) {

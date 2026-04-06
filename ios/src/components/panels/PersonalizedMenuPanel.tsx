@@ -11,7 +11,7 @@ export default function PersonalizedMenuPanel() {
   const { goBack, panelData } = usePanel();
   const c = useColors();
 
-  const businessId: number = panelData?.businessId;
+  const businessId: number | undefined = panelData?.businessId;
   const businessName: string = panelData?.businessName ?? 'this restaurant';
 
   const [loading, setLoading] = useState(true);
@@ -33,6 +33,17 @@ export default function PersonalizedMenuPanel() {
   };
 
   useEffect(() => { load(); }, []);
+
+  if (businessId === undefined) {
+    return (
+      <View style={[styles.container, { backgroundColor: c.panelBg, alignItems: 'center', justifyContent: 'center' }]}>
+        <Text style={{ color: c.muted, fontFamily: fonts.dmSans, fontSize: 14 }}>No restaurant selected.</Text>
+        <TouchableOpacity onPress={goBack} style={{ marginTop: 16 }}>
+          <Text style={{ color: c.accent, fontFamily: fonts.dmMono, fontSize: 13 }}>← back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const handleGenerate = async () => {
     setGenerating(true);

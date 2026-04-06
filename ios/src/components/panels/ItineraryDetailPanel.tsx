@@ -16,7 +16,7 @@ export default function ItineraryDetailPanel() {
   const { goBack, panelData } = usePanel();
   const c = useColors();
 
-  const itineraryId: number = panelData?.itineraryId;
+  const itineraryId: number | undefined = panelData?.itineraryId;
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [screen, setScreen] = useState<Screen>('view');
@@ -30,12 +30,24 @@ export default function ItineraryDetailPanel() {
   const [saving, setSaving] = useState(false);
 
   const load = async () => {
+    if (!itineraryId) return;
     setLoading(true);
     try { setData(await fetchItineraryDetail(itineraryId)); } catch { /* ignore */ }
     finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
+
+  if (itineraryId === undefined) {
+    return (
+      <View style={[{ flex: 1, alignItems: 'center', justifyContent: 'center' }, { backgroundColor: c.panelBg }]}>
+        <Text style={{ color: c.muted, fontFamily: fonts.dmSans, fontSize: 14 }}>No itinerary selected.</Text>
+        <TouchableOpacity onPress={goBack} style={{ marginTop: 16 }}>
+          <Text style={{ color: c.accent, fontFamily: fonts.dmMono, fontSize: 13 }}>← back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const handleAddDest = async () => {
     if (!placeName.trim() || !city.trim() || !country.trim()) {
