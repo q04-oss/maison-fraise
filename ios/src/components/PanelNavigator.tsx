@@ -90,7 +90,6 @@ import DjOfferPanel from './panels/DjOfferPanel';
 import NominationPanel from './panels/NominationPanel';
 import NominationHistoryPanel from './panels/NominationHistoryPanel';
 import CampaignCommissionPanel from './panels/CampaignCommissionPanel';
-import MembershipPanel from './panels/MembershipPanel';
 import NotificationsPanel from './panels/NotificationsPanel';
 import UserProfilePanel from './panels/UserProfilePanel';
 import TastingJournalPanel from './panels/TastingJournalPanel';
@@ -187,7 +186,6 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'nomination': NominationPanel,
   'nomination-history': NominationHistoryPanel,
   'campaign-commission': CampaignCommissionPanel,
-  'membership': MembershipPanel,
   'notifications': NotificationsPanel,
   'user-profile': UserProfilePanel,
   'tasting-journal': TastingJournalPanel,
@@ -262,7 +260,6 @@ const FULL_HEIGHT_PANELS = new Set([
   'nomination',
   'nomination-history',
   'campaign-commission',
-  'membership',
   'notifications',
   'user-profile',
   'tasting-journal',

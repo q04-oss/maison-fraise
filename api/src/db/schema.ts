@@ -66,6 +66,8 @@ export const campaignSignupStatusEnum = pgEnum('campaign_signup_status', [
   'completed',
 ]);
 
+export const socialTierEnum = pgEnum('social_tier', ['standard', 'reserve', 'estate']);
+
 export const varieties = pgTable('varieties', {
   id: serial('id').primaryKey(),
   name: text('name').notNull(),
@@ -81,6 +83,7 @@ export const varieties = pgTable('varieties', {
   active: boolean('active').notNull().default(true),
   variety_type: text('variety_type').notNull().default('strawberry'), // 'strawberry' | 'chocolate'
   sort_order: integer('sort_order').notNull().default(0),
+  social_tier: socialTierEnum('social_tier'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
@@ -180,6 +183,7 @@ export const users = pgTable('users', {
   stripe_connect_onboarded: boolean('stripe_connect_onboarded').notNull().default(false),
   ad_balance_cents: integer('ad_balance_cents').notNull().default(0),
   social_access_expires_at: timestamp('social_access_expires_at'),
+  social_tier: socialTierEnum('social_tier'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

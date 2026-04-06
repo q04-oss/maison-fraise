@@ -40,13 +40,14 @@ router.get('/me/social-access', requireUser, async (req: Request, res: Response)
   const user_id = (req as any).userId as number;
   try {
     const [user] = await db
-      .select({ social_access_expires_at: users.social_access_expires_at })
+      .select({ social_access_expires_at: users.social_access_expires_at, social_tier: users.social_tier })
       .from(users)
       .where(eq(users.id, user_id))
       .limit(1);
     const expires_at = user?.social_access_expires_at ?? null;
     const active = expires_at !== null && expires_at > new Date();
-    res.json({ active, expires_at });
+    const tier = active ? (user?.social_tier ?? null) : null;
+    res.json({ active, expires_at, tier });
   } catch {
     res.status(500).json({ error: 'internal_error' });
   }

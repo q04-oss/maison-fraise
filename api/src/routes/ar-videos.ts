@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db';
-import { arVideos, users, earningsLedger, memberships } from '../db/schema';
+import { arVideos, users, earningsLedger } from '../db/schema';
+
+const TIER_COMMISSION_RATE: Record<string, number> = { estate: 0.80, reserve: 0.75, standard: 0.70 };
+function tierRate(tier: string | null): number { return TIER_COMMISSION_RATE[tier ?? ''] ?? 0.70; }
 import { requireUser } from '../lib/auth';
 import { uploadMedia } from '../lib/upload';
 import { logger } from '../lib/logger';
@@ -101,7 +104,7 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
 
   try {
     const [user] = await db
-      .select({ social_access_expires_at: users.social_access_expires_at })
+      .select({ social_access_expires_at: users.social_access_expires_at, social_tier: users.social_tier })
       .from(users)
       .where(eq(users.id, userId))
       .limit(1);
@@ -110,15 +113,8 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
       res.status(403).json({ error: 'social_access_required', message: 'Tap your next box to unlock social access.' });
       return;
     }
-
-    const [activeMembership] = await db
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(and(eq(memberships.user_id, userId), eq(memberships.status, 'active')))
-      .limit(1);
-
-    if (!activeMembership) {
-      res.status(403).json({ error: 'membership_required' });
+    if (user.social_tier !== 'reserve' && user.social_tier !== 'estate') {
+      res.status(403).json({ error: 'tier_required', message: 'Reserve or estate grade required to pitch AR videos.' });
       return;
     }
 
@@ -341,6 +337,14 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
     if (!v) { res.status(404).json({ error: 'not_found' }); return; }
     if (v.status !== 'submitted') { res.status(409).json({ error: 'wrong_status' }); return; }
 
+    // Read author's current tier to apply commission rate
+    const [author] = await db
+      .select({ social_tier: users.social_tier })
+      .from(users)
+      .where(eq(users.id, v.author_user_id))
+      .limit(1);
+    const rate = tierRate(author?.social_tier ?? null);
+
     await db.update(arVideos).set({
       status: 'published',
       published_at: new Date(),
@@ -350,11 +354,12 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
     }).where(eq(arVideos.id, id));
 
     if (commission_cents && typeof commission_cents === 'number' && commission_cents > 0) {
+      const payout = Math.round(commission_cents * rate);
       await db.insert(earningsLedger).values({
         user_id: v.author_user_id,
-        amount_cents: commission_cents,
+        amount_cents: payout,
         type: 'credit',
-        description: `AR video commission — #${id}`,
+        description: `AR video commission — #${id} (${Math.round(rate * 100)}% tier rate)`,
       });
     }
 

@@ -63,8 +63,8 @@ function AbstractForm({ onSubmitted }: { onSubmitted: () => void }) {
     } catch (err: any) {
       if (err?.error === 'social_access_required') {
         Alert.alert('NFC tap required', 'Tap a box of strawberries to unlock the social platform.');
-      } else if (err?.error === 'membership_required') {
-        Alert.alert('Membership required', 'Active membership required.');
+      } else if (err?.error === 'tier_required') {
+        Alert.alert('Grade required', 'Reserve or estate grade required. Tap a box of reserve or estate strawberries to unlock.');
       } else if (err?.error === 'abstract_pending') {
         onSubmitted();
       } else {

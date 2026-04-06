@@ -59,8 +59,8 @@ function AbstractForm({ onSubmitted }: { onSubmitted: () => void }) {
       await submitAbstract(abstract.trim(), selectedTag);
       onSubmitted();
     } catch (err: any) {
-      if (err?.error === 'membership_required') {
-        Alert.alert('Membership required', 'An active membership is required to pitch editorial pieces.');
+      if (err?.error === 'tier_required') {
+        Alert.alert('Grade required', 'Reserve or estate grade required. Tap a box of reserve or estate strawberries to unlock.');
       } else if (err?.error === 'abstract_pending') {
         Alert.alert('Already submitted', 'You already have an abstract under consideration.');
         onSubmitted();

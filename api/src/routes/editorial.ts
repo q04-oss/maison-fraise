@@ -1,7 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, desc, ilike, or } from 'drizzle-orm';
 import { db } from '../db';
-import { editorialPieces, memberships, users, earningsLedger } from '../db/schema';
+import { editorialPieces, users, earningsLedger } from '../db/schema';
+
+const TIER_COMMISSION_RATE: Record<string, number> = { estate: 0.80, reserve: 0.75, standard: 0.70 };
+function tierRate(tier: string | null): number { return TIER_COMMISSION_RATE[tier ?? ''] ?? 0.70; }
 import { requireUser } from '../lib/auth';
 
 const router = Router();
@@ -99,7 +102,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 
 // ─── User actions ─────────────────────────────────────────────────────────────
 
-// POST /api/editorial/abstract — pitch an abstract (requireUser + active membership)
+// POST /api/editorial/abstract — pitch an abstract (requireUser + reserve or estate tier)
 router.post('/abstract', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   const { abstract, tag } = req.body;
@@ -110,14 +113,18 @@ router.post('/abstract', requireUser, async (req: Request, res: Response) => {
   }
 
   try {
-    const [activeMembership] = await db
-      .select({ id: memberships.id })
-      .from(memberships)
-      .where(and(eq(memberships.user_id, userId), eq(memberships.status, 'active')))
+    const [user] = await db
+      .select({ social_access_expires_at: users.social_access_expires_at, social_tier: users.social_tier })
+      .from(users)
+      .where(eq(users.id, userId))
       .limit(1);
 
-    if (!activeMembership) {
-      res.status(403).json({ error: 'membership_required' });
+    if (!user?.social_access_expires_at || user.social_access_expires_at < new Date()) {
+      res.status(403).json({ error: 'social_access_required', message: 'Tap a box to unlock social access.' });
+      return;
+    }
+    if (user.social_tier !== 'reserve' && user.social_tier !== 'estate') {
+      res.status(403).json({ error: 'tier_required', message: 'Reserve or estate grade required to pitch editorial pieces.' });
       return;
     }
 
@@ -334,6 +341,14 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
       res.status(409).json({ error: 'wrong_status' }); return;
     }
 
+    // Read author's current tier to apply commission rate
+    const [author] = await db
+      .select({ social_tier: users.social_tier })
+      .from(users)
+      .where(eq(users.id, piece.author_user_id))
+      .limit(1);
+    const rate = tierRate(author?.social_tier ?? null);
+
     await db
       .update(editorialPieces)
       .set({
@@ -346,11 +361,12 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
       .where(eq(editorialPieces.id, id));
 
     if (commission_cents && typeof commission_cents === 'number' && commission_cents > 0) {
+      const payout = Math.round(commission_cents * rate);
       await db.insert(earningsLedger).values({
         user_id: piece.author_user_id,
-        amount_cents: commission_cents,
+        amount_cents: payout,
         type: 'credit',
-        description: `Editorial commission — piece #${id}`,
+        description: `Editorial commission — piece #${id} (${Math.round(rate * 100)}% tier rate)`,
       });
     }
 

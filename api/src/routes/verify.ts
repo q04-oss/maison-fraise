@@ -31,6 +31,11 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj }).from(users).where(eq(users.id, user_id));
     const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
 
+    // Read variety's social tier before transaction
+    const [varietyTierRow] = await db.select({ social_tier: varieties.social_tier })
+      .from(varieties).where(eq(varieties.id, order.variety_id));
+    const varietySocialTier = varietyTierRow?.social_tier ?? null;
+
     await db.transaction(async (tx) => {
       // Atomic claim: only succeeds if nfc_token_used is still false
       const [claimed] = await tx.update(orders)
@@ -42,7 +47,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
         throw Object.assign(new Error('already_used'), { code: 'already_used' });
       }
 
-      // Social access window: 30 days from NFC tap
+      // Social access window: 30 days from NFC tap; tier from variety grade
       const socialExpiry = new Date(now);
       socialExpiry.setDate(socialExpiry.getDate() + 30);
 
@@ -52,6 +57,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
           verified_at: now,
           verified_by: 'nfc',
           social_access_expires_at: socialExpiry,
+          social_tier: varietySocialTier,
           ...(fraiseChatEmail ? { fraise_chat_email: fraiseChatEmail } : {}),
         })
         .where(eq(users.id, user_id));

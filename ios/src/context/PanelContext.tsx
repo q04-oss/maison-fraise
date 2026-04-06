@@ -90,7 +90,6 @@ export type PanelId =
   | 'nomination'
   | 'nomination-history'
   | 'campaign-commission'
-  | 'membership'
   | 'notifications'
   | 'user-profile'
   | 'tasting-journal'

@@ -24,7 +24,7 @@ import popupRequestsRouter from './routes/popup-requests';
 import campaignCommissionsRouter from './routes/campaign-commissions';
 import contractsRouter from './routes/contracts';
 import searchRouter from './routes/search';
-import { membershipsRouter, membersRouter, fundRouter } from './routes/memberships';
+import { membersRouter, fundRouter } from './routes/memberships';
 import editorialRouter from './routes/editorial';
 import nfcRouter, { contactsRouter } from './routes/nfc';
 import portalRouter from './routes/portal';
@@ -81,8 +81,8 @@ import notificationsRouter from './routes/notifications';
 import arVideosRouter from './routes/ar-videos';
 import { logger } from './lib/logger';
 import { db } from './db';
-import { editorialPieces, users, memberships, notifications } from './db/schema';
-import { eq, and, desc, lte, sql } from 'drizzle-orm';
+import { editorialPieces, users, notifications } from './db/schema';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { sendPushNotification } from './lib/push';
 import { requireUser } from './lib/auth';
 import { uploadMedia } from './lib/upload';
@@ -140,7 +140,6 @@ app.use('/api/popup-requests', popupRequestsRouter);
 app.use('/api/campaign-commissions', campaignCommissionsRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/search', searchRouter);
-app.use('/api/memberships', membershipsRouter);
 app.use('/api/members', membersRouter);
 app.use('/api/fund', fundRouter);
 app.use('/api/editorial', editorialRouter);
@@ -366,79 +365,6 @@ app.get('/members/:username', async (req, res) => {
     </div></body></html>`);
   } catch (e) { res.status(500).send('<h1>Error</h1>'); }
 });
-
-// ─── Membership expiry + renewal warning job (runs every 6 hours) ─────────────
-async function runMembershipJob() {
-  try {
-    const now = new Date();
-
-    // 1. Expire overdue memberships
-    const expired = await db
-      .update(memberships)
-      .set({ status: 'expired' })
-      .where(and(eq(memberships.status, 'active'), lte(memberships.renews_at, now)))
-      .returning({ user_id: memberships.user_id, tier: memberships.tier });
-
-    for (const m of expired) {
-      const [user] = await db.select({ push_token: users.push_token }).from(users).where(eq(users.id, m.user_id));
-      await db.insert(notifications).values({
-        user_id: m.user_id,
-        type: 'membership_expired',
-        title: 'Membership expired',
-        body: 'Your membership has expired. Renew to keep access.',
-        data: { screen: 'membership' },
-      });
-      if (user?.push_token) {
-        sendPushNotification(user.push_token, {
-          title: 'Your membership has expired',
-          body: 'Renew to keep access.',
-          data: { screen: 'membership' },
-        }).catch(() => {});
-      }
-    }
-
-    // 2. Warn members expiring in 7 days (once — check renewal_notified_at)
-    const in7 = new Date(now);
-    in7.setDate(in7.getDate() + 7);
-    const expiringSoon = await db
-      .select({ user_id: memberships.user_id, tier: memberships.tier, renews_at: memberships.renews_at })
-      .from(memberships)
-      .where(and(
-        eq(memberships.status, 'active'),
-        lte(memberships.renews_at, in7),
-        sql`renews_at > ${now}`,
-        sql`renewal_notified_at IS NULL`,
-      ));
-
-    for (const m of expiringSoon) {
-      await db
-        .update(memberships)
-        .set({ renewal_notified_at: now })
-        .where(and(eq(memberships.user_id, m.user_id), eq(memberships.status, 'active')));
-
-      const [user] = await db.select({ push_token: users.push_token }).from(users).where(eq(users.id, m.user_id));
-      await db.insert(notifications).values({
-        user_id: m.user_id,
-        type: 'membership_expiring',
-        title: 'Membership expiring soon',
-        body: 'Your membership expires in 7 days. Renew to avoid interruption.',
-        data: { screen: 'membership' },
-      });
-      if (user?.push_token) {
-        sendPushNotification(user.push_token, {
-          title: 'Membership expiring soon',
-          body: 'Your membership expires in 7 days.',
-          data: { screen: 'membership' },
-        }).catch(() => {});
-      }
-    }
-  } catch (err) {
-    logger.error('Membership job error', err);
-  }
-}
-
-setInterval(runMembershipJob, 6 * 60 * 60 * 1000);
-setTimeout(runMembershipJob, 30_000); // run shortly after startup
 
 // Sentry error handler — must be after all routes
 app.use(Sentry.expressErrorHandler());

@@ -4,7 +4,8 @@ import {
 } from 'react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchMyStats, fetchMyMembership, updateDisplayName } from '../../lib/api';
+import { fetchMyStats, updateDisplayName } from '../../lib/api';
+import { useSocialAccess } from '../SocialGate';
 import { getAverageVitaminCMgPerDay } from '../../lib/HealthKitService';
 
 function formatDate(iso: string | null) {
@@ -20,8 +21,8 @@ function daysUntil(iso: string | null): number {
 export default function MyProfilePanel() {
   const { goBack, showPanel } = usePanel();
   const c = useColors();
+  const { active: socialActive, tier: socialTier, expires_at: socialExpiry } = useSocialAccess();
   const [stats, setStats] = useState<any>(null);
-  const [membership, setMembership] = useState<any>(null);
   const [fundBalance, setFundBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [vitaminCNudge, setVitaminCNudge] = useState(false);
@@ -30,15 +31,8 @@ export default function MyProfilePanel() {
   const [savingName, setSavingName] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      fetchMyStats().catch(() => null),
-      fetchMyMembership().catch(() => null),
-    ]).then(([s, m]) => {
+    fetchMyStats().catch(() => null).then(s => {
       setStats(s);
-      if (m) {
-        setMembership(m.membership);
-        setFundBalance(m.fund?.balance_cents ?? 0);
-      }
     }).finally(() => setLoading(false));
 
     getAverageVitaminCMgPerDay(7).then(avg => {
@@ -60,8 +54,9 @@ export default function MyProfilePanel() {
     }
   };
 
-  const renewalDays = daysUntil(membership?.renews_at ?? null);
-  const showRenewalWarning = membership && renewalDays <= 30;
+  const accessDaysLeft = daysUntil(socialExpiry);
+  const accessExpiringSoon = socialActive && accessDaysLeft <= 7;
+  const TIER_LABELS: Record<string, string> = { standard: 'Standard', reserve: 'Reserve', estate: 'Estate' };
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
@@ -112,9 +107,9 @@ export default function MyProfilePanel() {
             {stats.user_code && stats.display_name && (
               <Text style={[styles.code, { color: c.muted }]}>{stats.user_code}</Text>
             )}
-            {membership?.tier && (
+            {socialActive && socialTier && (
               <Text style={[styles.tier, { color: c.accent }]}>
-                {membership.tier.charAt(0).toUpperCase() + membership.tier.slice(1)} member
+                {TIER_LABELS[socialTier] ?? socialTier}
               </Text>
             )}
           </View>
@@ -135,30 +130,25 @@ export default function MyProfilePanel() {
             </View>
           </View>
 
-          {/* Membership + fund */}
-          <TouchableOpacity
-            style={[styles.section, { borderBottomColor: c.border }]}
-            onPress={() => showPanel('membership')}
-            activeOpacity={0.8}
-          >
+          {/* Social access + fund */}
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
             <View style={styles.sectionRow}>
               <Text style={[styles.sectionLabel, { color: c.muted }]}>FUND BALANCE</Text>
-              <Text style={[styles.chevron, { color: c.accent }]}>→</Text>
             </View>
             <Text style={[styles.balance, { color: c.text }]}>
               CA${(fundBalance / 100).toLocaleString('en-CA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>
-            {membership?.renews_at && (
-              <Text style={[styles.renewalLine, { color: showRenewalWarning ? c.accent : c.muted }]}>
-                {showRenewalWarning
-                  ? `Renews in ${renewalDays} day${renewalDays === 1 ? '' : 's'} — tap to manage`
-                  : `Renews ${formatDate(membership.renews_at)}`}
+            {socialActive && socialExpiry && (
+              <Text style={[styles.renewalLine, { color: accessExpiringSoon ? c.accent : c.muted }]}>
+                {accessExpiringSoon
+                  ? `Access expires in ${accessDaysLeft} day${accessDaysLeft === 1 ? '' : 's'} — tap a new box`
+                  : `Access expires ${formatDate(socialExpiry)}`}
               </Text>
             )}
-            {!membership && (
-              <Text style={[styles.renewalLine, { color: c.muted }]}>No active membership — tap to join</Text>
+            {!socialActive && (
+              <Text style={[styles.renewalLine, { color: c.muted }]}>No active access — tap a box to unlock</Text>
             )}
-          </TouchableOpacity>
+          </View>
 
           {/* Vitamin C nudge */}
           {vitaminCNudge && (

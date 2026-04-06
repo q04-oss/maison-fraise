@@ -1113,6 +1113,17 @@ router.post('/migrate', async (_req: Request, res: Response) => {
 
     // Social access + AR video platform
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_access_expires_at TIMESTAMP`);
+
+    // Grade tier system
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'social_tier') THEN
+          CREATE TYPE social_tier AS ENUM ('standard', 'reserve', 'estate');
+        END IF;
+      END $$
+    `);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS social_tier social_tier`);
+    await db.execute(sql`ALTER TABLE varieties ADD COLUMN IF NOT EXISTS social_tier social_tier`);
     await db.execute(sql`
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ar_video_status') THEN
