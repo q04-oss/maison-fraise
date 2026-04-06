@@ -12,6 +12,17 @@ export interface TodayHealthContext {
   steps: number;
 }
 
+// Nutritional values per single strawberry (~12g, medium)
+const PER_STRAWBERRY = {
+  energy_kcal: 4,
+  carbs_g: 0.9,
+  sugar_g: 0.6,
+  fiber_g: 0.2,
+  vitamin_c_mg: 7,
+  protein_g: 0.08,
+  fat_g: 0.04,
+};
+
 export async function requestHealthKitPermissions(): Promise<boolean> {
   try {
     await HealthKit.requestAuthorization({
@@ -25,7 +36,44 @@ export async function requestHealthKitPermissions(): Promise<boolean> {
         'dietaryFiber',
         'stepCount',
       ],
+      share: [
+        'dietaryEnergyConsumed',
+        'dietaryProtein',
+        'dietaryCarbohydrates',
+        'dietaryFatTotal',
+        'dietarySugar',
+        'dietaryFiber',
+        'dietaryVitaminC',
+      ],
     });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Log strawberry consumption to HealthKit. quantity = number of individual strawberries.
+// Returns true if logged successfully, false if HealthKit unavailable or permission denied.
+export async function logStrawberries(quantity: number): Promise<boolean> {
+  if (quantity <= 0) return false;
+  const now = new Date();
+
+  const nutrients: Array<[string, string, number]> = [
+    ['dietaryEnergyConsumed',  'kcal', PER_STRAWBERRY.energy_kcal * quantity],
+    ['dietaryCarbohydrates',   'g',    PER_STRAWBERRY.carbs_g    * quantity],
+    ['dietarySugar',           'g',    PER_STRAWBERRY.sugar_g    * quantity],
+    ['dietaryFiber',           'g',    PER_STRAWBERRY.fiber_g    * quantity],
+    ['dietaryVitaminC',        'mg',   PER_STRAWBERRY.vitamin_c_mg * quantity],
+    ['dietaryProtein',         'g',    PER_STRAWBERRY.protein_g  * quantity],
+    ['dietaryFatTotal',        'g',    PER_STRAWBERRY.fat_g      * quantity],
+  ];
+
+  try {
+    await Promise.all(
+      nutrients.map(([type, unit, value]) =>
+        HealthKit.saveQuantitySample(type, unit, value, { startDate: now, endDate: now })
+      )
+    );
     return true;
   } catch {
     return false;

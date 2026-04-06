@@ -10,6 +10,7 @@ import { useStripe } from '@stripe/stripe-react-native';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchThread, sendMessage, acceptOffer, confirmOfferPayment, fetchNearbyJobs, applyForJob, JobPosting, acceptDinnerInvite, declineDinnerInvite, confirmEveningToken } from '../../lib/api';
+import { logStrawberries } from '../../lib/HealthKitService';
 import { useApp } from '../../../App';
 
 export default function MessageThreadPanel() {
@@ -40,6 +41,7 @@ export default function MessageThreadPanel() {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [appliedJobIds, setAppliedJobIds] = useState<Set<number>>(new Set());
   const [applyingJobId, setApplyingJobId] = useState<number | null>(null);
+  const [loggedHealthIds, setLoggedHealthIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_db_id', 'user_email']).then(pairs => {
@@ -444,6 +446,7 @@ export default function MessageThreadPanel() {
 
             if (item.type === 'gift_confirm') {
               const meta = item.metadata ?? {};
+              const alreadyLogged = loggedHealthIds.has(item.id);
               return (
                 <View style={[styles.confirmCard, { borderColor: c.border }]}>
                   <Text style={[styles.offerLabel, { color: c.accent }]}>gift for you</Text>
@@ -451,6 +454,25 @@ export default function MessageThreadPanel() {
                   <Text style={[styles.offerDetail, { color: c.muted }]}>{meta.slot_date} · {meta.slot_time}</Text>
                   {meta.nfc_token && (
                     <Text style={[styles.offerDetail, { color: c.accent, letterSpacing: 2 }]}>{meta.nfc_token}</Text>
+                  )}
+                  {alreadyLogged ? (
+                    <Text style={[styles.offerDetail, { color: c.muted }]}>logged to Health ✓</Text>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={async () => {
+                        const qty = parseInt(String(meta.quantity), 10);
+                        const ok = await logStrawberries(qty);
+                        if (ok) {
+                          setLoggedHealthIds(prev => new Set([...prev, item.id]));
+                        } else {
+                          Alert.alert('Health not available', 'Could not log to Apple Health. Check permissions in Settings.');
+                        }
+                      }}
+                      activeOpacity={0.7}
+                      style={[styles.offerBtn, { borderColor: c.border, marginTop: 8 }]}
+                    >
+                      <Text style={[styles.offerBtnText, { color: c.accent }]}>log {meta.quantity} strawberries to Health</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
               );
