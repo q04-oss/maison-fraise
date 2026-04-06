@@ -7,6 +7,7 @@ const MODULE_FILES = [
   'ARBoxModule.swift',
   'ARBoxViewController.swift',
   'ARCardView.swift',
+  'ARGiftCardView.swift',
   'ARStaffOverlay.swift',
   'ARMarketStallCardView.swift',
 ];

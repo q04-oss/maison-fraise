@@ -27,7 +27,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
 
     const now = new Date();
 
-    const [currentUser] = await db.select({ user_code: users.user_code }).from(users).where(eq(users.id, user_id));
+    const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj }).from(users).where(eq(users.id, user_id));
     const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
 
     await db.transaction(async (tx) => {
@@ -79,7 +79,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
-    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity, variety_id: order.variety_id, variety_name: variety?.name ?? null, farm: variety?.source_farm ?? null, harvest_date: variety?.harvest_date ?? null });
+    res.json({ verified: true, user_id, fraise_chat_email: fraiseChatEmail, is_dj: currentUser?.is_dj ?? false, unlocked: ['standing_orders', 'campaigns'], quantity: order.quantity, variety_id: order.variety_id, variety_name: variety?.name ?? null, farm: variety?.source_farm ?? null, harvest_date: variety?.harvest_date ?? null });
   } catch (err: any) {
     if (err?.code === 'already_used') {
       res.status(403).json({ error: 'This token is invalid or has already been used.' });
