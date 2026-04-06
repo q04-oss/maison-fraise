@@ -639,15 +639,18 @@ export const fundContributions = pgTable('fund_contributions', {
 });
 
 export const editorialStatusEnum = pgEnum('editorial_status', [
-  'draft', 'submitted', 'commissioned', 'published', 'declined'
+  'abstract_submitted', 'abstract_declined',
+  'commissioned',
+  'draft', 'submitted', 'published', 'declined'
 ]);
 
 export const editorialPieces = pgTable('editorial_pieces', {
   id: serial('id').primaryKey(),
   author_user_id: integer('author_user_id').notNull().references(() => users.id),
-  title: text('title').notNull(),
-  body: text('body').notNull(),
-  status: editorialStatusEnum('status').notNull().default('draft'),
+  abstract: text('abstract'),
+  title: text('title'),
+  body: text('body'),
+  status: editorialStatusEnum('status').notNull().default('abstract_submitted'),
   commission_cents: integer('commission_cents'),
   published_at: timestamp('published_at'),
   editor_note: text('editor_note'),

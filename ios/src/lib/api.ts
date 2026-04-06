@@ -894,11 +894,21 @@ export async function fetchEditorialPiece(id: number): Promise<any | null> {
   return r.json();
 }
 
-export async function submitEditorialPiece(title: string, body: string, tag?: string | null): Promise<any> {
+export async function submitAbstract(abstract: string, tag?: string | null): Promise<any> {
   const headers = await authHeader();
-  const r = await fetch(`${BASE_URL}/api/editorial`, {
+  const r = await fetch(`${BASE_URL}/api/editorial/abstract`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
-    body: JSON.stringify({ title, body, ...(tag ? { tag } : {}) }),
+    body: JSON.stringify({ abstract, ...(tag ? { tag } : {}) }),
+  });
+  if (!r.ok) { const e = await r.json(); throw { status: r.status, ...(e) }; }
+  return r.json();
+}
+
+export async function submitFullPiece(pieceId: number, title: string, body: string): Promise<any> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/editorial/${pieceId}/write`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ title, body }),
   });
   if (!r.ok) { const e = await r.json(); throw new Error(e.error ?? 'failed'); }
   return r.json();

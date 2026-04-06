@@ -1,12 +1,15 @@
 import { Router, Request, Response } from 'express';
-import { eq, and, desc, ilike, or, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, ilike, or } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import { db } from '../db';
-import { editorialPieces, memberships, users } from '../db/schema';
+import { editorialPieces, memberships, users, earningsLedger, membershipFunds } from '../db/schema';
 import { requireUser } from '../lib/auth';
 
 const router = Router();
 
-// GET /api/editorial — all published pieces; optional ?q= search, ?tag= filter
+// ─── Public ───────────────────────────────────────────────────────────────────
+
+// GET /api/editorial — published feed; ?q= search, ?tag= filter
 router.get('/', async (req: Request, res: Response) => {
   try {
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : undefined;
@@ -35,23 +38,33 @@ router.get('/', async (req: Request, res: Response) => {
       .orderBy(desc(editorialPieces.published_at));
 
     res.json(rows);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'internal_error' });
   }
 });
 
-// GET /api/editorial/mine — all pieces by current user (requireUser)
+// GET /api/editorial/mine — all pieces by current user
 router.get('/mine', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   try {
     const rows = await db
-      .select()
+      .select({
+        id: editorialPieces.id,
+        abstract: editorialPieces.abstract,
+        title: editorialPieces.title,
+        status: editorialPieces.status,
+        tag: editorialPieces.tag,
+        editor_note: editorialPieces.editor_note,
+        commission_cents: editorialPieces.commission_cents,
+        published_at: editorialPieces.published_at,
+        created_at: editorialPieces.created_at,
+      })
       .from(editorialPieces)
       .where(eq(editorialPieces.author_user_id, userId))
       .orderBy(desc(editorialPieces.created_at));
 
     res.json(rows);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'internal_error' });
   }
 });
@@ -59,10 +72,7 @@ router.get('/mine', requireUser, async (req: Request, res: Response) => {
 // GET /api/editorial/:id — full piece (published only)
 router.get('/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: 'invalid_id' });
-    return;
-  }
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
 
   try {
     const [piece] = await db
@@ -74,35 +84,28 @@ router.get('/:id', async (req: Request, res: Response) => {
         published_at: editorialPieces.published_at,
         commission_cents: editorialPieces.commission_cents,
         tag: editorialPieces.tag,
-        status: editorialPieces.status,
       })
       .from(editorialPieces)
       .leftJoin(users, eq(editorialPieces.author_user_id, users.id))
       .where(and(eq(editorialPieces.id, id), eq(editorialPieces.status, 'published')))
       .limit(1);
 
-    if (!piece) {
-      res.status(404).json({ error: 'not_found' });
-      return;
-    }
-
+    if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
     res.json(piece);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'internal_error' });
   }
 });
 
-// POST /api/editorial — submit new piece (requireUser + active membership)
-router.post('/', requireUser, async (req: Request, res: Response) => {
-  const userId: number = (req as any).userId;
-  const { title, body, tag } = req.body;
+// ─── User actions ─────────────────────────────────────────────────────────────
 
-  if (!title || typeof title !== 'string' || title.length > 200) {
-    res.status(400).json({ error: 'invalid_title', message: 'Title is required and must be 200 characters or fewer.' });
-    return;
-  }
-  if (!body || typeof body !== 'string' || body.length < 100) {
-    res.status(400).json({ error: 'invalid_body', message: 'Body must be at least 100 characters.' });
+// POST /api/editorial/abstract — pitch an abstract (requireUser + active membership)
+router.post('/abstract', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  const { abstract, tag } = req.body;
+
+  if (!abstract || typeof abstract !== 'string' || abstract.trim().length < 50 || abstract.trim().length > 600) {
+    res.status(400).json({ error: 'invalid_abstract', message: 'Abstract must be 50–600 characters.' });
     return;
   }
 
@@ -118,81 +121,260 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
+    // One pending abstract at a time
+    const [pending] = await db
+      .select({ id: editorialPieces.id })
+      .from(editorialPieces)
+      .where(and(
+        eq(editorialPieces.author_user_id, userId),
+        eq(editorialPieces.status, 'abstract_submitted'),
+      ))
+      .limit(1);
+
+    if (pending) {
+      res.status(409).json({ error: 'abstract_pending', message: 'You already have an abstract under consideration.' });
+      return;
+    }
+
     const [piece] = await db
       .insert(editorialPieces)
       .values({
         author_user_id: userId,
-        title,
-        body,
-        status: 'submitted',
-        tag: tag !== undefined ? String(tag) : null,
+        abstract: abstract.trim(),
+        title: null,
+        body: null,
+        status: 'abstract_submitted',
+        tag: tag ? String(tag) : null,
       })
-      .returning();
+      .returning({ id: editorialPieces.id, status: editorialPieces.status, created_at: editorialPieces.created_at });
 
     res.status(201).json(piece);
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'internal_error' });
   }
 });
 
-// PATCH /api/editorial/:id — edit piece (author only, draft/submitted only)
-router.patch('/:id', requireUser, async (req: Request, res: Response) => {
+// POST /api/editorial/:id/write — submit full piece for a commissioned record
+router.post('/:id/write', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: 'invalid_id' });
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { title, body } = req.body;
+
+  if (!title || typeof title !== 'string' || title.trim().length === 0 || title.length > 200) {
+    res.status(400).json({ error: 'invalid_title', message: 'Title is required (max 200 chars).' });
+    return;
+  }
+  if (!body || typeof body !== 'string' || body.length < 100) {
+    res.status(400).json({ error: 'invalid_body', message: 'Body must be at least 100 characters.' });
     return;
   }
 
-  const { title, body, tag } = req.body;
-
   try {
     const [piece] = await db
-      .select()
+      .select({ status: editorialPieces.status, author_user_id: editorialPieces.author_user_id })
       .from(editorialPieces)
       .where(eq(editorialPieces.id, id))
       .limit(1);
 
-    if (!piece) {
-      res.status(404).json({ error: 'not_found' });
+    if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
+    if (piece.author_user_id !== userId) { res.status(403).json({ error: 'forbidden' }); return; }
+    if (piece.status !== 'commissioned' && piece.status !== 'draft') {
+      res.status(409).json({ error: 'not_commissioned', message: 'This piece has not been commissioned.' });
       return;
-    }
-    if (piece.author_user_id !== userId) {
-      res.status(403).json({ error: 'forbidden' });
-      return;
-    }
-    if (piece.status !== 'draft' && piece.status !== 'submitted') {
-      res.status(409).json({ error: 'not_editable', message: 'Piece can only be edited when in draft or submitted status.' });
-      return;
-    }
-
-    const updates: Partial<{ title: string; body: string; tag: string | null; updated_at: Date }> = { updated_at: new Date() };
-    if (title !== undefined) {
-      if (typeof title !== 'string' || title.length > 200) {
-        res.status(400).json({ error: 'invalid_title' });
-        return;
-      }
-      updates.title = title;
-    }
-    if (body !== undefined) {
-      if (typeof body !== 'string' || body.length < 100) {
-        res.status(400).json({ error: 'invalid_body' });
-        return;
-      }
-      updates.body = body;
-    }
-    if (tag !== undefined) {
-      updates.tag = tag === null ? null : String(tag);
     }
 
     const [updated] = await db
       .update(editorialPieces)
-      .set(updates)
+      .set({ title: title.trim(), body, status: 'submitted', updated_at: new Date() })
       .where(eq(editorialPieces.id, id))
-      .returning();
+      .returning({ id: editorialPieces.id, status: editorialPieces.status });
 
     res.json(updated);
-  } catch (err) {
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ─── Admin ────────────────────────────────────────────────────────────────────
+
+function requireAdmin(req: Request, res: Response, next: Function) {
+  const key = req.headers['x-admin-key'];
+  if (!key || key !== process.env.ADMIN_SECRET) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  next();
+}
+
+// GET /api/editorial/admin/queue — abstracts pending review
+router.get('/admin/queue', requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: editorialPieces.id,
+        abstract: editorialPieces.abstract,
+        tag: editorialPieces.tag,
+        author_display_name: users.display_name,
+        author_user_id: editorialPieces.author_user_id,
+        created_at: editorialPieces.created_at,
+      })
+      .from(editorialPieces)
+      .leftJoin(users, eq(editorialPieces.author_user_id, users.id))
+      .where(eq(editorialPieces.status, 'abstract_submitted'))
+      .orderBy(desc(editorialPieces.created_at));
+
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// GET /api/editorial/admin/submitted — full pieces pending publish decision
+router.get('/admin/submitted', requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: editorialPieces.id,
+        title: editorialPieces.title,
+        body: editorialPieces.body,
+        abstract: editorialPieces.abstract,
+        tag: editorialPieces.tag,
+        author_display_name: users.display_name,
+        author_user_id: editorialPieces.author_user_id,
+        created_at: editorialPieces.created_at,
+      })
+      .from(editorialPieces)
+      .leftJoin(users, eq(editorialPieces.author_user_id, users.id))
+      .where(eq(editorialPieces.status, 'submitted'))
+      .orderBy(desc(editorialPieces.created_at));
+
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/editorial/admin/:id/commission — approve abstract
+router.post('/admin/:id/commission', requireAdmin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { editor_note } = req.body;
+
+  try {
+    const [piece] = await db
+      .select({ status: editorialPieces.status })
+      .from(editorialPieces)
+      .where(eq(editorialPieces.id, id))
+      .limit(1);
+
+    if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
+    if (piece.status !== 'abstract_submitted') {
+      res.status(409).json({ error: 'wrong_status' }); return;
+    }
+
+    await db
+      .update(editorialPieces)
+      .set({ status: 'commissioned', editor_note: editor_note ?? null, updated_at: new Date() })
+      .where(eq(editorialPieces.id, id));
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/editorial/admin/:id/decline — decline abstract or full piece
+router.post('/admin/:id/decline', requireAdmin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { editor_note } = req.body;
+
+  try {
+    const [piece] = await db
+      .select({ status: editorialPieces.status })
+      .from(editorialPieces)
+      .where(eq(editorialPieces.id, id))
+      .limit(1);
+
+    if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
+
+    const newStatus = piece.status === 'abstract_submitted' ? 'abstract_declined' : 'declined';
+
+    await db
+      .update(editorialPieces)
+      .set({ status: newStatus as any, editor_note: editor_note ?? null, updated_at: new Date() })
+      .where(eq(editorialPieces.id, id));
+
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// POST /api/editorial/admin/:id/publish — publish + credit commission
+router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+
+  const { commission_cents, editor_note } = req.body;
+
+  try {
+    const [piece] = await db
+      .select({ status: editorialPieces.status, author_user_id: editorialPieces.author_user_id })
+      .from(editorialPieces)
+      .where(eq(editorialPieces.id, id))
+      .limit(1);
+
+    if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
+    if (piece.status !== 'submitted') {
+      res.status(409).json({ error: 'wrong_status' }); return;
+    }
+
+    await db
+      .update(editorialPieces)
+      .set({
+        status: 'published',
+        published_at: new Date(),
+        commission_cents: commission_cents ?? null,
+        editor_note: editor_note ?? null,
+        updated_at: new Date(),
+      })
+      .where(eq(editorialPieces.id, id));
+
+    if (commission_cents && typeof commission_cents === 'number' && commission_cents > 0) {
+      await db.insert(earningsLedger).values({
+        user_id: piece.author_user_id,
+        amount_cents: commission_cents,
+        type: 'credit',
+        description: `Editorial commission — piece #${id}`,
+      });
+
+      const [fund] = await db
+        .select({ id: membershipFunds.id })
+        .from(membershipFunds)
+        .where(eq(membershipFunds.user_id, piece.author_user_id))
+        .limit(1);
+
+      if (fund) {
+        await db
+          .update(membershipFunds)
+          .set({ balance_cents: sql`balance_cents + ${commission_cents}` })
+          .where(eq(membershipFunds.user_id, piece.author_user_id));
+      } else {
+        await db.insert(membershipFunds).values({
+          user_id: piece.author_user_id,
+          balance_cents: commission_cents,
+          cycle_start: new Date(),
+        });
+      }
+    }
+
+    res.json({ ok: true });
+  } catch {
     res.status(500).json({ error: 'internal_error' });
   }
 });

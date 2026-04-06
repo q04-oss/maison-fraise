@@ -1087,7 +1087,7 @@ router.post('/migrate', async (_req: Request, res: Response) => {
           CREATE TYPE membership_tier AS ENUM ('maison','reserve','atelier','fondateur','patrimoine','souverain','unnamed');
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'editorial_status') THEN
-          CREATE TYPE editorial_status AS ENUM ('draft','submitted','commissioned','published','declined');
+          CREATE TYPE editorial_status AS ENUM ('abstract_submitted','abstract_declined','commissioned','draft','submitted','published','declined');
         END IF;
       END $$
     `);
@@ -1096,7 +1096,18 @@ router.post('/migrate', async (_req: Request, res: Response) => {
     await db.execute(sql`ALTER TABLE memberships ADD COLUMN IF NOT EXISTS renewal_notified_at TIMESTAMP`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS membership_funds (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) UNIQUE, balance_cents INTEGER NOT NULL DEFAULT 0, cycle_start TIMESTAMP NOT NULL DEFAULT NOW(), updated_at TIMESTAMP NOT NULL DEFAULT NOW())`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS fund_contributions (id SERIAL PRIMARY KEY, from_user_id INTEGER REFERENCES users(id), to_user_id INTEGER NOT NULL REFERENCES users(id), amount_cents INTEGER NOT NULL, stripe_payment_intent_id TEXT, note TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW())`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS editorial_pieces (id SERIAL PRIMARY KEY, author_user_id INTEGER NOT NULL REFERENCES users(id), title TEXT NOT NULL, body TEXT NOT NULL, status editorial_status NOT NULL DEFAULT 'draft', commission_cents INTEGER, published_at TIMESTAMP, editor_note TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW(), updated_at TIMESTAMP NOT NULL DEFAULT NOW())`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS editorial_pieces (id SERIAL PRIMARY KEY, author_user_id INTEGER NOT NULL REFERENCES users(id), title TEXT, body TEXT, status editorial_status NOT NULL DEFAULT 'abstract_submitted', commission_cents INTEGER, published_at TIMESTAMP, editor_note TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW(), updated_at TIMESTAMP NOT NULL DEFAULT NOW())`);
+    await db.execute(sql`ALTER TABLE editorial_pieces ADD COLUMN IF NOT EXISTS abstract TEXT`);
+    await db.execute(sql`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'abstract_submitted' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'editorial_status')) THEN
+          ALTER TYPE editorial_status ADD VALUE IF NOT EXISTS 'abstract_submitted' BEFORE 'draft';
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'abstract_declined' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'editorial_status')) THEN
+          ALTER TYPE editorial_status ADD VALUE IF NOT EXISTS 'abstract_declined' BEFORE 'draft';
+        END IF;
+      END $$
+    `);
     await db.execute(sql`ALTER TABLE editorial_pieces ADD COLUMN IF NOT EXISTS tag TEXT`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS membership_waitlist (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id), tier membership_tier NOT NULL, message TEXT, created_at TIMESTAMP NOT NULL DEFAULT NOW())`);
 
