@@ -18,6 +18,23 @@ const MODULE_FILES = [
   'ARPassportStampView.swift',
   'ARDropAlertView.swift',
   'ARBatchScanOverlay.swift',
+  // AR Expanded 3
+  'ARBrixScoreView.swift',
+  'ARGrowingMethodBadge.swift',
+  'ARLineageTreeView.swift',
+  'ARAltitudeSoilChipView.swift',
+  'AROptimalEatingView.swift',
+  'ARRecipeCardView.swift',
+  'ARWeatherAtHarvestView.swift',
+  'ARFarmPhotoView.swift',
+  'ARTastingJournalOverlay.swift',
+  'ARSocialShareView.swift',
+  'ARVarietyMapView.swift',
+  'ARStreakFlameView.swift',
+  'ARCollectifRankView.swift',
+  'ARProducerVideoView.swift',
+  'AROrderRoutingGrid.swift',
+  'ARColdChainView.swift',
 ];
 
 const SOURCE_DIR = path.join(__dirname, '..', 'modules', 'ARBoxModule');

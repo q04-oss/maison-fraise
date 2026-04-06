@@ -3360,3 +3360,38 @@ export async function bulkPrepareOrders(orderIds: number[], pin: string): Promis
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'bulk_prepare_failed'); }
 }
 
+// AR Expanded 3: user's scanned varieties with farm coordinates
+export async function fetchMyScannedVarieties(): Promise<Array<{ variety_id: number; variety_name: string; farm_lat: number | null; farm_lng: number | null }>> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/variety-map/my-scanned`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json().catch(() => []);
+}
+
+// AR Expanded 3: user's collectif rank
+export async function fetchCollectifRank(): Promise<{ rank: number; total_members: number } | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/collectifs/my-rank`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json().catch(() => null);
+}
+
+// AR Expanded 3: pickup grid for staff
+export async function fetchPickupGrid(): Promise<Array<{ slot_time: string; total: number; paid: number; preparing: number; ready: number }>> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/pickup-grid/today`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json().catch(() => []);
+}
+
+// AR Expanded 3: save tasting journal rating
+export async function saveTastingRating(varietyId: number, rating: number, notes: string | null): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/tasting-journal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ variety_id: varietyId, rating, notes }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'save_failed'); }
+}
+

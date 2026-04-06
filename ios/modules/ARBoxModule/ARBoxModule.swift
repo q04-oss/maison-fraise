@@ -26,8 +26,12 @@ class ARBoxModule: NSObject {
         reject("NO_ROOT_VC", "No root view controller found", nil)
         return
       }
+      var resolved = false
       let arVC = ARBoxViewController(varietyData: varietyData) {
-        resolve(nil)
+        if !resolved { resolved = true; resolve(nil) }
+      }
+      arVC.onTastingRating = { rating, notes in
+        if !resolved { resolved = true; resolve(["rating": rating, "notes": notes as Any]) }
       }
       arVC.modalPresentationStyle = .fullScreen
       topVC.present(arVC, animated: true)

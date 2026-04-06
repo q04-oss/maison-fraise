@@ -30,7 +30,7 @@ export interface ARVarietyData {
   next_standing_order_label?: string | null;
   // Feature D: Collectif member names
   collectif_member_names?: string[];
-  // AR Expanded: enrichment data
+  // AR Expanded 2: enrichment data
   flavor_profile?: {
     sweetness: number;
     acidity: number;
@@ -47,6 +47,24 @@ export interface ARVarietyData {
   season_end?: string | null;
   active_drop?: { title: string; price_cents: number; id: number } | null;
   is_first_variety?: boolean;
+  // AR Expanded 3: new enrichment fields
+  brix_score?: number | null;
+  growing_method?: string | null;
+  moon_phase_at_harvest?: string | null;
+  parent_a?: string | null;
+  parent_b?: string | null;
+  altitude_m?: number | null;
+  soil_type?: string | null;
+  eat_by_days?: number | null;
+  recipe_name?: string | null;
+  recipe_description?: string | null;
+  harvest_weather_json?: string | null;
+  farm_photo_url?: string | null;
+  producer_video_url?: string | null;
+  streak_weeks?: number | null;
+  collectif_rank?: number | null;
+  collectif_total_members?: number | null;
+  scanned_varieties?: Array<{ variety_id: number; variety_name: string; farm_lat?: number | null; farm_lng?: number | null }>;
 }
 
 // Feature E: Staff AR
@@ -62,6 +80,8 @@ export interface ARStaffData {
   gift_note?: string | null;
   slot_time?: string | null;
   push_token?: string | null;
+  // AR Expanded 3: pickup grid for staff
+  pickup_slots?: Array<{ slot_time: string; total: number; paid: number; preparing: number; ready: number }>;
 }
 
 // Feature F: Market stall AR
@@ -81,7 +101,7 @@ export interface ARMarketStallData {
 }
 
 export interface Spec extends TurboModule {
-  presentAR(varietyData: ARVarietyData): Promise<void>;
+  presentAR(varietyData: ARVarietyData): Promise<{ rating: number; notes: string | null } | null>;
   // Feature E
   presentStaffAR(staffData: ARStaffData): Promise<{ action: string; order_id: number } | null>;
   // Feature F

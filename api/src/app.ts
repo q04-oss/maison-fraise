@@ -69,6 +69,9 @@ import seasonsRouter from './routes/seasons';
 import fraiseChatRouter from './routes/fraise-chat';
 import webhooksRouter from './routes/webhooks';
 import varietyProfilesRouter from './routes/variety-profiles';
+import tastingJournalRouter from './routes/tasting-journal';
+import varietyMapRouter from './routes/variety-map';
+import pickupGridRouter from './routes/pickup-grid';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, memberships } from './db/schema';
@@ -176,6 +179,9 @@ app.use('/api/seasons', seasonsRouter);
 app.use('/api/fraise-chat', fraiseChatRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/variety-profiles', varietyProfilesRouter);
+app.use('/api/tasting-journal', tastingJournalRouter);
+app.use('/api/variety-map', varietyMapRouter);
+app.use('/api/pickup-grid', pickupGridRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

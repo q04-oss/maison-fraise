@@ -353,4 +353,46 @@ router.get('/leaderboard', requireUser, async (_req: Request, res: Response) => 
   }
 });
 
+// GET /api/collectifs/my-rank — user's rank within their collectif by pickup count this month
+router.get('/my-rank', requireUser, async (req: any, res: Response) => {
+  const userId = req.userId as number;
+  try {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    // Find the user's collectif
+    const memberRows = await db.execute(sql`
+      SELECT collectif_id FROM collectif_commitments
+      WHERE user_id = ${userId} AND status = 'captured'
+      ORDER BY committed_at DESC LIMIT 1
+    `);
+    const membership = ((memberRows as any).rows ?? memberRows)[0];
+    if (!membership) { res.json(null); return; }
+
+    const collectifId = membership.collectif_id;
+
+    // Rank all members by pickup count this month
+    const rankRows = await db.execute(sql`
+      SELECT user_id,
+        COUNT(le.id)::int AS pickup_count,
+        RANK() OVER (ORDER BY COUNT(le.id) DESC)::int AS rank
+      FROM collectif_commitments cc
+      LEFT JOIN legitimacy_events le
+        ON le.user_id = cc.user_id
+        AND le.event_type = 'nfc_verified'
+        AND le.created_at >= ${monthStart}
+      WHERE cc.collectif_id = ${collectifId} AND cc.status = 'captured'
+      GROUP BY cc.user_id
+    `);
+    const rankData = (rankRows as any).rows ?? rankRows;
+    const myRow = rankData.find((r: any) => r.user_id === userId);
+    if (!myRow) { res.json(null); return; }
+
+    res.json({ rank: myRow.rank, total_members: rankData.length });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 export default router;

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -70,9 +70,13 @@ export default function VerifyNFCPanel() {
           }
           return;
         }
-        const staffOrderData = await fetchStaffOrderByNfc(token);
+        const [staffOrderData, pickupSlots] = await Promise.all([
+          fetchStaffOrderByNfc(token),
+          fetchPickupGrid().catch(() => [] as any[]),
+        ]);
         setState('success');
-        const actionResult = await ARBoxModule.presentStaffAR(staffOrderData);
+        const staffPayload = { ...staffOrderData, pickup_slots: pickupSlots };
+        const actionResult = await ARBoxModule.presentStaffAR(staffPayload);
         if (actionResult) {
           const pin = await AsyncStorage.getItem('staff_pin') ?? '';
           if (actionResult.action === 'prepare') {
@@ -91,11 +95,13 @@ export default function VerifyNFCPanel() {
       if (alreadyVerified) {
         const reorderData = await verifyNfcReorder(token);
 
-        // Fetch enrichment data in parallel: HealthKit, variety profile, active drop
-        const [healthCtx, varietyProfile, activeDrop] = await Promise.all([
+        // Fetch all enrichment data in parallel
+        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData] = await Promise.all([
           getTodayHealthContext().catch(() => null),
           reorderData.variety_id ? fetchVarietyProfile(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           reorderData.variety_id ? fetchActiveDropForVariety(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
+          fetchMyScannedVarieties().catch(() => [] as any[]),
+          fetchCollectifRank().catch(() => null),
         ]);
 
         // Feature C: format standing order label server data into display string
@@ -135,16 +141,38 @@ export default function VerifyNFCPanel() {
           next_standing_order_label: nextStandingOrderLabel,
           // Feature D: collectif member names
           collectif_member_names: reorderData.collectif_member_names ?? [],
-          // AR Expanded: enrichment
+          // AR Expanded 2: enrichment
           flavor_profile: varietyProfile ?? null,
           farm_distance_km: varietyProfile?.farm_distance_km ?? null,
           season_start: reorderData.season_start ?? null,
           season_end: reorderData.season_end ?? null,
           active_drop: activeDrop ? { id: activeDrop.id, title: activeDrop.title, price_cents: activeDrop.price_cents } : null,
           is_first_variety: isFirstVariety,
+          // AR Expanded 3: new enrichment
+          brix_score: varietyProfile?.brix_score ?? null,
+          growing_method: varietyProfile?.growing_method ?? null,
+          moon_phase_at_harvest: varietyProfile?.moon_phase_at_harvest ?? null,
+          parent_a: varietyProfile?.parent_a ?? null,
+          parent_b: varietyProfile?.parent_b ?? null,
+          altitude_m: varietyProfile?.altitude_m ?? null,
+          soil_type: varietyProfile?.soil_type ?? null,
+          eat_by_days: varietyProfile?.eat_by_days ?? null,
+          recipe_name: varietyProfile?.recipe_name ?? null,
+          recipe_description: varietyProfile?.recipe_description ?? null,
+          harvest_weather_json: varietyProfile?.harvest_weather_json ?? null,
+          farm_photo_url: varietyProfile?.farm_photo_url ?? null,
+          producer_video_url: varietyProfile?.producer_video_url ?? null,
+          streak_weeks: reorderData.streak_weeks ?? null,
+          collectif_rank: collectifRankData?.rank ?? null,
+          collectif_total_members: collectifRankData?.total_members ?? null,
+          scanned_varieties: scannedVarieties ?? [],
         };
         setState('success');
-        await ARBoxModule.presentAR(arPayload);
+        const arResult = await ARBoxModule.presentAR(arPayload);
+        // Save tasting journal rating if user provided one
+        if (arResult && arResult.rating && reorderData.variety_id) {
+          saveTastingRating(reorderData.variety_id, arResult.rating, arResult.notes ?? null).catch(() => {});
+        }
         if (activeDrop) {
           showPanel('drop-detail', { drop: activeDrop });
         } else {
