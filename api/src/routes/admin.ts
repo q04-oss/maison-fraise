@@ -370,7 +370,7 @@ router.get('/varieties', async (_req: Request, res: Response) => {
 router.patch('/varieties/:id', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid id' }); return; }
-  const allowed = ['name', 'description', 'price_cents', 'active', 'location_id', 'tag', 'source_farm'];
+  const allowed = ['name', 'description', 'price_cents', 'active', 'location_id', 'tag', 'source_farm', 'social_tier', 'time_credits_days'];
   const body: any = {};
   for (const key of allowed) {
     if (req.body[key] !== undefined) body[key] = req.body[key];
@@ -382,6 +382,36 @@ router.patch('/varieties/:id', async (req: Request, res: Response) => {
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/admin/varieties/assign-tiers — auto-assign social_tier + time_credits_days by price percentile
+router.post('/varieties/assign-tiers', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({ id: varieties.id, price_cents: varieties.price_cents })
+      .from(varieties)
+      .orderBy(varieties.price_cents);
+
+    const n = rows.length;
+    if (n === 0) { res.json({ assigned: 0 }); return; }
+
+    const estateStart = Math.floor(n * 0.67);
+    const reserveStart = Math.floor(n * 0.33);
+
+    let assigned = 0;
+    for (let i = 0; i < rows.length; i++) {
+      const tier = i >= estateStart ? 'estate' : i >= reserveStart ? 'reserve' : 'standard';
+      const credits = tier === 'estate' ? 120 : tier === 'reserve' ? 60 : 30;
+      await db.update(varieties)
+        .set({ social_tier: tier as any, time_credits_days: credits })
+        .where(eq(varieties.id, rows[i].id));
+      assigned++;
+    }
+
+    res.json({ assigned, breakdown: { standard: reserveStart, reserve: estateStart - reserveStart, estate: n - estateStart } });
+  } catch {
+    res.status(500).json({ error: 'internal_error' });
   }
 });
 

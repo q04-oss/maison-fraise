@@ -1296,6 +1296,30 @@ export async function updateVarietySortOrder(id: number, sort_order: number, adm
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'sort_order_update_failed'); }
 }
 
+export async function updateVarietyTier(
+  id: number,
+  social_tier: 'standard' | 'reserve' | 'estate',
+  time_credits_days: number,
+): Promise<void> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/admin/varieties/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ social_tier, time_credits_days }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'update_failed'); }
+}
+
+export async function autoAssignVarietyTiers(): Promise<{ assigned: number; breakdown: Record<string, number> }> {
+  const headers = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/admin/varieties/assign-tiers`, {
+    method: 'POST',
+    headers,
+  });
+  if (!r.ok) throw new Error('assign_failed');
+  return r.json();
+}
+
 export async function fundChocolateLocation(
   businessId: number,
 ): Promise<{ client_secret: string; amount_cents: number }> {
