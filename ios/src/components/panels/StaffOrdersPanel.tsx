@@ -18,7 +18,7 @@ function offsetDate(base: string, days: number): string {
 }
 
 export default function StaffOrdersPanel() {
-  const { goBack } = usePanel();
+  const { goBack, showPanel } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
@@ -30,9 +30,6 @@ export default function StaffOrdersPanel() {
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState<string>('ALL');
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [flagNote, setFlagNote] = useState('');
-  const [flaggingId, setFlaggingId] = useState<number | null>(null);
-
   // Restore saved pin on mount
   useEffect(() => {
     AsyncStorage.getItem('staff_pin').then(saved => {
@@ -84,13 +81,25 @@ export default function StaffOrdersPanel() {
   };
 
   const markPrepare = async (id: number) => {
-    await staffMarkPrepare(pin, id);
+    const prev = orders.find(o => o.id === id)?.status;
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'preparing' } : o));
+    try {
+      await staffMarkPrepare(pin, id);
+    } catch {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prev } : o));
+      Alert.alert('Failed to update order');
+    }
   };
 
   const markReady = async (id: number) => {
-    await staffMarkReady(pin, id);
+    const prev = orders.find(o => o.id === id)?.status;
     setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'ready' } : o));
+    try {
+      await staffMarkReady(pin, id);
+    } catch {
+      setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prev } : o));
+      Alert.alert('Failed to update order');
+    }
   };
 
   const handleFlag = async (id: number) => {
@@ -280,6 +289,19 @@ export default function StaffOrdersPanel() {
                               activeOpacity={0.7}
                             >
                               <Text style={[styles.actionBtnText, { color: '#EF4444', fontFamily: fonts.dmMono }]}>FLAG</Text>
+                            </TouchableOpacity>
+                          )}
+                          {(order.status === 'paid' || order.status === 'preparing' || order.status === 'ready') && order.nfc_token && (
+                            <TouchableOpacity
+                              style={[styles.actionBtn, { borderColor: c.accent }]}
+                              onPress={() => showPanel('nfc-write', {
+                                nfc_token: order.nfc_token,
+                                variety_name: order.variety_name,
+                                customer_email: order.customer_email,
+                              })}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.actionBtnText, { color: c.accent, fontFamily: fonts.dmMono }]}>TAG BOX</Text>
                             </TouchableOpacity>
                           )}
                         </View>

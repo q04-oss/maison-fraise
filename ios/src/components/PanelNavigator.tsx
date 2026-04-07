@@ -99,6 +99,7 @@ import ARVideoDetailPanel from './panels/ARVideoDetailPanel';
 import SubmitARVideoPanel from './panels/SubmitARVideoPanel';
 import TastingFeedPanel from './panels/TastingFeedPanel';
 import ArtAuctionPanel from './panels/ArtAuctionPanel';
+import NfcWritePanel from './panels/NfcWritePanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -198,10 +199,11 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'submit-ar-video': SubmitARVideoPanel,
   'tasting-feed': TastingFeedPanel,
   'art-auctions': ArtAuctionPanel,
+  'nfc-write': NfcWritePanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
-  'verified', 'standingOrder', 'partner-detail', 'order-history',
+  'nfc-write', 'verified', 'standingOrder', 'partner-detail', 'order-history',
   'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'jobDetail',
   'popup-detail', 'collectif-list', 'collectif-detail', 'collectif-create',
   'market', 'market-stall', 'portal', 'tokens', 'token-detail', 'tournaments', 'tournament-detail',

@@ -20,6 +20,18 @@ export async function readNfcToken(): Promise<string> {
   return payload.trim();
 }
 
+export async function writeNfcToken(token: string): Promise<void> {
+  await ensureStarted();
+  await NfcManager.requestTechnology(NfcTech.Ndef);
+  try {
+    const bytes = Ndef.encodeMessage([Ndef.textRecord(token)]);
+    if (!bytes) throw new Error('Failed to encode NDEF message');
+    await NfcManager.ndefHandler.writeNdefMessage(bytes);
+  } finally {
+    await NfcManager.cancelTechnologyRequest().catch(() => {});
+  }
+}
+
 export async function cancelNfc() {
   try {
     await NfcManager.cancelTechnologyRequest();
