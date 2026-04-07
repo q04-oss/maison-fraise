@@ -883,6 +883,7 @@ const nameInputRef = useRef<TextInput>(null);
               </View>
             )}
 
+            {reviewMode && (<>
             {/* VENTURES */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />
             <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('ventures')} activeOpacity={0.7}>
@@ -1052,6 +1053,7 @@ const nameInputRef = useRef<TextInput>(null);
               </>
             )}
 
+</>)}
 </>
             )}
           </>
