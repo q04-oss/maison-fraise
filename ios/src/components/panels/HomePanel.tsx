@@ -8,6 +8,8 @@ import { usePanel, Variety } from '../../context/PanelContext';
 import { fetchVarieties, fetchTodayStats } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES } from '../../data/seed';
+import ARBoxModule from '../../lib/NativeARBoxModule';
+import { useApp } from '../../../App';
 
 const SHEET_NAME = 'main-sheet';
 
@@ -19,6 +21,7 @@ function formatHarvestDate(iso: string): string {
 
 export default function HomePanel() {
   const { setVarieties, setActiveLocation, varieties, activeLocation, businesses, sheetHeight, setPanelData, jumpToPanel, showPanel, order, setOrder } = usePanel();
+  const { reviewMode } = useApp();
 
   const now = new Date();
   const otherLocations = businesses.filter((b: any) => {
@@ -179,6 +182,25 @@ export default function HomePanel() {
               <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
                 <Text style={[styles.collectifLinkText, { color: c.muted }]}>scan your box →</Text>
               </TouchableOpacity>
+              {reviewMode && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => ARBoxModule.presentAR({
+                    variety_id: 1, variety_name: 'Albion', farm: 'Domaine Lacroix',
+                    harvest_date: '2026-04-05', quantity: 2, chocolate: 'dark', finish: 'floral',
+                    brix_score: 11.4, growing_method: 'organic', altitude_m: 320,
+                    soil_type: 'sandy loam', farm_photo_url: null,
+                    tasting_notes: ['bright', 'citrus', 'sweet'],
+                    variety_description: 'A classic Californian variety with bright acidity and rich sweetness.',
+                    carbon_footprint_kg: 0.12, sunlight_hours: 8,
+                    pairing_suggestions: ['dark chocolate', 'aged brie'],
+                    collectif_name: null, show_referral_bubble: false,
+                    tasting_word_cloud: [], batch_members: [], lot_companions: [],
+                  }).catch(() => {})}
+                >
+                  <Text style={[styles.collectifLinkText, { color: c.accent }]}>try ar →</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => showPanel('staff-orders')} activeOpacity={0.7}>
                 <Text style={[styles.collectifLinkText, { color: c.muted }]}>staff →</Text>
               </TouchableOpacity>

@@ -657,44 +657,6 @@ export default function MapScreen() {
         </View>
       )}
 
-      {reviewMode && (
-        <TouchableOpacity
-          style={[styles.arDemoBtn, { backgroundColor: c.accent, bottom: fabBottom + 12 }]}
-          activeOpacity={0.85}
-          onPress={() => {
-            ARBoxModule.presentAR({
-              variety_id: 1,
-              variety_name: 'Albion',
-              farm: 'Domaine Lacroix',
-              harvest_date: '2026-04-05',
-              quantity: 2,
-              chocolate: 'dark',
-              finish: 'floral',
-              brix_score: 11.4,
-              growing_method: 'organic',
-              lineage_parents: ['Seascape', 'Pajaro'],
-              altitude_m: 320,
-              soil_type: 'sandy loam',
-              optimal_eating_window_days: 3,
-              weather_at_harvest: 'Sunny, 18°C',
-              farm_photo_url: null,
-              tasting_notes: ['bright', 'citrus', 'sweet'],
-              variety_description: 'A classic Californian variety with bright acidity and rich sweetness.',
-              price_history: [],
-              carbon_footprint_kg: 0.12,
-              sunlight_hours: 8,
-              pairing_suggestions: ['dark chocolate', 'aged brie'],
-              collectif_name: null,
-              show_referral_bubble: false,
-              tasting_word_cloud: [],
-              batch_members: [],
-              lot_companions: [],
-            }).catch((e: any) => Alert.alert('AR Error', String(e?.message ?? e)));
-          }}
-        >
-          <Text style={[styles.arDemoBtnText, { color: '#fff', fontFamily: fonts.dmMono }]}>TRY AR</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 }
