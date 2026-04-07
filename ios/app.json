@@ -18,7 +18,7 @@
       "bundleIdentifier": "com.maisonfraise.app",
       "entitlements": {
         "com.apple.developer.in-app-payments": [
-          "merchant.com.maisonfraise.app"
+          "merchant.maison.fraise"
         ],
         "com.apple.developer.applesignin": [
           "Default"
