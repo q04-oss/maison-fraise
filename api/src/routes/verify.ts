@@ -84,10 +84,10 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     const newLongest = Math.max(longestStreak, newStreak);
 
     await db.transaction(async (tx) => {
-      // Atomic claim: only succeeds if nfc_token_used is still false
+      // Atomic claim: only succeeds if token not yet used AND order is paid (not already collected)
       const [claimed] = await tx.update(orders)
         .set({ nfc_token_used: true, nfc_verified_at: now, status: 'collected' })
-        .where(and(eq(orders.id, order.id), eq(orders.nfc_token_used, false)))
+        .where(and(eq(orders.id, order.id), eq(orders.nfc_token_used, false), eq(orders.status, 'paid')))
         .returning({ id: orders.id });
 
       if (!claimed) {

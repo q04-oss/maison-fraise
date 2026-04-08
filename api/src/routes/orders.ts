@@ -140,9 +140,13 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
     // Mark as queued — card is authorized, not yet captured
     await db.update(orders).set({ status: 'queued', queued_at: new Date() }).where(eq(orders.id, id));
 
-    // Send "you're in the queue" email
+    // Check if threshold is met — may immediately trigger
     const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
-    if (variety) {
+    const { triggered, deliveryDate } = await checkAndTriggerBatch(order.variety_id, order.location_id);
+
+    // Only send "in the queue" email if batch didn't trigger immediately
+    // (batchTrigger.ts already sends the batch-confirmed email if triggered)
+    if (!triggered && variety) {
       sendOrderQueued({
         to: order.customer_email,
         varietyName: variety.name,
@@ -152,9 +156,6 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
         totalCents: order.total_cents,
       }).catch(() => {});
     }
-
-    // Check if threshold is met — may immediately trigger
-    const { triggered, deliveryDate } = await checkAndTriggerBatch(order.variety_id, order.location_id);
 
     // Fetch final state of this order (may now be 'paid' if batch just triggered)
     const [updated] = await db.select().from(orders).where(eq(orders.id, id));
@@ -301,18 +302,20 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
     // Legitimacy event
     await db.insert(legitimacyEvents).values({ user_id: userId, event_type: 'order_placed', weight: 1 }).catch(() => {});
 
-    // Queue email
-    sendOrderQueued({
-      to: currentUser.email,
-      varietyName: variety.name,
-      chocolate: order.chocolate,
-      finish: order.finish,
-      quantity: order.quantity,
-      totalCents: total_cents,
-    }).catch(() => {});
-
     // Check if this tips over the threshold
     const { triggered, deliveryDate } = await checkAndTriggerBatch(variety_id, location_id);
+
+    // Only send "in the queue" email if batch didn't trigger immediately
+    if (!triggered) {
+      sendOrderQueued({
+        to: currentUser.email,
+        varietyName: variety.name,
+        chocolate: order.chocolate,
+        finish: order.finish,
+        quantity: order.quantity,
+        totalCents: total_cents,
+      }).catch(() => {});
+    }
     const [updated] = await db.select().from(orders).where(eq(orders.id, order.id));
 
     res.status(201).json({ ...updated, delivery_date: deliveryDate ?? null, user_db_id: userId });
