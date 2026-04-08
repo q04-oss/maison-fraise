@@ -228,6 +228,14 @@ router.post('/demo', async (req: Request, res: Response) => {
       const insertedRows = (inserted as any).rows ?? inserted;
       userId = insertedRows[0].id;
     }
+    // Seed nfc_verified legitimacy event so the reorder NFC flow works
+    await db.execute(sql`
+      INSERT INTO legitimacy_events (user_id, event_type, weight, created_at)
+      SELECT ${userId}, 'nfc_verified', 1, now()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM legitimacy_events WHERE user_id = ${userId} AND event_type = 'nfc_verified'
+      )
+    `).catch(() => {});
     res.json({ user_id: userId, token: signToken(userId), is_new: false });
   } catch (e) {
     logger.error('Demo login error: ' + String(e));
