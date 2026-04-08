@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maison Fraise — Chocolatier</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0C0C0E; --bg2: #0A0A0C; --card: rgba(28,28,30,0.95); --card2: #1A1A1C;
+      --amber: #C9973A; --amber2: #D4A843; --text: #F2F2F7; --muted: rgba(242,242,247,0.42);
+      --border: rgba(255,255,255,0.08); --border2: rgba(255,255,255,0.13);
+      --red: rgba(220,80,80,0.9); --green: rgba(80,200,120,0.9); --radius: 14px;
+    }
+    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* PIN */
+    #pin-screen {
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 40px 24px; gap: 32px; background: var(--bg2);
+      position: relative; overflow: hidden;
+    }
+    #pin-screen::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.016) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px);
+      background-size: 60px 60px;
+      mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, black 0%, transparent 100%);
+      pointer-events: none;
+    }
+    .logo-block { text-align: center; position: relative; z-index: 1; }
+    .logo-title { font-family: 'Playfair Display', serif; font-style: italic; font-size: 32px; }
+    .logo-sub { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--amber); margin-top: 8px; }
+    .pin-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 28px 24px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 16px; position: relative; z-index: 1; }
+    .pin-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .pin-input { width: 100%; padding: 14px 16px; font-size: 22px; letter-spacing: 8px; border: 1px solid var(--border2); border-radius: 10px; background: rgba(255,255,255,0.04); color: var(--text); outline: none; text-align: center; font-family: 'DM Mono', monospace; transition: border-color 0.2s; }
+    .pin-input:focus { border-color: var(--amber); }
+    .pin-btn { width: 100%; padding: 16px; background: var(--amber); color: #0C0C0E; border: none; border-radius: 30px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
+    .pin-btn:active { opacity: 0.8; }
+    .pin-error { font-family: 'DM Mono', monospace; font-size: 12px; color: #E05A5A; text-align: center; min-height: 18px; }
+
+    /* DASHBOARD */
+    #dashboard { display: none; flex-direction: column; min-height: 100vh; }
+    .dash-header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 52px 20px 0; }
+    .dash-header-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding-bottom: 16px; }
+    .dash-role { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--amber); }
+    .dash-title { font-family: 'Playfair Display', serif; font-size: 30px; }
+    .dash-date { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .logout-btn { background: rgba(255,255,255,0.06); border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; padding: 9px 16px; border-radius: 20px; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
+    .logout-btn:hover { color: var(--text); border-color: var(--border2); }
+    .tab-row { display: flex; gap: 0; border-top: 1px solid var(--border); }
+    .tab { padding: 12px 20px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+    .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+    .dash-body { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 12px; max-width: 640px; width: 100%; margin: 0 auto; }
+
+    /* CARDS */
+    .batch-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .batch-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .batch-variety { font-family: 'Playfair Display', serif; font-size: 20px; }
+    .batch-location { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .batch-meta { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--muted); }
+    .batch-notes { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--muted); font-style: italic; }
+    .status-badge { flex-shrink: 0; padding: 4px 11px; border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; }
+    .badge-live { background: rgba(80,200,120,0.15); color: var(--green); }
+    .badge-draft { background: rgba(242,242,247,0.06); color: var(--muted); }
+    .badge-closed { background: rgba(220,80,80,0.1); color: var(--red); }
+    .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn { padding: 9px 18px; border-radius: 20px; font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; border: 1px solid; transition: opacity 0.15s; }
+    .btn:active { opacity: 0.7; }
+    .btn-publish { background: rgba(80,200,120,0.12); border-color: var(--green); color: var(--green); }
+    .btn-close { background: rgba(220,80,80,0.1); border-color: var(--red); color: var(--red); }
+
+    /* ORDER CARDS */
+    .order-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+    .order-variety { font-family: 'Playfair Display', serif; font-size: 18px; }
+    .order-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); }
+    .order-email { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--muted); }
+    .walkin-badge { display: inline-block; background: rgba(201,151,58,0.15); color: var(--amber); font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.8px; padding: 3px 9px; border-radius: 10px; }
+
+    /* NEW BATCH FORM */
+    .form-card { background: var(--card); border: 1px solid var(--border2); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .form-label { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; display: block; }
+    .form-select, .form-input, .form-textarea {
+      width: 100%; padding: 12px 14px; font-size: 14px; border: 1px solid var(--border2);
+      border-radius: 10px; background: rgba(255,255,255,0.04); color: var(--text);
+      outline: none; font-family: 'DM Sans', sans-serif; transition: border-color 0.2s;
+    }
+    .form-select:focus, .form-input:focus, .form-textarea:focus { border-color: var(--amber); }
+    .form-select option { background: #1A1A1C; }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-submit { width: 100%; padding: 16px; background: var(--amber); color: #0C0C0E; border: none; border-radius: 30px; font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 2px; text-transform: uppercase; cursor: pointer; transition: opacity 0.15s; }
+    .form-submit:active { opacity: 0.8; }
+    .form-error { font-family: 'DM Mono', monospace; font-size: 12px; color: #E05A5A; min-height: 18px; }
+    .section-title { font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .empty { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--muted); font-style: italic; text-align: center; padding: 40px 0; }
+    .progress-bar-bg { background: rgba(255,255,255,0.06); border-radius: 4px; height: 4px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--amber); border-radius: 4px; transition: width 0.3s; }
+  </style>
+</head>
+<body>
+
+<!-- PIN SCREEN -->
+<div id="pin-screen">
+  <div class="logo-block">
+    <div class="logo-title">Maison Fraise</div>
+    <div class="logo-sub">Chocolatier Portal</div>
+  </div>
+  <div class="pin-card">
+    <div class="pin-label">Enter your PIN</div>
+    <input id="pin-input" class="pin-input" type="password" inputmode="numeric" placeholder="····" maxlength="10" autocomplete="off" />
+    <button class="pin-btn" onclick="login()">Enter →</button>
+    <div id="pin-error" class="pin-error"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="dash-header">
+    <div class="dash-header-top">
+      <div class="dash-header-left">
+        <div class="dash-role">Chocolatier</div>
+        <div class="dash-title">Maison Fraise</div>
+        <div id="dash-date" class="dash-date"></div>
+      </div>
+      <button class="logout-btn" onclick="logout()">Sign out</button>
+    </div>
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('batches')">Batches</div>
+      <div class="tab" onclick="switchTab('orders')">Today's Orders</div>
+      <div class="tab" onclick="switchTab('new')">New Batch</div>
+    </div>
+  </div>
+
+  <!-- BATCHES TAB -->
+  <div id="tab-batches" class="dash-body">
+    <div class="section-title">Active & Recent</div>
+    <div id="batches-list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- ORDERS TAB -->
+  <div id="tab-orders" class="dash-body" style="display:none">
+    <div class="section-title">Paid orders today</div>
+    <div id="orders-list"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- NEW BATCH TAB -->
+  <div id="tab-new" class="dash-body" style="display:none">
+    <div class="form-card">
+      <div>
+        <label class="form-label">Location</label>
+        <select id="new-location" class="form-select"><option value="">— select —</option></select>
+      </div>
+      <div>
+        <label class="form-label">Variety</label>
+        <select id="new-variety" class="form-select"><option value="">— select —</option></select>
+      </div>
+      <div>
+        <label class="form-label">Quantity (boxes)</label>
+        <input id="new-quantity" class="form-input" type="number" min="1" max="500" placeholder="e.g. 24" />
+      </div>
+      <div>
+        <label class="form-label">Notes (optional)</label>
+        <textarea id="new-notes" class="form-textarea" placeholder="e.g. extra-ripe, picked this morning…"></textarea>
+      </div>
+      <div id="new-error" class="form-error"></div>
+      <button class="form-submit" onclick="createBatch()">Create batch →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let PIN = '';
+  let varieties = [];
+  let locs = [];
+
+  const today = new Date();
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+  function api(path, opts = {}) {
+    return fetch('/api/chocolatier' + path, {
+      ...opts,
+      headers: { 'x-chocolatier-pin': PIN, 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    });
+  }
+
+  async function login() {
+    const input = document.getElementById('pin-input');
+    const err = document.getElementById('pin-error');
+    PIN = input.value.trim();
+    err.textContent = '';
+    const r = await api('/batches');
+    if (r.status === 401) { err.textContent = 'Incorrect PIN.'; PIN = ''; return; }
+    document.getElementById('pin-screen').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'flex';
+    document.getElementById('dash-date').textContent =
+      days[today.getDay()] + ', ' + months[today.getMonth()] + ' ' + today.getDate();
+    await Promise.all([loadBatches(), loadOrders(), loadSelects()]);
+  }
+
+  function logout() {
+    PIN = '';
+    document.getElementById('pin-screen').style.display = 'flex';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('pin-input').value = '';
+  }
+
+  function switchTab(name) {
+    ['batches','orders','new'].forEach(t => {
+      document.getElementById('tab-' + t).style.display = t === name ? 'flex' : 'none';
+      document.querySelectorAll('.tab')[['batches','orders','new'].indexOf(t)].classList.toggle('active', t === name);
+    });
+  }
+
+  async function loadBatches() {
+    const r = await api('/batches');
+    const data = await r.json();
+    const el = document.getElementById('batches-list');
+    if (!data.length) { el.innerHTML = '<div class="empty">No batches yet. Create one.</div>'; return; }
+    el.innerHTML = data.map(b => {
+      const sold = b.quantity_total - b.quantity_remaining;
+      const pct = b.quantity_total > 0 ? Math.round(sold / b.quantity_total * 100) : 0;
+      const badge = b.closed_at
+        ? '<span class="status-badge badge-closed">Closed</span>'
+        : b.published
+          ? '<span class="status-badge badge-live">Live</span>'
+          : '<span class="status-badge badge-draft">Draft</span>';
+      const actions = b.closed_at ? '' : b.published
+        ? `<button class="btn btn-close" onclick="closeBatch(${b.id})">Close</button>`
+        : `<button class="btn btn-publish" onclick="publishBatch(${b.id})">Publish</button>
+           <button class="btn btn-close" onclick="closeBatch(${b.id})">Discard</button>`;
+      return `
+        <div class="batch-card">
+          <div class="batch-top">
+            <div>
+              <div class="batch-variety">${b.variety_name}</div>
+              <div class="batch-location">${b.location_name}</div>
+            </div>
+            ${badge}
+          </div>
+          <div class="batch-meta">${b.quantity_remaining} / ${b.quantity_total} remaining · CA$${(b.price_cents/100).toFixed(0)} each</div>
+          <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+          ${b.notes ? `<div class="batch-notes">${b.notes}</div>` : ''}
+          ${actions ? `<div class="action-row">${actions}</div>` : ''}
+        </div>`;
+    }).join('');
+  }
+
+  async function loadOrders() {
+    const r = await api('/orders');
+    const data = await r.json();
+    const el = document.getElementById('orders-list');
+    if (!data.length) { el.innerHTML = '<div class="empty">No orders yet today.</div>'; return; }
+    el.innerHTML = data.map(o => `
+      <div class="order-card">
+        <div class="order-variety">${o.variety_name} ${o.walk_in ? '<span class="walkin-badge">walk-in</span>' : ''}</div>
+        <div class="order-meta">${o.chocolate !== 'none' ? o.chocolate : 'no chocolate'} · ${o.finish} · qty ${o.quantity}</div>
+        <div class="order-email">${o.customer_email}</div>
+        ${o.is_gift ? `<div class="walkin-badge" style="background:rgba(201,151,58,0.15);color:var(--amber)">gift${o.gift_note ? ' — ' + o.gift_note : ''}</div>` : ''}
+      </div>`).join('');
+  }
+
+  async function loadSelects() {
+    const [vr, lr] = await Promise.all([api('/varieties'), api('/locations')]);
+    varieties = await vr.json();
+    locs = await lr.json();
+    const vs = document.getElementById('new-variety');
+    const ls = document.getElementById('new-location');
+    varieties.forEach(v => { const o = document.createElement('option'); o.value = v.id; o.textContent = `${v.name} — CA$${(v.price_cents/100).toFixed(0)}`; vs.appendChild(o); });
+    locs.forEach(l => { const o = document.createElement('option'); o.value = l.id; o.textContent = l.name; ls.appendChild(o); });
+  }
+
+  async function publishBatch(id) {
+    await api(`/batches/${id}/publish`, { method: 'POST' });
+    loadBatches();
+  }
+
+  async function closeBatch(id) {
+    if (!confirm('Close this batch? It will be removed from the app.')) return;
+    await api(`/batches/${id}/close`, { method: 'POST' });
+    loadBatches();
+  }
+
+  async function createBatch() {
+    const loc = document.getElementById('new-location').value;
+    const variety = document.getElementById('new-variety').value;
+    const qty = document.getElementById('new-quantity').value;
+    const notes = document.getElementById('new-notes').value.trim();
+    const err = document.getElementById('new-error');
+    err.textContent = '';
+    if (!loc || !variety || !qty || parseInt(qty) < 1) { err.textContent = 'Fill in all fields.'; return; }
+    const r = await api('/batches', {
+      method: 'POST',
+      body: JSON.stringify({ location_id: parseInt(loc), variety_id: parseInt(variety), quantity: parseInt(qty), notes: notes || undefined }),
+    });
+    if (!r.ok) { err.textContent = 'Failed to create batch.'; return; }
+    document.getElementById('new-quantity').value = '';
+    document.getElementById('new-notes').value = '';
+    switchTab('batches');
+    loadBatches();
+  }
+
+  document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>

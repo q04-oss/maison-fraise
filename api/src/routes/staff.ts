@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
 import { db } from '../db';
-import { orders, users, varieties, timeSlots } from '../db/schema';
+import { orders, users, varieties, timeSlots, locations, walkInTokens } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { fireWebhook } from '../lib/webhooks';
 
@@ -9,8 +10,27 @@ const router = Router();
 
 const requireStaff = async (req: Request, res: Response, next: NextFunction) => {
   const pin = req.headers['x-staff-pin'] as string | undefined;
-  const staffPin = process.env.STAFF_PIN;
-  if (staffPin && pin === staffPin) { next(); return; }
+
+  // Global superadmin PIN — full access, no location filter
+  const globalPin = process.env.STAFF_PIN;
+  if (globalPin && pin === globalPin) { next(); return; }
+
+  // Per-location PIN — attach locationId to request
+  if (pin) {
+    try {
+      const [loc] = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(eq(locations.staff_pin, pin))
+        .limit(1);
+      if (loc) {
+        (req as any).staffLocationId = loc.id;
+        next();
+        return;
+      }
+    } catch { /* fall through */ }
+  }
+
   // Fallback: authenticated user with is_dj flag
   const authHeader = req.headers.authorization;
   if (!authHeader) { res.status(403).json({ error: 'staff_only' }); return; }
@@ -62,6 +82,7 @@ router.get('/orders', requireStaff, async (req: Request, res: Response) => {
     const dateParam = (req.query.date as string | undefined) ?? new Date().toISOString().slice(0, 10);
     const dayStart = new Date(`${dateParam}T00:00:00.000Z`);
     const dayEnd = new Date(`${dateParam}T23:59:59.999Z`);
+    const locationId = (req as any).staffLocationId as number | undefined;
 
     const rows = await db
       .select({
@@ -85,7 +106,11 @@ router.get('/orders', requireStaff, async (req: Request, res: Response) => {
       .from(orders)
       .innerJoin(varieties, eq(orders.variety_id, varieties.id))
       .innerJoin(timeSlots, eq(orders.time_slot_id, timeSlots.id))
-      .where(and(gte(orders.created_at, dayStart), lte(orders.created_at, dayEnd)))
+      .where(and(
+        gte(orders.created_at, dayStart),
+        lte(orders.created_at, dayEnd),
+        locationId !== undefined ? eq(timeSlots.location_id, locationId) : undefined,
+      ))
       .orderBy(timeSlots.time, orders.created_at);
 
     res.json(rows);
@@ -288,6 +313,23 @@ router.get('/postal-heatmap', requireStaff, async (req: Request, res: Response) 
       count: Number(r.count),
     }));
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/staff/walkin-tokens — generate a walk-in token for a location + variety
+router.post('/walkin-tokens', requireStaff, async (req: Request, res: Response) => {
+  const { location_id, variety_id } = req.body as { location_id?: number; variety_id?: number };
+  if (!location_id || !variety_id) { res.status(400).json({ error: 'location_id and variety_id required' }); return; }
+  const locationId = (req as any).staffLocationId as number | undefined;
+  if (locationId !== undefined && locationId !== location_id) {
+    res.status(403).json({ error: 'location_mismatch' }); return;
+  }
+  try {
+    const token = `fraise-walkin-${randomUUID()}`;
+    await db.insert(walkInTokens).values({ token, location_id, variety_id });
+    res.status(201).json({ token });
   } catch (err) {
     res.status(500).json({ error: 'internal' });
   }

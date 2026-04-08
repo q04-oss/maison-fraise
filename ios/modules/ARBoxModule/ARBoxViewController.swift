@@ -995,6 +995,18 @@ class ARBoxViewController: UIViewController, ARSCNViewDelegate {
     if staffMode, let sd = staffData { setupStaffCard(staffData: sd); return }
     if batchScanMode { return }
 
+    // Generic thank-you tag: skip AR card, show overlay directly then dismiss
+    if (varietyData["card_type"] as? String) == "thankyou" {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+        guard let self = self else { return }
+        ARThankYouOverlay.present(farmName: "Maison Fraise", in: self.view)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+          self.dismiss(animated: true, completion: nil)
+        }
+      }
+      return
+    }
+
     let name = (varietyData["variety_name"] as? String) ?? "Strawberry"
     let farm = (varietyData["farm"] as? String) ?? ""
     let harvestDate = (varietyData["harvest_date"] as? String) ?? ""

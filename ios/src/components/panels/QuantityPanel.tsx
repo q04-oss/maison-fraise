@@ -52,7 +52,7 @@ export default function QuantityPanel() {
           style={[styles.cta, { backgroundColor: c.accent }]}
           onPress={() => {
             setOrder({ quantity: selected, is_gift: false, gift_note: null });
-            showPanel('when');
+            showPanel('review');
           }}
           activeOpacity={0.8}
         >

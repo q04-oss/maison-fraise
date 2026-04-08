@@ -11,14 +11,6 @@ import * as Haptics from 'expo-haptics';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-function formatDate(iso: string | null): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  return `${DAYS[date.getDay()]}, ${MONTHS[date.getMonth()]} ${d}`;
-}
 
 export default function ReviewPanel() {
   const { goBack, showPanel, jumpToPanel, currentPanel, order, setOrder, varieties, businesses } = usePanel();
@@ -81,7 +73,7 @@ export default function ReviewPanel() {
       Alert.alert('Price unavailable', 'Return to the order flow and reselect your variety.');
       return;
     }
-    if (!order.variety_id || !order.location_id || !order.time_slot_id || !order.chocolate || !order.finish) {
+    if (!order.variety_id || !order.location_id || !order.chocolate || !order.finish) {
       Alert.alert('Incomplete', 'Something is missing from your order.');
       return;
     }
@@ -92,7 +84,6 @@ export default function ReviewPanel() {
       const { order: created, client_secret } = await createOrder({
         variety_id: order.variety_id!,
         location_id: order.location_id!,
-        time_slot_id: order.time_slot_id!,
         chocolate: order.chocolate!,
         finish: order.finish!,
         quantity: order.quantity,
@@ -144,6 +135,8 @@ export default function ReviewPanel() {
 
       setOrder({
         order_id: confirmed.id,
+        order_status: confirmed.status,
+        delivery_date: (confirmed as any).delivery_date ?? null,
         nfc_token: confirmed.nfc_token ?? null,
         total_cents: confirmed.total_cents ?? totalCents,
       });
@@ -189,9 +182,9 @@ export default function ReviewPanel() {
             </View>
             <View style={[styles.cardDivider, { backgroundColor: c.border }]} />
             <View style={styles.detailRow}>
-              <Text style={[styles.detailLabel, { color: c.muted }]}>WHEN</Text>
-              <Text style={[styles.detailValue, { color: c.text }]}>
-                {order.time_slot_time ?? '—'}{order.date ? `  ${formatDate(order.date)}` : ''}
+              <Text style={[styles.detailLabel, { color: c.muted }]}>PICKUP</Text>
+              <Text style={[styles.detailValue, { color: c.muted }]}>
+                within 3 days of batch fill
               </Text>
             </View>
           </View>

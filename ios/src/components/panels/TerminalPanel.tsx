@@ -9,22 +9,23 @@ import * as Haptics from 'expo-haptics';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useApp } from '../../../App';
+import ARBoxModule from '../../lib/NativeARBoxModule';
 import { usePanel } from '../../context/PanelContext';
 import {
   verifyAppleSignIn, setAuthToken, deleteAuthToken,
-  fetchOrdersByEmail, fetchTimeSlots,
+  fetchOrdersByEmail,
   demoLogin, updateDisplayName,
   createOrder, confirmOrder, payOrderWithBalance, operatorLogin,
   startIdentityVerification, fetchMyVentures,
   fetchMyMarketOrders, collectMarketOrder, fetchAdBalance, fetchAvailableAds,
-  respondToAdImpression,
+  respondToAdImpression, fetchStaffOrders,
 } from '../../lib/api';
-import { CHOCOLATES, FINISHES, getDateOptions } from '../../data/seed';
+import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
 
 const SHEET_NAME = 'main-sheet';
 
-type OrderStep = 'variety' | 'chocolate' | 'finish' | 'quantity' | 'when' | 'review' | 'confirmed';
+type OrderStep = 'variety' | 'chocolate' | 'finish' | 'quantity' | 'review' | 'confirmed';
 
 export default function TerminalPanel() {
   const { goHome, showPanel, setOrder, order, setActiveLocation, varieties, businesses, activeLocation, panelData, setPanelData } = usePanel();
@@ -41,6 +42,11 @@ export default function TerminalPanel() {
   const [displayName, setDisplayName] = useState<string>('');
   const [editingName, setEditingName] = useState(false);
   const [isShop, setIsShop] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
+  const [staffOrders, setStaffOrders] = useState<any[]>([]);
+  const [staffPin, setStaffPin] = useState('');
+  const [staffPinInput, setStaffPinInput] = useState('');
+  const [staffPinNeeded, setStaffPinNeeded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [signingIn, setSigningIn] = useState(false);
   const [operatorCode, setOperatorCode] = useState('');
@@ -68,35 +74,17 @@ const nameInputRef = useRef<TextInput>(null);
     finish: string | null;
     finish_name: string | null;
     quantity: number;
-    date: string | null;
-    time_slot_id: number | null;
-    time_slot_time: string | null;
   }>({
     variety_id: null, variety_name: null, price_cents: null,
     chocolate: null, chocolate_name: null,
     finish: null, finish_name: null,
     quantity: 4,
-    date: null, time_slot_id: null, time_slot_time: null,
   });
-  const [slots, setSlots] = useState<any[]>([]);
-  const [loadingSlots, setLoadingSlots] = useState(false);
   const [paying, setPaying] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any | null>(null);
 
-  const DATE_OPTIONS = useMemo(() => getDateOptions(), []);
-
   const location = activeLocation ?? businesses.find(b => b.id === order.location_id) ?? null;
   const isPopup = location?.type === 'popup';
-
-  // Load time slots when date + location set
-  useEffect(() => {
-    if (!location?.id || !inlineOrder.date) return;
-    setLoadingSlots(true);
-    fetchTimeSlots(location.id, inlineOrder.date)
-      .then(setSlots)
-      .catch(() => setSlots([]))
-      .finally(() => setLoadingSlots(false));
-  }, [location?.id, inlineOrder.date]);
 
   // Auto-scroll when step advances
   const scrollToBottom = () => {
@@ -106,13 +94,6 @@ const nameInputRef = useRef<TextInput>(null);
   useEffect(() => {
     if (orderOpen && orderStep !== 'variety') scrollToBottom();
   }, [orderStep]);
-
-  // Auto-set popup date on inline order when location is a popup
-  useEffect(() => {
-    if (isPopup && location?.launched_at && !inlineOrder.date) {
-      setInlineOrder(p => ({ ...p, date: location.launched_at!.split('T')[0] }));
-    }
-  }, [isPopup, location?.launched_at]);
 
   // Auto-open or reset order based on how terminal was triggered
   useEffect(() => {
@@ -140,9 +121,23 @@ const nameInputRef = useRef<TextInput>(null);
       AsyncStorage.getItem('fraise_chat_email'),
       AsyncStorage.getItem('display_name'),
       AsyncStorage.getItem('is_shop'),
-    ]).then(([email, verified, dbId, chatEmail, name, shopFlag]) => {
+      AsyncStorage.getItem('is_staff'),
+    ]).then(([email, verified, dbId, chatEmail, name, shopFlag, staffFlag]) => {
       setIsVerified(verified === 'true');
       if (shopFlag === 'true') setIsShop(true);
+      if (staffFlag === 'true') {
+        setIsStaff(true);
+        AsyncStorage.getItem('staff_pin').then(pin => {
+          if (pin) {
+            setStaffPin(pin);
+            setStaffPinInput(pin);
+            const today = new Date().toISOString().slice(0, 10);
+            fetchStaffOrders(pin, today).then(setStaffOrders).catch(() => {});
+          } else {
+            setStaffPinNeeded(true);
+          }
+        });
+      }
       if (dbId) setUserDbId(parseInt(dbId, 10));
       if (chatEmail) setFraiseChatEmail(chatEmail);
       if (name) setDisplayName(name);
@@ -272,17 +267,16 @@ const nameInputRef = useRef<TextInput>(null);
   };
 
   const resetInlineOrder = () => {
-    setInlineOrder({ variety_id: null, variety_name: null, price_cents: null, chocolate: null, chocolate_name: null, finish: null, finish_name: null, quantity: 4, date: null, time_slot_id: null, time_slot_time: null });
+    setInlineOrder({ variety_id: null, variety_name: null, price_cents: null, chocolate: null, chocolate_name: null, finish: null, finish_name: null, quantity: 4 });
     setOrderStep('variety');
     setConfirmedOrder(null);
-    setSlots([]);
   };
 
   const handlePay = async () => {
     const email = userEmail;
     if (!email || !email.includes('@')) { Alert.alert('Email required', 'Sign in to place an order.'); return; }
     if (!location?.id) { Alert.alert('No location', 'Select a collection point on the map first.'); return; }
-    if (!inlineOrder.variety_id || !inlineOrder.chocolate || !inlineOrder.finish || !inlineOrder.time_slot_id || !inlineOrder.date) {
+    if (!inlineOrder.variety_id || !inlineOrder.chocolate || !inlineOrder.finish) {
       Alert.alert('Incomplete', 'Something is missing from your order.'); return;
     }
     const totalCents = (inlineOrder.price_cents ?? 0) * inlineOrder.quantity;
@@ -302,7 +296,6 @@ const nameInputRef = useRef<TextInput>(null);
       const { order: created, client_secret } = await createOrder({
         variety_id: inlineOrder.variety_id!,
         location_id: location.id,
-        time_slot_id: inlineOrder.time_slot_id!,
         chocolate: inlineOrder.chocolate!,
         finish: inlineOrder.finish!,
         quantity: inlineOrder.quantity,
@@ -348,7 +341,7 @@ const nameInputRef = useRef<TextInput>(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
-      setOrder({ order_id: confirmed.id, location_id: location.id });
+      setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
       // Refresh order history
       fetchOrdersByEmail()
         .then((orders: any[]) => {
@@ -368,7 +361,7 @@ const nameInputRef = useRef<TextInput>(null);
   };
 
   const handlePayWithBalance = async () => {
-    if (!location?.id || !inlineOrder.variety_id || !inlineOrder.chocolate || !inlineOrder.finish || !inlineOrder.time_slot_id) {
+    if (!location?.id || !inlineOrder.variety_id || !inlineOrder.chocolate || !inlineOrder.finish) {
       Alert.alert('Incomplete', 'Something is missing from your order.'); return;
     }
     setPaying(true);
@@ -376,7 +369,6 @@ const nameInputRef = useRef<TextInput>(null);
       const confirmed = await payOrderWithBalance({
         variety_id: inlineOrder.variety_id!,
         location_id: location.id,
-        time_slot_id: inlineOrder.time_slot_id!,
         chocolate: inlineOrder.chocolate!,
         finish: inlineOrder.finish!,
         quantity: inlineOrder.quantity,
@@ -389,7 +381,7 @@ const nameInputRef = useRef<TextInput>(null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
-      setOrder({ order_id: confirmed.id, location_id: location.id });
+      setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
       fetchOrdersByEmail()
         .then((orders: any[]) => {
           const paid = orders.filter((o: any) => o.status === 'paid' || o.status === 'confirmed').sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
@@ -413,20 +405,9 @@ const nameInputRef = useRef<TextInput>(null);
 
   const totalCents = (inlineOrder.price_cents ?? 0) * inlineOrder.quantity;
 
-  const visibleSlots = useMemo(() => {
-    if (!inlineOrder.date || !DATE_OPTIONS[0]) return slots;
-    const isToday = inlineOrder.date === DATE_OPTIONS[0].isoDate;
-    if (!isToday) return slots;
-    return slots.filter(slot => {
-      const [h, m = 0] = (slot.time ?? '').split(':').map(Number);
-      const slotTime = new Date(); slotTime.setHours(h, m, 0, 0);
-      return slotTime > new Date();
-    });
-  }, [slots, inlineOrder.date, DATE_OPTIONS]);
-
   // Step label helpers
   const stepDone = (step: OrderStep) => {
-    const order = ['variety', 'chocolate', 'finish', 'quantity', 'when', 'review', 'confirmed'];
+    const order = ['variety', 'chocolate', 'finish', 'quantity', 'review', 'confirmed'];
     return order.indexOf(orderStep) > order.indexOf(step);
   };
 
@@ -601,14 +582,18 @@ const nameInputRef = useRef<TextInput>(null);
                 {/* Confirmed state */}
                 {orderStep === 'confirmed' && confirmedOrder && (
                   <View style={styles.confirmedBlock}>
-                    <Text style={[styles.confirmedTitle, { color: c.text }]}>order placed</Text>
+                    <Text style={[styles.confirmedTitle, { color: c.text }]}>
+                      {confirmedOrder.status === 'queued' ? 'in the queue' : 'order placed'}
+                    </Text>
                     <Text style={[styles.confirmedDetail, { color: c.muted }]}>
                       {inlineOrder.variety_name}{'  ·  '}{inlineOrder.chocolate_name}{'  ·  '}{inlineOrder.finish_name}{'  ·  '}×{inlineOrder.quantity}
                     </Text>
-                    <Text style={[styles.confirmedDetail, { color: c.muted }]}>{inlineOrder.time_slot_time}  ·  {location?.name}</Text>
-                    {confirmedOrder.nfc_token && (
+                    <Text style={[styles.confirmedDetail, { color: c.muted }]}>{location?.name}</Text>
+                    {confirmedOrder.status === 'queued' ? (
+                      <Text style={[styles.confirmedHint, { color: c.muted }]}>we'll notify you when your batch fills</Text>
+                    ) : confirmedOrder.nfc_token ? (
                       <Text style={[styles.confirmedHint, { color: c.accent }]}>tap to collect at the shop</Text>
-                    )}
+                    ) : null}
                     {location?.shop_user_id && (
                       <TouchableOpacity
                         onPress={() => {
@@ -635,7 +620,7 @@ const nameInputRef = useRef<TextInput>(null);
                 {location && orderStep !== 'confirmed' && (
                   <>
                     {stepDone('variety') ? (
-                      <TouchableOpacity onPress={() => { setOrderStep('variety'); setInlineOrder(p => ({ ...p, chocolate: null, chocolate_name: null, finish: null, finish_name: null, time_slot_id: null, time_slot_time: null, date: null })); }} activeOpacity={0.7}>
+                      <TouchableOpacity onPress={() => { setOrderStep('variety'); setInlineOrder(p => ({ ...p, chocolate: null, chocolate_name: null, finish: null, finish_name: null })); }} activeOpacity={0.7}>
                         <Text style={[styles.stepSummary, { color: c.text }]}>{inlineOrder.variety_name}</Text>
                       </TouchableOpacity>
                     ) : (
@@ -669,7 +654,7 @@ const nameInputRef = useRef<TextInput>(null);
                       <>
                         <View style={[styles.rowDivider, { backgroundColor: c.border }]} />
                         {stepDone('chocolate') ? (
-                          <TouchableOpacity onPress={() => { setOrderStep('chocolate'); setInlineOrder(p => ({ ...p, finish: null, finish_name: null, time_slot_id: null, time_slot_time: null, date: null })); }} activeOpacity={0.7}>
+                          <TouchableOpacity onPress={() => { setOrderStep('chocolate'); setInlineOrder(p => ({ ...p, finish: null, finish_name: null })); }} activeOpacity={0.7}>
                             <Text style={[styles.stepSummary, { color: c.muted }]}>{inlineOrder.chocolate_name}</Text>
                           </TouchableOpacity>
                         ) : (
@@ -701,7 +686,7 @@ const nameInputRef = useRef<TextInput>(null);
                       <>
                         <View style={[styles.rowDivider, { backgroundColor: c.border }]} />
                         {stepDone('finish') ? (
-                          <TouchableOpacity onPress={() => { setOrderStep('finish'); setInlineOrder(p => ({ ...p, time_slot_id: null, time_slot_time: null, date: null })); }} activeOpacity={0.7}>
+                          <TouchableOpacity onPress={() => { setOrderStep('finish'); }} activeOpacity={0.7}>
                             <Text style={[styles.stepSummary, { color: c.muted }]}>{inlineOrder.finish_name}</Text>
                           </TouchableOpacity>
                         ) : (
@@ -733,7 +718,7 @@ const nameInputRef = useRef<TextInput>(null);
                       <>
                         <View style={[styles.rowDivider, { backgroundColor: c.border }]} />
                         {stepDone('quantity') ? (
-                          <TouchableOpacity onPress={() => { setOrderStep('quantity'); setInlineOrder(p => ({ ...p, time_slot_id: null, time_slot_time: null, date: null })); }} activeOpacity={0.7}>
+                          <TouchableOpacity onPress={() => { setOrderStep('quantity'); }} activeOpacity={0.7}>
                             <Text style={[styles.stepSummary, { color: c.muted }]}>×{inlineOrder.quantity}</Text>
                           </TouchableOpacity>
                         ) : (
@@ -747,71 +732,10 @@ const nameInputRef = useRef<TextInput>(null);
                               <TouchableOpacity onPress={() => setInlineOrder(p => ({ ...p, quantity: Math.min(12, p.quantity + 1) }))} activeOpacity={0.7} style={styles.qtyBtn}>
                                 <Text style={[styles.qtyBtnText, { color: c.accent }]}>+</Text>
                               </TouchableOpacity>
-                              <TouchableOpacity onPress={() => setOrderStep('when')} activeOpacity={0.7} style={styles.qtyConfirm}>
+                              <TouchableOpacity onPress={() => setOrderStep('review')} activeOpacity={0.7} style={styles.qtyConfirm}>
                                 <Text style={[styles.label, { color: c.accent }]}>CONFIRM</Text>
                               </TouchableOpacity>
                             </View>
-                          </>
-                        )}
-                      </>
-                    )}
-
-                    {/* Step: When */}
-                    {(orderStep === 'when' || stepDone('when')) && (
-                      <>
-                        <View style={[styles.rowDivider, { backgroundColor: c.border }]} />
-                        {stepDone('when') ? (
-                          <TouchableOpacity onPress={() => { setOrderStep('when'); setInlineOrder(p => ({ ...p, time_slot_id: null, time_slot_time: null })); }} activeOpacity={0.7}>
-                            <Text style={[styles.stepSummary, { color: c.muted }]}>{inlineOrder.time_slot_time}</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <>
-                            <Text style={[styles.stepLabel, { color: c.muted }]}>when</Text>
-                            {!isPopup && (
-                              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-                                {DATE_OPTIONS.map((d, idx) => {
-                                  const sel = inlineOrder.date === d.isoDate;
-                                  return (
-                                    <TouchableOpacity
-                                      key={idx}
-                                      style={[styles.dateChip, sel && { backgroundColor: c.accent }]}
-                                      onPress={() => setInlineOrder(p => ({ ...p, date: d.isoDate, time_slot_id: null, time_slot_time: null }))}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Text style={[styles.dateLabel, { color: sel ? 'rgba(255,255,255,0.7)' : c.muted }]}>{d.label}</Text>
-                                      <Text style={[styles.dateNum, { color: sel ? '#fff' : c.text }]}>{d.dayNum}</Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </ScrollView>
-                            )}
-                            {loadingSlots ? (
-                              <ActivityIndicator color={c.accent} style={{ marginVertical: 12 }} />
-                            ) : visibleSlots.length === 0 && inlineOrder.date ? (
-                              <Text style={[styles.emptyHint, { color: c.muted }]}>No slots available.</Text>
-                            ) : (
-                              visibleSlots.map((slot, i) => {
-                                const available = (slot.capacity ?? 0) - (slot.booked ?? 0);
-                                const sel = inlineOrder.time_slot_id === slot.id;
-                                return (
-                                  <React.Fragment key={slot.id}>
-                                    {i > 0 && <View style={[styles.rowDivider, { backgroundColor: c.border }]} />}
-                                    <TouchableOpacity
-                                      style={[styles.optionRow, available <= 0 && { opacity: 0.35 }]}
-                                      disabled={available <= 0}
-                                      onPress={() => {
-                                        setInlineOrder(p => ({ ...p, time_slot_id: slot.id, time_slot_time: slot.time?.substring(0, 5) ?? '' }));
-                                        setOrderStep('review');
-                                      }}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Text style={[styles.optionName, { color: sel ? c.accent : c.text }]}>{slot.time?.substring(0, 5) ?? ''}</Text>
-                                      <Text style={[styles.optionMeta, { color: c.muted }]}>{available} left</Text>
-                                    </TouchableOpacity>
-                                  </React.Fragment>
-                                );
-                              })
-                            )}
                           </>
                         )}
                       </>
@@ -826,7 +750,7 @@ const nameInputRef = useRef<TextInput>(null);
                           <Text style={[styles.reviewDetail, { color: c.muted }]}>
                             {inlineOrder.chocolate_name}{'  ·  '}{inlineOrder.finish_name}{'  ·  '}×{inlineOrder.quantity}
                           </Text>
-                          <Text style={[styles.reviewDetail, { color: c.muted }]}>{inlineOrder.time_slot_time}  ·  {location?.name}</Text>
+                          <Text style={[styles.reviewDetail, { color: c.muted }]}>{location?.name}</Text>
                           <View style={styles.reviewFooter}>
                             <Text style={[styles.reviewTotal, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
                             <View style={styles.reviewPayBtns}>
@@ -1032,6 +956,103 @@ const nameInputRef = useRef<TextInput>(null);
             )}
 
 </>)}
+
+            {/* ── Utility shortcuts ── */}
+            <View style={[styles.divider, { backgroundColor: c.border }]} />
+            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
+              <Text style={[styles.label, { color: c.muted }]}>SCAN BOX</Text>
+              <Text style={[styles.label, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
+            {isStaff && (
+              <>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('nfc-write', { nfc_token: 'fraise-thankyou' })} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>WRITE GENERIC TAG</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('walk-in-write')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>WRITE WALK-IN TAGS</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                {staffPinNeeded ? (
+                  <View style={styles.staffPinRow}>
+                    <TextInput
+                      style={[styles.staffPinInput, { color: c.text, borderColor: c.border, fontFamily: fonts.dmMono }]}
+                      value={staffPinInput}
+                      onChangeText={setStaffPinInput}
+                      placeholder="staff pin"
+                      placeholderTextColor={c.muted}
+                      secureTextEntry
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      onSubmitEditing={async () => {
+                        const pin = staffPinInput.trim();
+                        if (!pin) return;
+                        const today = new Date().toISOString().slice(0, 10);
+                        try {
+                          const data = await fetchStaffOrders(pin, today);
+                          await AsyncStorage.setItem('staff_pin', pin);
+                          setStaffPin(pin);
+                          setStaffOrders(data);
+                          setStaffPinNeeded(false);
+                        } catch { Alert.alert('Incorrect PIN'); }
+                      }}
+                    />
+                  </View>
+                ) : staffOrders.filter(o => o.nfc_token && ['paid','preparing','ready'].includes(o.status)).length > 0 ? (
+                  <>
+                    <Text style={[styles.label, { color: c.muted, paddingVertical: 10 }]}>TAG BOXES</Text>
+                    {staffOrders
+                      .filter(o => o.nfc_token && ['paid','preparing','ready'].includes(o.status))
+                      .map(o => (
+                        <TouchableOpacity
+                          key={o.id}
+                          style={[styles.staffOrderRow, { borderBottomColor: c.border }]}
+                          onPress={() => showPanel('nfc-write', {
+                            nfc_token: o.nfc_token,
+                            variety_name: o.variety_name,
+                            customer_email: o.customer_email,
+                          })}
+                          activeOpacity={0.7}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.staffOrderName, { color: c.text, fontFamily: fonts.playfair }]}>{o.variety_name}</Text>
+                            <Text style={[styles.staffOrderMeta, { color: c.muted, fontFamily: fonts.dmMono }]}>{o.customer_email}</Text>
+                          </View>
+                          <Text style={[styles.label, { color: c.accent }]}>TAG →</Text>
+                        </TouchableOpacity>
+                      ))}
+                  </>
+                ) : null}
+              </>
+            )}
+            {reviewMode && (
+              <>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity
+                  style={styles.inboxBtn}
+                  onPress={() => ARBoxModule.presentAR({
+                    variety_id: 1, variety_name: 'Albion', farm: 'Domaine Lacroix',
+                    harvest_date: '2026-04-05', quantity: 2, chocolate: 'dark', finish: 'floral',
+                    brix_score: 11.4, growing_method: 'organic', altitude_m: 320,
+                    soil_type: 'sandy loam', farm_photo_url: null,
+                    tasting_notes: ['bright', 'citrus', 'sweet'],
+                    variety_description: 'A classic Californian variety with bright acidity and rich sweetness.',
+                    carbon_footprint_kg: 0.12, sunlight_hours: 8,
+                    pairing_suggestions: ['dark chocolate', 'aged brie'],
+                    collectif_name: null, show_referral_bubble: false,
+                    tasting_word_cloud: [], batch_members: [], lot_companions: [],
+                  }).catch(() => {})}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.label, { color: c.muted }]}>TRY AR</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
 </>
             )}
           </>
@@ -1169,4 +1190,9 @@ const styles = StyleSheet.create({
   adOfferBtns: { flexDirection: 'row', gap: 8 },
   adOfferBtn: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
   adOfferBtnText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  staffPinRow: { paddingHorizontal: 16, paddingVertical: 10 },
+  staffPinInput: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, letterSpacing: 2 },
+  staffOrderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+  staffOrderName: { fontSize: 15 },
+  staffOrderMeta: { fontSize: 10, opacity: 0.6, marginTop: 2 },
 });

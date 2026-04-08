@@ -109,15 +109,14 @@ export interface OrderState {
   quantity: number;
   location_id: number | null;
   location_name: string | null;
-  time_slot_id: number | null;
-  time_slot_time: string | null;
-  date: string | null;
   is_gift: boolean;
   gift_note: string | null;
   customer_email: string;
   ordered_at_popup: boolean;
   // post-confirm
   order_id: number | null;
+  order_status: string | null;
+  delivery_date: string | null;
   nfc_token: string | null;
   total_cents: number | null;
 }
@@ -186,14 +185,13 @@ const defaultOrder: OrderState = {
   quantity: 4,
   location_id: null,
   location_name: null,
-  time_slot_id: null,
-  time_slot_time: null,
-  date: null,
   is_gift: false,
   gift_note: null,
   customer_email: '',
   ordered_at_popup: false,
   order_id: null,
+  order_status: null,
+  delivery_date: null,
   nfc_token: null,
   total_cents: null,
 };

@@ -25,6 +25,7 @@ export const finishEnum = pgEnum('finish', ['plain', 'fleur_de_sel', 'or_fin']);
 
 export const orderStatusEnum = pgEnum('order_status', [
   'pending',
+  'queued',
   'paid',
   'preparing',
   'ready',
@@ -93,6 +94,7 @@ export const locations = pgTable('locations', {
   name: text('name').notNull(),
   address: text('address').notNull(),
   active: boolean('active').notNull().default(true),
+  staff_pin: text('staff_pin'),
 });
 
 export const timeSlots = pgTable('time_slots', {
@@ -116,8 +118,9 @@ export const orders = pgTable('orders', {
     .notNull()
     .references(() => locations.id),
   time_slot_id: integer('time_slot_id')
-    .notNull()
     .references(() => timeSlots.id),
+  batch_id: integer('batch_id').references(() => batches.id),
+  walk_in: boolean('walk_in').notNull().default(false),
   chocolate: chocolateEnum('chocolate').notNull(),
   finish: finishEnum('finish').notNull(),
   quantity: integer('quantity').notNull(),
@@ -140,6 +143,8 @@ export const orders = pgTable('orders', {
   payment_method: text('payment_method'),
   excess_amount_cents: integer('excess_amount_cents').notNull().default(0),
   token_id: integer('token_id'),
+  payment_captured: boolean('payment_captured').notNull().default(false),
+  queued_at: timestamp('queued_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ({
   idx_customer_email: index('orders_customer_email_idx').on(t.customer_email),
@@ -1452,4 +1457,34 @@ export const artManagementFees = pgTable('art_management_fees', {
   paid_at: timestamp('paid_at', { withTimezone: true }),
   stripe_payment_intent_id: text('stripe_payment_intent_id'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const batches = pgTable('batches', {
+  id: serial('id').primaryKey(),
+  location_id: integer('location_id').notNull().references(() => locations.id),
+  variety_id: integer('variety_id').notNull().references(() => varieties.id),
+  quantity_total: integer('quantity_total').notNull(),
+  quantity_remaining: integer('quantity_remaining').notNull(),
+  published: boolean('published').notNull().default(false),
+  notes: text('notes'),
+  min_quantity: integer('min_quantity').notNull().default(4),
+  lead_days: integer('lead_days').notNull().default(3),
+  delivery_date: date('delivery_date'),
+  cutoff_at: timestamp('cutoff_at'),
+  triggered_at: timestamp('triggered_at'),
+  ready_at: timestamp('ready_at'),
+  cancelled_at: timestamp('cancelled_at'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  published_at: timestamp('published_at'),
+  closed_at: timestamp('closed_at'),
+});
+
+export const walkInTokens = pgTable('walk_in_tokens', {
+  id: serial('id').primaryKey(),
+  token: text('token').notNull().unique(),
+  location_id: integer('location_id').notNull().references(() => locations.id),
+  variety_id: integer('variety_id').notNull().references(() => varieties.id),
+  claimed: boolean('claimed').notNull().default(false),
+  claimed_order_id: integer('claimed_order_id'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
 });

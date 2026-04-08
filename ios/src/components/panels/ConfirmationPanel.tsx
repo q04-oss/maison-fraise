@@ -35,14 +35,20 @@ export default function ConfirmationPanel() {
     Share.share({ message: `Maison Fraise — Order #${order.order_id}` });
   };
 
+  const isQueued = order.order_status === 'queued';
+
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={[styles.body]}>
         <View style={[styles.checkCircle, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.checkIcon, { color: c.accent }]}>✓</Text>
+          <Text style={[styles.checkIcon, { color: c.accent }]}>{isQueued ? '◷' : '✓'}</Text>
         </View>
-        <Text style={[styles.title, { color: c.text }]}>Order placed.</Text>
-        <Text style={[styles.subtitle, { color: c.muted }]}>{order.location_name} · {order.time_slot_time}</Text>
+        <Text style={[styles.title, { color: c.text }]}>{isQueued ? 'You\'re in the queue.' : 'Order placed.'}</Text>
+        <Text style={[styles.subtitle, { color: c.muted }]}>
+          {isQueued
+            ? 'We\'ll notify you when your batch is confirmed. Your card won\'t be charged until then.'
+            : order.location_name}
+        </Text>
 
         <View style={[styles.card, { backgroundColor: c.card, borderColor: c.border }]}>
           <View style={styles.cardRow}>
@@ -54,13 +60,30 @@ export default function ConfirmationPanel() {
           </View>
           <View style={[styles.divider, { backgroundColor: c.border }]} />
           <View style={styles.cardRow}>
-            <Text style={[styles.cardLabel, { color: c.muted }]}>TOTAL</Text>
+            <Text style={[styles.cardLabel, { color: c.muted }]}>{isQueued ? 'AMOUNT HELD' : 'TOTAL'}</Text>
             <Text style={[styles.cardValue, { color: c.text }]}>CA${((order.total_cents ?? 0) / 100).toFixed(2)}</Text>
           </View>
+          {isQueued && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+              <View style={styles.cardRow}>
+                <Text style={[styles.cardLabel, { color: c.muted }]}>PICKUP</Text>
+                <Text style={[styles.cardValue, { color: c.muted }]}>within 3 days of batch fill</Text>
+              </View>
+            </>
+          )}
+          {!isQueued && order.delivery_date && (
+            <>
+              <View style={[styles.divider, { backgroundColor: c.border }]} />
+              <View style={styles.cardRow}>
+                <Text style={[styles.cardLabel, { color: c.muted }]}>READY</Text>
+                <Text style={[styles.cardValue, { color: c.text }]}>{order.delivery_date}</Text>
+              </View>
+            </>
+          )}
         </View>
 
-
-        {isVerified && (
+        {!isQueued && isVerified && (
           <TouchableOpacity
             style={[styles.standingBtn, { backgroundColor: c.card, borderColor: c.border }]}
             onPress={() => jumpToPanel('standingOrder')}
