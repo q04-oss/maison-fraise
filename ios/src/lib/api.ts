@@ -78,6 +78,12 @@ export async function fetchLiveBatches(locationId: number, varietyId: number): P
   return res.json();
 }
 
+export async function fetchBatchStatus(locationId: number): Promise<{ variety_id: number; queued_boxes: number; min_quantity: number }[]> {
+  const res = await fetch(`${BASE_URL}/api/locations/${locationId}/batch-status`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function createOrder(body: {
   variety_id: number;
   location_id: number;

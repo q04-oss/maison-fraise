@@ -21,6 +21,7 @@ import {
   respondToAdImpression,
   fetchMyNodeApplication, submitNodeApplication, NodeApplication,
   requestWorkerAccess, fetchMyWorkerAccess,
+  fetchBatchStatus,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -87,6 +88,7 @@ const nameInputRef = useRef<TextInput>(null);
   });
   const [paying, setPaying] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any | null>(null);
+  const [batchStatus, setBatchStatus] = useState<Record<number, { queued_boxes: number; min_quantity: number }>>({});
 
   const location = activeLocation ?? businesses.find(b => b.id === order.location_id) ?? null;
   const isPopup = location?.type === 'popup';
@@ -99,6 +101,19 @@ const nameInputRef = useRef<TextInput>(null);
   useEffect(() => {
     if (orderOpen && orderStep !== 'variety') scrollToBottom();
   }, [orderStep]);
+
+  // Fetch batch fill progress per variety whenever the active location changes
+  useEffect(() => {
+    if (!activeLocation?.id) { setBatchStatus({}); return; }
+    let cancelled = false;
+    fetchBatchStatus(activeLocation.id).then(rows => {
+      if (cancelled) return;
+      const map: Record<number, { queued_boxes: number; min_quantity: number }> = {};
+      rows.forEach(r => { map[r.variety_id] = { queued_boxes: r.queued_boxes, min_quantity: r.min_quantity }; });
+      setBatchStatus(map);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeLocation?.id]);
 
   // Auto-open or reset order based on how terminal was triggered
   useEffect(() => {
@@ -550,7 +565,19 @@ const nameInputRef = useRef<TextInput>(null);
                                 }}
                                 activeOpacity={0.7}
                               >
-                                <Text style={[styles.optionName, { color: c.text }]}>{v.name}</Text>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[styles.optionName, { color: c.text }]}>{v.name}</Text>
+                                  {batchStatus[v.id] && (
+                                    <View style={styles.batchBarWrap}>
+                                      <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
+                                        <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, (batchStatus[v.id].queued_boxes / batchStatus[v.id].min_quantity) * 100)}%` }]} />
+                                      </View>
+                                      <Text style={[styles.batchBarLabel, { color: c.muted }]}>
+                                        {batchStatus[v.id].queued_boxes} of {batchStatus[v.id].min_quantity} boxes queued
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
                                 <Text style={[styles.optionMeta, { color: c.muted }]}>CA${(v.price_cents / 100).toFixed(0)}</Text>
                               </TouchableOpacity>
                             </React.Fragment>

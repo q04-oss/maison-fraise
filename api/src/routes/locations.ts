@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { and, eq, gt, lt, SQL, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { locations, timeSlots } from '../db/schema';
+import { locations, timeSlots, orders } from '../db/schema';
+import { MIN_QUANTITY } from '../lib/batchTrigger';
 
 export const locationsRouter = Router();
 export const slotsRouter = Router();
@@ -68,6 +69,43 @@ slotsRouter.get('/', async (req: Request, res: Response) => {
     res.json(
       rows.map((s) => ({ ...s, available: s.capacity - s.booked }))
     );
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/locations/:id/batch-status — queued box counts per variety for a location
+locationsRouter.get('/:id/batch-status', async (req: Request, res: Response) => {
+  const locationId = parseInt(req.params.id, 10);
+  if (isNaN(locationId)) {
+    res.status(400).json({ error: 'Invalid location id' });
+    return;
+  }
+  try {
+    const rows = await db
+      .select({
+        variety_id: orders.variety_id,
+        quantity: orders.quantity,
+      })
+      .from(orders)
+      .where(and(
+        eq(orders.location_id, locationId),
+        eq(orders.status, 'queued'),
+      ));
+
+    // Group by variety_id in JS
+    const grouped: Record<number, number> = {};
+    for (const row of rows) {
+      grouped[row.variety_id] = (grouped[row.variety_id] ?? 0) + row.quantity;
+    }
+
+    const result = Object.entries(grouped).map(([variety_id, queued_boxes]) => ({
+      variety_id: parseInt(variety_id, 10),
+      queued_boxes,
+      min_quantity: MIN_QUANTITY,
+    }));
+
+    res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
