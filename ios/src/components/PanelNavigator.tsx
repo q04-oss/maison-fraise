@@ -63,7 +63,7 @@ export default function PanelNavigator() {
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (COLLAPSED_PANELS.has(currentPanel) && lastNavType.current === 'show') {
-      timerRef.current = setTimeout(() => TrueSheet.dismiss('main-sheet'), 150);
+      timerRef.current = setTimeout(() => TrueSheet.dismiss('main-sheet'), 0);
     } else if (FULL_HEIGHT_PANELS.has(currentPanel) && lastNavType.current === 'show') {
       timerRef.current = setTimeout(() => TrueSheet.present('main-sheet', 2), 350);
     } else if (currentPanel === 'home' && mountedRef.current) {

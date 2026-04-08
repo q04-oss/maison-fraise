@@ -464,7 +464,7 @@ const nameInputRef = useRef<TextInput>(null);
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={[styles.terminalHeader, { borderBottomColor: c.border }]}>
         <View style={styles.headerSpacer} />
-        <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.6} style={{ flex: 1 }}>
+        <TouchableOpacity onPress={() => { TrueSheet.dismiss('main-sheet'); showPanel('verifyNFC'); }} activeOpacity={0.6} style={{ flex: 1 }}>
           <Text style={[styles.terminalTitle, { color: c.text }]}>box fraise</Text>
         </TouchableOpacity>
         <View style={styles.nfcHeaderBtn} />
