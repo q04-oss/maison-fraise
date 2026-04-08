@@ -804,12 +804,17 @@ const nameInputRef = useRef<TextInput>(null);
               </>
             )}
 
-            {/* ── Utility shortcuts ── */}
+            {/* ── Scan box ── */}
             <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
-              <Text style={[styles.label, { color: c.muted }]}>SCAN BOX</Text>
+            <TouchableOpacity style={styles.scanBoxRow} onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.scanBoxHeading, { color: c.text }]}>Scan your box</Text>
+                <Text style={[styles.scanBoxHint, { color: c.muted }]}>hold your phone to the NFC sticker</Text>
+              </View>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
+
+            {/* ── Utility shortcuts ── */}
             {isVerified && (
               <>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -1016,6 +1021,9 @@ const styles = StyleSheet.create({
   operatorBlock: { paddingTop: 4, paddingBottom: SPACING.md, gap: 6, alignItems: 'center' },
   operatorTag: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, textTransform: 'uppercase', paddingTop: 8 },
   inboxBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, width: '100%' },
+  scanBoxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
+  scanBoxHeading: { fontSize: 15, fontFamily: fonts.playfair },
+  scanBoxHint: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 2 },
   operatorInput: { width: '100%', height: 48, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 16, fontSize: 22, fontFamily: fonts.dmMono, textAlign: 'center', letterSpacing: 4 },
   operatorSubmit: { width: '100%', height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   adOfferCard: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 12, marginBottom: 8, gap: 10 },
