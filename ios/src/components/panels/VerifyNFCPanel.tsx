@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions, fetchWalkInToken } from '../../lib/api';
+import { verifyNfc, verifyNfcReorder, fetchStaffOrderByNfc, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions, fetchWalkInToken } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -25,39 +26,6 @@ export default function VerifyNFCPanel() {
     setErrorMsg('');
     try {
       const token = await readNfcToken();
-
-      // Feature F: market stall NFC tag
-      if (token.startsWith('fraise-stall-')) {
-        const stallId = token.replace('fraise-stall-', '');
-        const stallData = await fetchMarketStallAR(stallId);
-        setState('success');
-        await ARBoxModule.presentMarketStallAR(stallData);
-        showPanel('market-vendor');
-        return;
-      }
-
-      if (token === 'fraise.market') {
-        const marketResult = await collectMarketOrderByNfc(token);
-        setState('success');
-        if (marketResult.vendor_info) {
-          const marketPayload: ARVarietyData = {
-            variety_id: 0,
-            variety_name: marketResult.vendor_info.listing_name,
-            farm: marketResult.vendor_info.vendor_name,
-            harvest_date: null,
-            quantity: 0,
-            chocolate: '',
-            finish: '',
-            card_type: 'market',
-            vendor_description: marketResult.vendor_info.vendor_description ?? null,
-            vendor_instagram: marketResult.vendor_info.instagram_handle ?? null,
-            vendor_tags: marketResult.vendor_info.tags ?? [],
-          };
-          await ARBoxModule.presentAR(marketPayload);
-        }
-        showPanel('market-orders');
-        return;
-      }
 
       // Walk-in purchase tag
       if (token.startsWith('fraise-walkin-')) {
@@ -175,14 +143,13 @@ export default function VerifyNFCPanel() {
         });
 
         // Fetch all enrichment data in parallel
-        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, openFarmVisits, wordCloud, batchMembers, streakLeaders, currentChallenge, bundleSuggestion, upcomingDrop, personalBestFlavor, lotCompanions] = await Promise.all([
+        const [healthCtx, varietyProfile, activeDrop, scannedVarieties, collectifRankData, nearbyNotes, wordCloud, batchMembers, streakLeaders, currentChallenge, bundleSuggestion, upcomingDrop, personalBestFlavor, lotCompanions] = await Promise.all([
           getTodayHealthContext().catch(() => null),
           reorderData.variety_id ? fetchVarietyProfile(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           reorderData.variety_id ? fetchActiveDropForVariety(reorderData.variety_id).catch(() => null) : Promise.resolve(null),
           fetchMyScannedVarieties().catch(() => [] as any[]),
           fetchCollectifRank().catch(() => null),
           fetchNearbyArNotes(deviceLat, deviceLng).catch(() => [] as any[]),
-          fetchOpenFarmVisits(reorderData.farm ?? '').catch(() => [] as any[]),
           reorderData.variety_id ? fetchTastingWordCloud(reorderData.variety_id).catch(() => [] as any[]) : Promise.resolve([]),
           reorderData.variety_id ? fetchBatchMembers(reorderData.variety_id).catch(() => [] as any[]) : Promise.resolve([]),
           reorderData.variety_id ? fetchVarietyStreakLeaders(reorderData.variety_id).catch(() => ({ leaders: [], my_rank: null })) : Promise.resolve({ leaders: [], my_rank: null }),
@@ -306,7 +273,6 @@ export default function VerifyNFCPanel() {
           carbon_offset_program: (varietyProfile as any)?.carbon_offset_program ?? null,
           sunlight_hours: (varietyProfile as any)?.sunlight_hours ?? null,
           price_history_json: (varietyProfile as any)?.price_history_json ?? null,
-          open_farm_visit: (openFarmVisits as any[])[0] ?? null,
           nearby_ar_notes: nearbyNotes ?? [],
           // AR Expanded 5-6: science & sensory
           personal_best_flavor: (personalBestFlavor as any) ?? null,
@@ -372,30 +338,13 @@ export default function VerifyNFCPanel() {
         if (arResult && arResult.rating && reorderData.variety_id) {
           saveTastingRating(reorderData.variety_id, arResult.rating, arResult.notes ?? null).catch(() => {});
         }
-        // AR Expanded 4: handle farm visit tap, leave note
         if (arResult?.gift_registry_added && reorderData.variety_id) {
           addToGiftRegistry(reorderData.variety_id, reorderData.variety_name ?? undefined).catch(() => {});
-        }
-        if (arResult?.farm_visit_tapped) {
-          showPanel('farm-visits');
-          return;
-        }
-        if (arResult?.referral_tapped) {
-          showPanel('referral');
-          return;
-        }
-        if (arResult?.bundle_tapped) {
-          showPanel('drops');
-          return;
         }
         if (arResult?.note_body && arResult?.note_color) {
           postArNote(deviceLat, deviceLng, arResult.note_body, arResult.note_color).catch(() => {});
         }
-        if (activeDrop) {
-          showPanel('drop-detail', { drop: activeDrop });
-        } else {
-          showPanel('ar-box', arPayload);
-        }
+        goHome();
       } else {
         const result = await verifyNfc(token);
         await AsyncStorage.setItem('verified', 'true');
@@ -417,6 +366,7 @@ export default function VerifyNFCPanel() {
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
       setState('error');
+      TrueSheet.present('main-sheet', 1);
     }
   };
 
