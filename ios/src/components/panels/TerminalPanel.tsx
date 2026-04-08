@@ -946,7 +946,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   terminalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
   headerSpacer: { width: 40 },
-  terminalTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontFamily: fonts.playfair },
+  terminalTitle: { textAlign: 'center', fontSize: 18, fontFamily: fonts.playfair },
   nfcHeaderBtn: { width: 40, alignItems: 'flex-end' },
   nfcHeaderLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
   body: { paddingTop: 8, paddingHorizontal: SPACING.md },
