@@ -112,11 +112,12 @@ export default function HomePanel() {
       {/* Collapsed strip */}
       <TouchableOpacity
         style={styles.strip}
-        activeOpacity={activeLocation?.shop_user_id ? 0.6 : 1}
+        activeOpacity={activeLocation ? 0.6 : 1}
         onPress={() => {
-          if (!activeLocation?.shop_user_id) return;
-          setPanelData({ userId: activeLocation.shop_user_id, displayName: activeLocation.name, isShop: true });
-          jumpToPanel('messageThread');
+          if (!activeLocation) return;
+          setPanelData({ openOrder: true });
+          jumpToPanel('terminal');
+          setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
         }}
       >
         <Text style={[styles.stripBrand, { color: c.text }]}>
