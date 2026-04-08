@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, users, legitimacyEvents, varieties, standingOrders, batches } from '../db/schema';
+import { orders, users, legitimacyEvents, varieties, batches } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 import { fireWebhook } from '../lib/webhooks';
@@ -336,6 +336,7 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       batch_notes: batchInfo?.notes ?? null,
     });
   } catch (err) {
+    logger.error('verify/reorder error: ' + String(err));
     res.status(500).json({ error: 'Internal server error' });
   }
 });
