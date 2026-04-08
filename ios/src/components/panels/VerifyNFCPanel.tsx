@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -13,6 +14,7 @@ type FirstTapResult = { streak_weeks?: number; streak_milestone?: boolean; bank_
 
 export default function VerifyNFCPanel() {
   const { goHome, showPanel } = usePanel();
+  const insets = useSafeAreaInsets();
   const showPanelRef = useRef(showPanel);
   showPanelRef.current = showPanel;
   const goHomeRef = useRef(goHome);
@@ -175,7 +177,7 @@ export default function VerifyNFCPanel() {
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity onPress={() => { cancelNfc(); goHomeRef.current(); }} activeOpacity={0.7} style={styles.headerLeft}>
           <Text style={[styles.headerBackText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
@@ -197,7 +199,7 @@ export default function VerifyNFCPanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 24, paddingBottom: 14 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingBottom: 14 },
   headerLeft: { width: 72 },
   headerRight: { width: 72, alignItems: 'flex-end' },
   headerBackText: { fontSize: 28, lineHeight: 34 },
