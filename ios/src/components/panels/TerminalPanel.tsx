@@ -579,24 +579,17 @@ const nameInputRef = useRef<TextInput>(null);
                                 }}
                                 activeOpacity={0.7}
                               >
-                                <View style={{ flex: 1 }}>
-                                  <Text style={[styles.optionName, { color: c.text }]}>{v.name}</Text>
-                                  {(() => {
-                                    const bs = batchStatus[v.id] ?? { queued_boxes: 0, min_quantity: 4 };
-                                    return (
-                                      <View style={styles.batchBarWrap}>
-                                        <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
-                                          <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, (bs.queued_boxes / bs.min_quantity) * 100)}%` }]} />
-                                        </View>
-                                        <Text style={[styles.batchBarLabel, { color: c.muted }]}>
-                                          {bs.queued_boxes} of {bs.min_quantity} boxes queued
-                                        </Text>
-                                      </View>
-                                    );
-                                  })()}
-                                </View>
+                                <Text style={[styles.optionName, { color: c.text }]}>{v.name}</Text>
                                 <Text style={[styles.optionMeta, { color: c.muted }]}>CA${(v.price_cents / 100).toFixed(0)}</Text>
                               </TouchableOpacity>
+                                <View style={styles.batchBarWrap}>
+                                  <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
+                                    <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, ((batchStatus[v.id]?.queued_boxes ?? 0) / (batchStatus[v.id]?.min_quantity ?? 4)) * 100)}%` }]} />
+                                  </View>
+                                  <Text style={[styles.batchBarLabel, { color: c.muted }]}>
+                                    {batchStatus[v.id]?.queued_boxes ?? 0} of {batchStatus[v.id]?.min_quantity ?? 4} boxes queued
+                                  </Text>
+                                </View>
                             </React.Fragment>
                           ))
                         )}
