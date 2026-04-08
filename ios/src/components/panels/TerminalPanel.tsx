@@ -462,10 +462,10 @@ const nameInputRef = useRef<TextInput>(null);
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={[styles.terminalHeader, { borderBottomColor: c.border }]}>
         <View style={styles.headerSpacer} />
-        <Text style={[styles.terminalTitle, { color: c.text }]}>box fraise</Text>
-        <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.6} style={styles.nfcHeaderBtn}>
-          <Text style={[styles.nfcHeaderLabel, { color: c.muted }]}>scan</Text>
+        <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.6} style={{ flex: 1 }}>
+          <Text style={[styles.terminalTitle, { color: c.text }]}>box fraise</Text>
         </TouchableOpacity>
+        <View style={styles.nfcHeaderBtn} />
       </View>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
 
