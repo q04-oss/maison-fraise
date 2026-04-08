@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Haptics from 'expo-haptics';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useApp } from '../../../App';
 import ARBoxModule from '../../lib/NativeARBoxModule';
@@ -33,6 +34,7 @@ export default function TerminalPanel() {
   const { pushToken } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
 
   // Auth state
@@ -630,7 +632,7 @@ const nameInputRef = useRef<TextInput>(null);
                       </>
                     )}
 
-                    {/* Step: Review */}
+                                        {/* Step: Review */}
                     {orderStep === 'review' && (
                       <>
                         <View style={[styles.rowDivider, { backgroundColor: c.border }]} />
@@ -640,33 +642,7 @@ const nameInputRef = useRef<TextInput>(null);
                             {inlineOrder.chocolate_name}{'  ·  '}{inlineOrder.finish_name}{'  ·  '}×{inlineOrder.quantity}
                           </Text>
                           <Text style={[styles.reviewDetail, { color: c.muted }]}>{location?.name}</Text>
-                          <View style={styles.reviewFooter}>
-                            <Text style={[styles.reviewTotal, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
-                            <View style={styles.reviewPayBtns}>
-                              {userDbId && adBalanceCents >= totalCents && (
-                                <TouchableOpacity
-                                  style={[styles.payBtn, { backgroundColor: c.accent }, paying && { opacity: 0.5 }]}
-                                  onPress={handlePayWithBalance}
-                                  disabled={paying}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={[styles.payBtnText, { color: c.ctaText }]}>
-                                    {paying ? 'Processing…' : `use ad balance  ·  CA$${(adBalanceCents / 100).toFixed(2)}`}
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                              <TouchableOpacity
-                                style={[styles.payBtn, userDbId && adBalanceCents >= totalCents ? [styles.payBtnOutline, { borderColor: c.border }] : { backgroundColor: c.accent }, paying && { opacity: 0.5 }]}
-                                onPress={handlePay}
-                                disabled={paying}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={[styles.payBtnText, { color: userDbId && adBalanceCents >= totalCents ? c.text : c.ctaText }]}>
-                                  {paying ? 'Processing…' : 'pay with card'}
-                                </Text>
-                              </TouchableOpacity>
-                            </View>
-                          </View>
+                          <Text style={[styles.reviewTotal, { color: c.text }]}>CA${(totalCents / 100).toFixed(2)}</Text>
                         </View>
                       </>
                     )}
@@ -938,6 +914,32 @@ const nameInputRef = useRef<TextInput>(null);
 
         <View style={{ height: 48 }} />
       </ScrollView>
+      {orderStep === 'review' && (
+        <View style={[styles.reviewBar, { backgroundColor: paying ? c.cardDark : c.accent }]}>
+          {userDbId && adBalanceCents >= totalCents && (
+            <TouchableOpacity
+              style={[styles.reviewBarBtn, styles.reviewBarBtnBalance, paying && { opacity: 0.5 }]}
+              onPress={handlePayWithBalance}
+              disabled={paying}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.reviewBarBtnText}>
+                {paying ? 'Processing…' : `use balance · CA${(adBalanceCents / 100).toFixed(2)}`}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.reviewBarBtn, { paddingBottom: Math.max(insets.bottom, SPACING.md) }, paying && { opacity: 0.55 }]}
+            onPress={handlePay}
+            disabled={paying}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.reviewBarBtnText}>
+              {paying ? 'Processing…' : `Pay · CA${(totalCents / 100).toFixed(2)}`}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -1054,4 +1056,8 @@ const styles = StyleSheet.create({
   },
   workerAccessLink: { alignItems: 'center', paddingVertical: 16 },
   workerAccessLinkText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
+  reviewBar: {},
+  reviewBarBtn: { paddingTop: 20, alignItems: 'center' },
+  reviewBarBtnBalance: { paddingTop: 16, paddingBottom: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.25)', width: '100%' },
+  reviewBarBtnText: { fontSize: 17, fontFamily: fonts.dmSans, fontWeight: '700', color: '#FFFFFF' },
 });
