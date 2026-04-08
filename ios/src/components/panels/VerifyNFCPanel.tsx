@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
@@ -13,6 +13,10 @@ type FirstTapResult = { streak_weeks?: number; streak_milestone?: boolean; bank_
 
 export default function VerifyNFCPanel() {
   const { goHome, showPanel } = usePanel();
+  const showPanelRef = useRef(showPanel);
+  showPanelRef.current = showPanel;
+  const goHomeRef = useRef(goHome);
+  goHomeRef.current = goHome;
   const c = useColors();
   const [state, setState] = useState<State>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
@@ -28,7 +32,7 @@ export default function VerifyNFCPanel() {
       const isDemo = await AsyncStorage.getItem('is_demo') === 'true';
       if (isDemo) {
         setState('success');
-        showPanel('nfc-reveal', { variety_name: 'Gariguette', tasting_notes: null, location_id: null });
+        showPanelRef.current('nfc-reveal', { variety_name: 'Gariguette', tasting_notes: null, location_id: null });
         return;
       }
 
@@ -39,7 +43,7 @@ export default function VerifyNFCPanel() {
 
         // Location is a pre-order pickup node — redirect to ordering flow
         if (data.allows_walkin === false) {
-          showPanel('location', { preselect_location_id: data.location_id, preselect_location_name: data.location_name });
+          showPanelRef.current('location', { preselect_location_id: data.location_id, preselect_location_name: data.location_name });
           return;
         }
 
@@ -62,15 +66,15 @@ export default function VerifyNFCPanel() {
               tasting_word_cloud: [], batch_members: [], lot_companions: [],
             } as any;
             await ARBoxModule.presentAR(arPayload);
-            goHome();
+            goHomeRef.current();
           } else {
             // Someone else's box at a walkin location — show remaining inventory
             setState('success');
-            showPanel('walk-in-inventory', { location_id: data.location_id, location_name: data.location_name });
+            showPanelRef.current('walk-in-inventory', { location_id: data.location_id, location_name: data.location_name });
           }
         } else {
           setState('success');
-          showPanel('walk-in', { walk_in_token: token });
+          showPanelRef.current('walk-in', { walk_in_token: token });
         }
         return;
       }
@@ -82,7 +86,7 @@ export default function VerifyNFCPanel() {
           variety_id: 0, variety_name: null, farm: null, harvest_date: null,
           quantity: 0, chocolate: '', finish: '', card_type: 'thankyou',
         } as any);
-        goHome();
+        goHomeRef.current();
         return;
       }
 
@@ -136,7 +140,7 @@ export default function VerifyNFCPanel() {
       if (alreadyVerified) {
         const reorderData = await verifyNfcReorder(token);
         setState('success');
-        showPanel('nfc-reveal', {
+        showPanelRef.current('nfc-reveal', {
           variety_name: reorderData.variety_name ?? 'Strawberry',
           tasting_notes: null,
           location_id: reorderData.location_id ?? null,
@@ -156,7 +160,7 @@ export default function VerifyNFCPanel() {
         requestHealthKitPermissions().catch(() => {});
         setFirstTapResult({ streak_weeks: result.streak_weeks, streak_milestone: result.streak_milestone, bank_days: result.bank_days, tier: result.tier });
         setState('success');
-        setTimeout(() => showPanel('verified'), result.streak_milestone ? 2000 : 600);
+        setTimeout(() => showPanelRef.current('verified'), result.streak_milestone ? 2000 : 600);
       }
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
@@ -172,7 +176,7 @@ export default function VerifyNFCPanel() {
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => { cancelNfc(); goHome(); }} activeOpacity={0.7} style={styles.headerLeft}>
+        <TouchableOpacity onPress={() => { cancelNfc(); goHomeRef.current(); }} activeOpacity={0.7} style={styles.headerLeft}>
           <Text style={[styles.headerBackText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <TouchableOpacity
