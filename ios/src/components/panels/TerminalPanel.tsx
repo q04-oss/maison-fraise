@@ -30,7 +30,8 @@ const SHEET_NAME = 'main-sheet';
 type OrderStep = 'variety' | 'chocolate' | 'finish' | 'quantity' | 'review' | 'confirmed';
 
 export default function TerminalPanel() {
-  const { goHome, showPanel, setOrder, order, setActiveLocation, varieties, businesses, activeLocation, panelData, setPanelData } = usePanel();
+  const { goHome, showPanel, setOrder, order, setActiveLocation, varieties, businesses, activeLocation, panelData, setPanelData, sheetHeight } = usePanel();
+  const isCollapsed = sheetHeight < 110;
   const { pushToken } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const c = useColors();
@@ -470,12 +471,12 @@ const nameInputRef = useRef<TextInput>(null);
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={[styles.terminalHeader, { borderBottomColor: c.border }]}>
-        <View style={styles.headerSpacer} />
+      <View style={[styles.terminalHeader, { borderBottomColor: isCollapsed ? 'transparent' : c.border }]}>
+        {!isCollapsed && <View style={styles.headerSpacer} />}
         <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.6} style={{ flex: 1 }}>
           <Text style={[styles.terminalTitle, { color: c.text }]}>box fraise</Text>
         </TouchableOpacity>
-        <View style={styles.nfcHeaderBtn} />
+        {!isCollapsed && <View style={styles.nfcHeaderBtn} />}
       </View>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
 
