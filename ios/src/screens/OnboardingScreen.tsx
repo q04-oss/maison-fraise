@@ -56,6 +56,7 @@ export default function OnboardingScreen({ onDone }: Props) {
         ['user_db_id', String(result.user_id)],
         ['verified', 'true'],
         ['onboarding_done', '1'],
+        ['is_demo', 'true'],
       ]);
       onDone();
     } catch {

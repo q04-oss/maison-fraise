@@ -24,6 +24,14 @@ export default function VerifyNFCPanel() {
     try {
       const token = await readNfcToken();
 
+      // Demo mode: skip server call, show mock reveal
+      const isDemo = await AsyncStorage.getItem('is_demo') === 'true';
+      if (isDemo) {
+        setState('success');
+        showPanel('nfc-reveal', { variety_name: 'Gariguette', tasting_notes: null, location_id: null });
+        return;
+      }
+
       // Walk-in purchase tag
       if (token.startsWith('fraise-walkin-')) {
         const data = await fetchWalkInToken(token).catch(() => null);
