@@ -449,7 +449,7 @@ export default function VerifyNFCPanel() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  errorHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  errorHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 14, paddingBottom: 14 },
   errorBack: { width: 40 },
   errorBackText: { fontSize: 28, lineHeight: 34 },
   errorTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: fonts.playfair },
