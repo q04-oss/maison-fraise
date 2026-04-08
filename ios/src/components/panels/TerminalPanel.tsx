@@ -460,6 +460,13 @@ const nameInputRef = useRef<TextInput>(null);
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
+      <View style={[styles.terminalHeader, { borderBottomColor: c.border }]}>
+        <View style={styles.headerSpacer} />
+        <Text style={[styles.terminalTitle, { color: c.text }]}>box fraise</Text>
+        <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.6} style={styles.nfcHeaderBtn}>
+          <Text style={[styles.nfcHeaderLabel, { color: c.muted }]}>scan</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView ref={scrollRef} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
 
         {loading ? (
@@ -802,16 +809,6 @@ const nameInputRef = useRef<TextInput>(null);
               </>
             )}
 
-            {/* ── Scan box ── */}
-            <View style={[styles.divider, { backgroundColor: c.border }]} />
-            <TouchableOpacity style={styles.scanBoxRow} onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.scanBoxHeading, { color: c.text }]}>Scan your box</Text>
-                <Text style={[styles.scanBoxHint, { color: c.muted }]}>hold your phone to the NFC sticker</Text>
-              </View>
-              <Text style={[styles.label, { color: c.accent }]}>→</Text>
-            </TouchableOpacity>
-
             {/* ── Utility shortcuts ── */}
             {isVerified && (
               <>
@@ -947,6 +944,11 @@ const nameInputRef = useRef<TextInput>(null);
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  terminalHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 14, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth },
+  headerSpacer: { width: 40 },
+  terminalTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontFamily: fonts.playfair },
+  nfcHeaderBtn: { width: 40, alignItems: 'flex-end' },
+  nfcHeaderLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
   body: { paddingTop: 8, paddingHorizontal: SPACING.md },
   identityBlock: { paddingTop: 4, paddingBottom: SPACING.md, gap: 6, alignItems: 'center' },
   name: { fontSize: 32, fontFamily: fonts.playfair, textAlign: 'center' },
