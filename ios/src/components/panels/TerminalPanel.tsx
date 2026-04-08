@@ -860,18 +860,6 @@ const nameInputRef = useRef<TextInput>(null);
                       <Text style={[styles.workerRequestStatus, { color: c.muted }]}>Visit this location to be eligible</Text>
                     </View>
                   </>
-                ) : workerAccess === 'none' ? (
-                  <>
-                    <TouchableOpacity
-                      style={[styles.workerRequestBtn, { borderColor: c.border }]}
-                      onPress={handleRequestWorkerAccess}
-                      disabled={requestingAccess}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.label, { color: c.muted }]}>REQUEST WORKER ACCESS</Text>
-                      <Text style={[styles.label, { color: c.accent }]}>{requestingAccess ? '…' : '→'}</Text>
-                    </TouchableOpacity>
-                  </>
                 ) : null}
               </>
             )}
@@ -1064,4 +1052,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  workerAccessLink: { alignItems: 'center', paddingVertical: 16 },
+  workerAccessLinkText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
 });
