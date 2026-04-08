@@ -63,6 +63,14 @@ export default function VerifyNFCPanel() {
       if (token.startsWith('fraise-walkin-')) {
         const data = await fetchWalkInToken(token).catch(() => null);
         if (!data) { setErrorMsg('Tag not recognised.'); setState('error'); return; }
+
+        // Location is a pre-order pickup node — redirect to ordering flow
+        if (data.walkin_unavailable || !data.allows_walkin) {
+          setState('success');
+          showPanel('location', { preselect_location_id: data.location_id, preselect_location_name: data.location_name });
+          return;
+        }
+
         if (data.claimed) {
           const myEmail = await AsyncStorage.getItem('user_email');
           if (myEmail && myEmail === data.owner_email) {
@@ -84,7 +92,7 @@ export default function VerifyNFCPanel() {
             await ARBoxModule.presentAR(arPayload);
             goHome();
           } else {
-            // Someone else's box — show remaining inventory at this location
+            // Someone else's box at a walkin location — show remaining inventory
             setState('success');
             showPanel('walk-in-inventory', { location_id: data.location_id, location_name: data.location_name });
           }

@@ -170,6 +170,7 @@ export interface Business {
   venture_id?: number | null;
   has_toilet?: boolean;
   toilet_fee_cents?: number;
+  allows_walkin?: boolean;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;

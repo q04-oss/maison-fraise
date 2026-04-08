@@ -95,6 +95,7 @@ export const locations = pgTable('locations', {
   address: text('address').notNull(),
   active: boolean('active').notNull().default(true),
   staff_pin: text('staff_pin'),
+  allows_walkin: boolean('allows_walkin').notNull().default(false),
 });
 
 export const timeSlots = pgTable('time_slots', {
@@ -237,6 +238,8 @@ export const businesses = pgTable('businesses', {
   toilet_fee_cents: integer('toilet_fee_cents').notNull().default(150),
   // Beacon proximity detection
   beacon_uuid: text('beacon_uuid').unique(),
+  // Walk-in purchases: only true for the chocolatier's own counter (Marché Atwater)
+  allows_walkin: boolean('allows_walkin').notNull().default(false),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

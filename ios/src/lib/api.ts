@@ -3906,7 +3906,20 @@ export async function fetchMyArtContributions(): Promise<{ painted: any[]; colle
 }
 
 
-export async function fetchWalkInToken(token: string): Promise<any> {
+export async function fetchWalkInToken(token: string): Promise<{
+  id: number;
+  token: string;
+  claimed: boolean;
+  location_id: number;
+  location_name: string;
+  allows_walkin: boolean;
+  walkin_unavailable?: boolean;
+  variety_id: number;
+  variety_name: string;
+  price_cents: number;
+  stock_remaining: number;
+  owner_email?: string | null;
+}> {
   const r = await fetch(`${BASE_URL}/api/walkin/${encodeURIComponent(token)}`);
   if (r.status === 404) throw new Error('not_found');
   if (r.status === 410) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gone'); }

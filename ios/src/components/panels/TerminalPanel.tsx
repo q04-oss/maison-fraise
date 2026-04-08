@@ -970,11 +970,15 @@ const nameInputRef = useRef<TextInput>(null);
                   <Text style={[styles.label, { color: c.muted }]}>WRITE GENERIC TAG</Text>
                   <Text style={[styles.label, { color: c.accent }]}>→</Text>
                 </TouchableOpacity>
-                <View style={[styles.divider, { backgroundColor: c.border }]} />
-                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('walk-in-write')} activeOpacity={0.7}>
-                  <Text style={[styles.label, { color: c.muted }]}>WRITE WALK-IN TAGS</Text>
-                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
-                </TouchableOpacity>
+                {location?.allows_walkin && (
+                  <>
+                    <View style={[styles.divider, { backgroundColor: c.border }]} />
+                    <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('walk-in-write')} activeOpacity={0.7}>
+                      <Text style={[styles.label, { color: c.muted }]}>WRITE WALK-IN TAGS</Text>
+                      <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
                 {staffPinNeeded ? (
                   <View style={styles.staffPinRow}>

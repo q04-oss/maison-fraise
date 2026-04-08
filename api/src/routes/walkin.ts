@@ -8,6 +8,9 @@ import { logger } from '../lib/logger';
 
 const router = Router();
 
+// Self-healing
+db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS allows_walkin boolean NOT NULL DEFAULT false`).catch(() => {});
+
 // GET /api/walkin/inventory?location_id=X — unclaimed tokens at a location grouped by variety
 router.get('/inventory', async (req: Request, res: Response) => {
   const location_id = parseInt(req.query.location_id as string, 10);
@@ -48,6 +51,7 @@ router.get('/:token', async (req: Request, res: Response) => {
         claimed_order_id: walkInTokens.claimed_order_id,
         location_id: walkInTokens.location_id,
         location_name: locations.name,
+        allows_walkin: locations.allows_walkin,
         variety_id: walkInTokens.variety_id,
         variety_name: varieties.name,
         price_cents: varieties.price_cents,
@@ -68,6 +72,12 @@ router.get('/:token', async (req: Request, res: Response) => {
         .from(orders)
         .where(eq(orders.id, row.claimed_order_id));
       res.json({ ...row, owner_email: order?.customer_email ?? null });
+      return;
+    }
+
+    // Walk-in not allowed at this location — return flag so app can redirect to pre-order
+    if (!row.allows_walkin) {
+      res.json({ ...row, walkin_unavailable: true });
       return;
     }
 
@@ -96,16 +106,19 @@ router.post('/:token/order', async (req: Request, res: Response) => {
         id: walkInTokens.id,
         claimed: walkInTokens.claimed,
         location_id: walkInTokens.location_id,
+        allows_walkin: locations.allows_walkin,
         variety_id: walkInTokens.variety_id,
         price_cents: varieties.price_cents,
         stock_remaining: varieties.stock_remaining,
         variety_name: varieties.name,
       })
       .from(walkInTokens)
+      .innerJoin(locations, eq(walkInTokens.location_id, locations.id))
       .innerJoin(varieties, eq(walkInTokens.variety_id, varieties.id))
       .where(eq(walkInTokens.token, token));
 
     if (!row) { res.status(404).json({ error: 'not_found' }); return; }
+    if (!row.allows_walkin) { res.status(403).json({ error: 'walkin_not_available' }); return; }
     if (row.claimed) { res.status(410).json({ error: 'already_claimed' }); return; }
     if (row.stock_remaining <= 0) { res.status(410).json({ error: 'sold_out' }); return; }
 
