@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  RefreshControl, StyleSheet, ActivityIndicator, Image, FlatList,
+  RefreshControl, StyleSheet, ActivityIndicator, FlatList,
 } from 'react-native';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel, Variety } from '../../context/PanelContext';
@@ -273,9 +273,6 @@ export default function HomePanel() {
                                 {batchStatus[v.id]?.queued_boxes ?? 0} of {batchStatus[v.id]?.min_quantity ?? 4} queued
                               </Text>
                             </View>
-                            {v.image_url && (
-                              <Image source={{ uri: v.image_url }} style={[styles.thumb, { backgroundColor: c.border }]} />
-                            )}
                           </View>
                         </TouchableOpacity>
                       </React.Fragment>
@@ -336,7 +333,6 @@ const styles = StyleSheet.create({
   rating: { fontSize: 10, fontFamily: fonts.dmMono },
   varietyDesc: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 20, fontStyle: 'italic' },
   varietyBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 4 },
-  thumb: { width: 64, height: 64, borderRadius: 8 },
   retryRow: { paddingVertical: 16 },
   retryText: { fontSize: 12, fontFamily: fonts.dmSans, fontStyle: 'italic' },
   nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
