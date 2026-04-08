@@ -275,7 +275,7 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
         AND so.status = 'active'
       ORDER BY so.next_order_date ASC
       LIMIT 1
-    `);
+    `).catch(() => ({ rows: [] }));
     const standingRow = ((standingRows as any).rows ?? standingRows)[0] ?? null;
     let nextStandingOrder: { variety_name: string; days_until: number } | null = null;
     if (standingRow?.next_order_date) {
