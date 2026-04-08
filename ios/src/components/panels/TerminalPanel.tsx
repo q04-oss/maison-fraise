@@ -669,7 +669,7 @@ const nameInputRef = useRef<TextInput>(null);
                 )}
               </View>
 
-            {isVerified && !isShop && nodeApplication !== undefined && (
+            {isVerified && !isShop && nodeApplication != null && (
               <>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
                 {nodeApplication === null ? (
