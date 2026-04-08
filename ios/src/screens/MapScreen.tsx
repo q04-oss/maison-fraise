@@ -162,17 +162,17 @@ export default function MapScreen() {
     if (pendingScreen === 'order-history') {
       clearPendingScreen();
       showPanel('order-history');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
     }
     if (pendingScreen === 'profile') {
       clearPendingScreen();
       jumpToPanel('terminal');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     }
     if (pendingScreen === 'NFCVerify') {
       clearPendingScreen();
       showPanel('verifyNFC');
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
     }
   }, [pendingScreen, businesses]);
 
@@ -220,7 +220,7 @@ export default function MapScreen() {
     setActiveLocation(biz);
     goHome();
     setOrder({ location_id: biz.id, location_name: biz.name });
-    setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
+    setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     mapRef.current?.animateToRegion({
       latitude: biz.lat - 0.003,
       longitude: biz.lng,
@@ -237,7 +237,7 @@ export default function MapScreen() {
   const handlePartnerPress = (biz: any) => {
     setActiveLocation(biz);
     showPanel('partner-detail');
-    setTimeout(() => TrueSheet.present(SHEET_NAME, 2), 350);
+    setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
     mapRef.current?.animateToRegion({
       latitude: biz.lat - 0.003,
       longitude: biz.lng,
@@ -249,7 +249,7 @@ export default function MapScreen() {
   const handlePopupPress = (biz: any) => {
     setActiveLocation(biz);
     showPanel('home');
-    setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350);
+    setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     mapRef.current?.animateToRegion({
       latitude: biz.lat - 0.003,
       longitude: biz.lng,
@@ -499,7 +499,7 @@ export default function MapScreen() {
 
       <TouchableOpacity
         style={[styles.profileBtn, { backgroundColor: c.card, top: insets.top + 12 }]}
-        onPress={() => { setPanelData({ resetOrder: true }); jumpToPanel('terminal'); setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 350); }}
+        onPress={() => { setPanelData({ resetOrder: true }); jumpToPanel('terminal'); setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350); }}
         onLongPress={handleSignOut}
         delayLongPress={600}
         activeOpacity={0.8}

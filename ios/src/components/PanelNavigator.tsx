@@ -45,14 +45,14 @@ const PANELS: Record<string, React.ComponentType<any>> = {
 };
 
 const FULL_HEIGHT_PANELS = new Set([
-  'nfc-write', 'nfc-reveal', 'walk-in', 'walk-in-write', 'walk-in-inventory',
+  'nfc-write', 'walk-in', 'walk-in-write', 'walk-in-inventory',
   'verified', 'batch-preference', 'partner-detail', 'order-history',
   'search', 'receipt',
   'my-profile', 'notifications', 'staff-orders',
 ]);
 
 // Panels that collapse the sheet so native system UI (NFC prompt) appears unobstructed
-const COLLAPSED_PANELS = new Set(['verifyNFC']);
+const COLLAPSED_PANELS = new Set<string>();
 
 export default function PanelNavigator() {
   const { currentPanel, slideAnim, lastNavType } = usePanel();
@@ -65,11 +65,11 @@ export default function PanelNavigator() {
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (COLLAPSED_PANELS.has(currentPanel) && lastNavType.current === 'show') {
-      timerRef.current = setTimeout(() => TrueSheet.present('main-sheet', 0), 0);
+      timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 0), 0);
     } else if (FULL_HEIGHT_PANELS.has(currentPanel) && lastNavType.current === 'show') {
-      timerRef.current = setTimeout(() => TrueSheet.present('main-sheet', 2), 350);
+      timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 2), 350);
     } else if (currentPanel === 'home' && mountedRef.current) {
-      timerRef.current = setTimeout(() => TrueSheet.present('main-sheet', 1), 350);
+      timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 1), 350);
     }
     mountedRef.current = true;
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };

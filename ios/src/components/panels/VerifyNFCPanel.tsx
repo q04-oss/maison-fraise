@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, verifyNfcReorder, fetchStaffOrderByNfc, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions, fetchWalkInToken } from '../../lib/api';
+import { verifyNfc, verifyNfcReorder, fetchStaffOrderByNfc, staffMarkPrepare, staffMarkReady, staffFlagOrder, bulkPrepareOrders, fetchPickupGrid, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchWalkInToken } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
-import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
+import { logStrawberries, requestHealthKitPermissions } from '../../lib/HealthKitService';
 
-type State = 'scanning' | 'success' | 'error' | 'revealed';
+type State = 'scanning' | 'success' | 'error';
 type FirstTapResult = { streak_weeks?: number; streak_milestone?: boolean; bank_days?: number; tier?: string | null } | null;
 
 export default function VerifyNFCPanel() {
@@ -17,7 +16,6 @@ export default function VerifyNFCPanel() {
   const c = useColors();
   const [state, setState] = useState<State>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
-  const [revealData, setRevealData] = useState<{ variety_name: string; tasting_notes: string | null; location_id: number | null } | null>(null);
   const [firstTapResult, setFirstTapResult] = useState<FirstTapResult>(null);
 
   const scan = async () => {
@@ -80,10 +78,9 @@ export default function VerifyNFCPanel() {
         return;
       }
 
-      // Feature E: staff AR — check if user is staff before normal flow
+      // Staff flow
       const isStaff = await AsyncStorage.getItem('is_staff') === 'true';
       if (isStaff) {
-        // Batch scan token: staff taps "batch scan" button which writes fraise-batch to NFC trigger
         if (token === 'fraise-batch') {
           setState('success');
           const pin = await AsyncStorage.getItem('staff_pin') ?? '';
@@ -130,20 +127,18 @@ export default function VerifyNFCPanel() {
 
       if (alreadyVerified) {
         const reorderData = await verifyNfcReorder(token);
-        setRevealData({
+        setState('success');
+        showPanel('nfc-reveal', {
           variety_name: reorderData.variety_name ?? 'Strawberry',
           tasting_notes: null,
           location_id: reorderData.location_id ?? null,
         });
-        setState('revealed');
-        TrueSheet.present('main-sheet', 2).catch(() => {});
       } else {
         const result = await verifyNfc(token);
         await AsyncStorage.setItem('verified', 'true');
         if (result.fraise_chat_email) {
           await AsyncStorage.setItem('fraise_chat_email', result.fraise_chat_email);
         }
-        // Store is_staff flag for future scans
         if (result.is_dj) {
           await AsyncStorage.setItem('is_staff', 'true');
         }
@@ -166,32 +161,6 @@ export default function VerifyNFCPanel() {
     return () => { clearTimeout(t); cancelNfc(); };
   }, []);
 
-  if (state === 'revealed' && revealData) {
-    return (
-      <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-        <View style={styles.revealHeader}>
-          <TouchableOpacity onPress={goHome} activeOpacity={0.7}>
-            <Text style={[styles.headerBackText, { color: c.accent }]}>←</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.revealBody}>
-          <Text style={[styles.collectedLabel, { color: c.muted, fontFamily: fonts.dmMono }]}>COLLECTED</Text>
-          <Text style={[styles.revealVariety, { color: c.text, fontFamily: fonts.playfair }]}>{revealData.variety_name}</Text>
-          {!!revealData.tasting_notes && (
-            <Text style={[styles.revealNotes, { color: c.muted, fontFamily: fonts.dmSans }]}>{revealData.tasting_notes}</Text>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.reorderBtn, { backgroundColor: c.accent }]}
-          onPress={() => showPanel('location', revealData.location_id ? { preselect_location_id: revealData.location_id } : undefined)}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.reorderText, { fontFamily: fonts.dmSans }]}>REORDER →</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
       <View style={styles.header}>
@@ -207,7 +176,6 @@ export default function VerifyNFCPanel() {
           <Text style={[styles.headerTitle, { color: c.text }]}>
             {state === 'error' ? "Didn't catch it." : 'box fraise'}
           </Text>
-
         </TouchableOpacity>
         <View style={styles.headerRight} />
       </View>
@@ -215,17 +183,9 @@ export default function VerifyNFCPanel() {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 24, paddingBottom: 14 },
-  revealHeader: { paddingHorizontal: SPACING.md, paddingTop: 24, paddingBottom: 8 },
-  revealBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.lg, gap: 16 },
-  collectedLabel: { fontSize: 11, letterSpacing: 3 },
-  revealVariety: { fontSize: 38, textAlign: 'center', lineHeight: 46 },
-  revealNotes: { fontSize: 15, textAlign: 'center', lineHeight: 24, marginTop: 8, maxWidth: 300 },
-  reorderBtn: { marginHorizontal: SPACING.lg, marginBottom: 40, borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
-  reorderText: { color: '#fff', fontSize: 14, letterSpacing: 1.5 },
   headerLeft: { width: 72 },
   headerRight: { width: 72, alignItems: 'flex-end' },
   headerBackText: { fontSize: 28, lineHeight: 34 },

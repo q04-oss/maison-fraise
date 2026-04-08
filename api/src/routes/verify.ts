@@ -190,17 +190,6 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
-    // Security: verify the requesting user was the one who originally claimed this token
-    const [claimEvent] = await db.select({ id: legitimacyEvents.id })
-      .from(legitimacyEvents)
-      .where(and(eq(legitimacyEvents.user_id, user_id), eq(legitimacyEvents.event_type, 'nfc_verified')));
-
-    if (!claimEvent) {
-      logger.warn(`verify/reorder: no nfc_verified event — user=${user_id}`);
-      res.status(403).json({ error: 'This token is invalid or has already been used.' });
-      return;
-    }
-
     const [variety] = await db.select({
       id: varieties.id,
       name: varieties.name,
