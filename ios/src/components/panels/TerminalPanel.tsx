@@ -21,7 +21,6 @@ import {
   respondToAdImpression,
   fetchMyNodeApplication, submitNodeApplication, NodeApplication,
   requestWorkerAccess, fetchMyWorkerAccess,
-  fetchBatchStatus,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -88,7 +87,6 @@ const nameInputRef = useRef<TextInput>(null);
   });
   const [paying, setPaying] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<any | null>(null);
-  const [batchStatus, setBatchStatus] = useState<Record<number, { queued_boxes: number; min_quantity: number }>>({});
 
   const location = activeLocation ?? businesses.find(b => b.id === order.location_id) ?? null;
   const isPopup = location?.type === 'popup';
@@ -102,18 +100,6 @@ const nameInputRef = useRef<TextInput>(null);
     if (orderOpen && orderStep !== 'variety') scrollToBottom();
   }, [orderStep]);
 
-  // Fetch batch fill progress per variety whenever the active location changes
-  useEffect(() => {
-    if (!location?.id) { setBatchStatus({}); return; }
-    let cancelled = false;
-    fetchBatchStatus(location.id).then(rows => {
-      if (cancelled) return;
-      const map: Record<number, { queued_boxes: number; min_quantity: number }> = {};
-      rows.forEach(r => { map[r.variety_id] = { queued_boxes: r.queued_boxes, min_quantity: r.min_quantity }; });
-      setBatchStatus(map);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [location?.id]);
 
   // Auto-open or reset order based on how terminal was triggered
   useEffect(() => {
@@ -406,13 +392,6 @@ const nameInputRef = useRef<TextInput>(null);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
       setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
-      if (confirmed.status === 'queued' && location?.id) {
-        fetchBatchStatus(location.id).then(rows => {
-          const map: Record<number, { queued_boxes: number; min_quantity: number }> = {};
-          rows.forEach(r => { map[r.variety_id] = { queued_boxes: r.queued_boxes, min_quantity: r.min_quantity }; });
-          setBatchStatus(map);
-        }).catch(() => {});
-      }
       // Refresh order history
       fetchOrdersByEmail()
         .then((orders: any[]) => {
@@ -453,13 +432,6 @@ const nameInputRef = useRef<TextInput>(null);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
       setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
-      if (confirmed.status === 'queued' && location?.id) {
-        fetchBatchStatus(location.id).then(rows => {
-          const map: Record<number, { queued_boxes: number; min_quantity: number }> = {};
-          rows.forEach(r => { map[r.variety_id] = { queued_boxes: r.queued_boxes, min_quantity: r.min_quantity }; });
-          setBatchStatus(map);
-        }).catch(() => {});
-      }
       fetchOrdersByEmail()
         .then((orders: any[]) => {
           const paid = orders.filter((o: any) => o.status === 'paid' || o.status === 'confirmed').sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
@@ -582,14 +554,6 @@ const nameInputRef = useRef<TextInput>(null);
                                 <Text style={[styles.optionName, { color: c.text }]}>{v.name}</Text>
                                 <Text style={[styles.optionMeta, { color: c.muted }]}>CA${(v.price_cents / 100).toFixed(0)}</Text>
                               </TouchableOpacity>
-                                <View style={styles.batchBarWrap}>
-                                  <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
-                                    <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, ((batchStatus[v.id]?.queued_boxes ?? 0) / (batchStatus[v.id]?.min_quantity ?? 4)) * 100)}%` }]} />
-                                  </View>
-                                  <Text style={[styles.batchBarLabel, { color: c.muted }]}>
-                                    {batchStatus[v.id]?.queued_boxes ?? 0} of {batchStatus[v.id]?.min_quantity ?? 4} boxes queued
-                                  </Text>
-                                </View>
                             </React.Fragment>
                           ))
                         )}
