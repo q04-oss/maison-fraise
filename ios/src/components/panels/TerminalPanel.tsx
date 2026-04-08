@@ -391,7 +391,6 @@ const nameInputRef = useRef<TextInput>(null);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
       setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 150);
       // Refresh order history
       fetchOrdersByEmail()
         .then((orders: any[]) => {
@@ -432,7 +431,6 @@ const nameInputRef = useRef<TextInput>(null);
       setConfirmedOrder(confirmed);
       setOrderStep('confirmed');
       setOrder({ order_id: confirmed.id, order_status: confirmed.status, delivery_date: (confirmed as any).delivery_date ?? null, location_id: location.id });
-      setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 150);
       fetchOrdersByEmail()
         .then((orders: any[]) => {
           const paid = orders.filter((o: any) => o.status === 'paid' || o.status === 'confirmed').sort((a: any, b: any) => (b.id ?? 0) - (a.id ?? 0));
@@ -451,6 +449,13 @@ const nameInputRef = useRef<TextInput>(null);
       setPaying(false);
     }
   };
+
+  // Re-expand sheet when order step reaches confirmed (Stripe sheet leaves it collapsed)
+  useEffect(() => {
+    if (orderStep === 'confirmed') {
+      setTimeout(() => TrueSheet.present(SHEET_NAME, 1), 400);
+    }
+  }, [orderStep]);
 
   const lastOrder = recentOrders[0] ?? null;
 
