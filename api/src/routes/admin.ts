@@ -3264,6 +3264,42 @@ router.post('/node-applications/:id/reject', async (req: Request, res: Response)
   }
 });
 
+// POST /api/admin/verify-user — force-verify a user by email (for NFC testing)
+router.post('/verify-user', requirePin, async (req: Request, res: Response) => {
+  const { email } = req.body;
+  if (!email) { res.status(400).json({ error: 'email required' }); return; }
+  try {
+    const [updated] = await db.update(users)
+      .set({ verified: true, verified_at: new Date(), verified_by: 'admin' })
+      .where(eq(users.email, email))
+      .returning({ id: users.id, email: users.email });
+    if (!updated) { res.status(404).json({ error: 'User not found' }); return; }
+    res.json({ ok: true, user_id: updated.id, email: updated.email });
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/admin/grant-worker-access — directly approve worker access for a user by email + location_id
+router.post('/grant-worker-access', requirePin, async (req: Request, res: Response) => {
+  const { email, location_id } = req.body;
+  if (!email || !location_id) { res.status(400).json({ error: 'email and location_id required' }); return; }
+  try {
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+    await db.insert(locationStaff).values({
+      user_id: user.id,
+      location_id: parseInt(location_id, 10),
+      status: 'approved',
+      requested_at: new Date(),
+      reviewed_at: new Date(),
+    }).onConflictDoUpdate({ target: [locationStaff.user_id, locationStaff.location_id], set: { status: 'approved', reviewed_at: new Date() } });
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // GET /api/admin/worker-requests — list all worker access requests
 router.get('/worker-requests', requirePin, async (req: Request, res: Response) => {
   try {
