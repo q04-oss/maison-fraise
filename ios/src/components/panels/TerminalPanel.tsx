@@ -19,6 +19,7 @@ import {
   startIdentityVerification, fetchMyVentures,
   fetchMyMarketOrders, collectMarketOrder, fetchAdBalance, fetchAvailableAds,
   respondToAdImpression, fetchStaffOrders,
+  fetchMyNodeApplication, submitNodeApplication, NodeApplication,
 } from '../../lib/api';
 import { CHOCOLATES, FINISHES } from '../../data/seed';
 import { useColors, fonts, SPACING } from '../../theme';
@@ -60,6 +61,9 @@ export default function TerminalPanel() {
   const [marketOrders, setMarketOrders] = useState<any[]>([]);
   const [adBalanceCents, setAdBalanceCents] = useState(0);
   const [availableAds, setAvailableAds] = useState<any[]>([]);
+  const [nodeApplication, setNodeApplication] = useState<NodeApplication | null | undefined>(undefined);
+  const [nodeAppForm, setNodeAppForm] = useState({ business_name: '', address: '', neighbourhood: '', description: '', instagram_handle: '' });
+  const [nodeAppSubmitting, setNodeAppSubmitting] = useState(false);
 const nameInputRef = useRef<TextInput>(null);
 
   // Inline order state
@@ -155,6 +159,9 @@ const nameInputRef = useRef<TextInput>(null);
         fetchMyMarketOrders().then(setMarketOrders).catch(() => {});
         fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
         fetchAvailableAds().then(setAvailableAds).catch(() => {});
+        if (verified === 'true') {
+          fetchMyNodeApplication().then(setNodeApplication).catch(() => setNodeApplication(null));
+        }
       }
     }).finally(() => setLoading(false));
   }, []);
@@ -264,6 +271,30 @@ const nameInputRef = useRef<TextInput>(null);
     setDisplayName(trimmed);
     await AsyncStorage.setItem('display_name', trimmed);
     updateDisplayName(trimmed).catch(() => {});
+  };
+
+  const handleSubmitNodeApp = async () => {
+    const { business_name, address } = nodeAppForm;
+    if (!business_name.trim() || !address.trim()) {
+      Alert.alert('Required', 'Business name and address are required.');
+      return;
+    }
+    setNodeAppSubmitting(true);
+    try {
+      await submitNodeApplication({
+        business_name: business_name.trim(),
+        address: address.trim(),
+        neighbourhood: nodeAppForm.neighbourhood.trim() || undefined,
+        description: nodeAppForm.description.trim() || undefined,
+        instagram_handle: nodeAppForm.instagram_handle.trim() || undefined,
+      });
+      const updated = await fetchMyNodeApplication();
+      setNodeApplication(updated);
+    } catch (err: any) {
+      Alert.alert('Submission failed', err?.message ?? 'Try again.');
+    } finally {
+      setNodeAppSubmitting(false);
+    }
   };
 
   const resetInlineOrder = () => {
@@ -884,6 +915,90 @@ const nameInputRef = useRef<TextInput>(null);
               <Text style={[styles.label, { color: c.muted }]}>MY BOOKINGS</Text>
               <Text style={[styles.label, { color: c.accent }]}>→</Text>
             </TouchableOpacity>
+            {isVerified && !isShop && nodeApplication !== undefined && (
+              <>
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                {nodeApplication === null ? (
+                  <>
+                    <Text style={[styles.label, { color: c.muted, paddingVertical: 10 }]}>BECOME A PICKUP NODE</Text>
+                    <TextInput
+                      style={[styles.nodeAppInput, { color: c.text, borderColor: c.border }]}
+                      placeholder="Business name"
+                      placeholderTextColor={c.muted}
+                      value={nodeAppForm.business_name}
+                      onChangeText={v => setNodeAppForm(p => ({ ...p, business_name: v }))}
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      style={[styles.nodeAppInput, { color: c.text, borderColor: c.border }]}
+                      placeholder="Address"
+                      placeholderTextColor={c.muted}
+                      value={nodeAppForm.address}
+                      onChangeText={v => setNodeAppForm(p => ({ ...p, address: v }))}
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      style={[styles.nodeAppInput, { color: c.text, borderColor: c.border }]}
+                      placeholder="Neighbourhood (optional)"
+                      placeholderTextColor={c.muted}
+                      value={nodeAppForm.neighbourhood}
+                      onChangeText={v => setNodeAppForm(p => ({ ...p, neighbourhood: v }))}
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      style={[styles.nodeAppInput, styles.nodeAppTextarea, { color: c.text, borderColor: c.border }]}
+                      placeholder="Tell us about your space (optional)"
+                      placeholderTextColor={c.muted}
+                      value={nodeAppForm.description}
+                      onChangeText={v => setNodeAppForm(p => ({ ...p, description: v }))}
+                      multiline
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      style={[styles.nodeAppInput, { color: c.text, borderColor: c.border }]}
+                      placeholder="Instagram handle (optional)"
+                      placeholderTextColor={c.muted}
+                      value={nodeAppForm.instagram_handle}
+                      onChangeText={v => setNodeAppForm(p => ({ ...p, instagram_handle: v }))}
+                      autoCapitalize="none"
+                      returnKeyType="done"
+                    />
+                    <TouchableOpacity
+                      style={[styles.nodeAppSubmitBtn, { backgroundColor: nodeAppSubmitting ? c.border : c.accent }]}
+                      onPress={handleSubmitNodeApp}
+                      disabled={nodeAppSubmitting}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.nodeAppSubmitText, { color: c.ctaText ?? '#fff' }]}>
+                        {nodeAppSubmitting ? 'Submitting…' : 'Apply'}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : nodeApplication.status === 'pending' ? (
+                  <View style={[styles.nodeAppStatus, { borderColor: c.border }]}>
+                    <Text style={[styles.label, { color: c.muted }]}>NODE APPLICATION</Text>
+                    <Text style={[styles.nodeAppStatusName, { color: c.text }]}>{nodeApplication.business_name}</Text>
+                    <Text style={[styles.nodeAppStatusBadge, { color: c.muted }]}>Under review</Text>
+                  </View>
+                ) : nodeApplication.status === 'rejected' ? (
+                  <View style={[styles.nodeAppStatus, { borderColor: c.border }]}>
+                    <Text style={[styles.label, { color: c.muted }]}>NODE APPLICATION</Text>
+                    <Text style={[styles.nodeAppStatusName, { color: c.text }]}>{nodeApplication.business_name}</Text>
+                    <Text style={[styles.nodeAppStatusBadge, { color: c.muted }]}>
+                      Not approved{nodeApplication.admin_notes ? ` · ${nodeApplication.admin_notes}` : ''}
+                    </Text>
+                    <TouchableOpacity
+                      style={[styles.nodeAppSubmitBtn, { backgroundColor: c.accent, marginTop: 8 }]}
+                      onPress={() => setNodeApplication(null)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.nodeAppSubmitText, { color: c.ctaText ?? '#fff' }]}>Apply again</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+              </>
+            )}
+
             {isShop && (
               <>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -1199,4 +1314,16 @@ const styles = StyleSheet.create({
   staffOrderRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   staffOrderName: { fontSize: 15 },
   staffOrderMeta: { fontSize: 10, opacity: 0.6, marginTop: 2 },
+  nodeAppInput: {
+    borderWidth: StyleSheet.hairlineWidth, borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 14, fontFamily: fonts.dmSans,
+    marginHorizontal: 16, marginBottom: 8,
+  },
+  nodeAppTextarea: { minHeight: 72, textAlignVertical: 'top' },
+  nodeAppSubmitBtn: { borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginHorizontal: 16, marginTop: 4, marginBottom: 8 },
+  nodeAppSubmitText: { fontSize: 14, fontFamily: fonts.playfair },
+  nodeAppStatus: { marginHorizontal: 16, marginVertical: 8, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, padding: 16, gap: 4 },
+  nodeAppStatusName: { fontSize: 16, fontFamily: fonts.playfair },
+  nodeAppStatusBadge: { fontSize: 12, fontFamily: fonts.dmMono },
 });

@@ -3964,3 +3964,44 @@ export async function createWalkInTokens(pin: string, location_id: number, varie
   }
   return tokens;
 }
+
+export type NodeApplication = {
+  id: number;
+  status: 'pending' | 'approved' | 'rejected';
+  business_name: string;
+  address: string;
+  neighbourhood: string | null;
+  description: string | null;
+  instagram_handle: string | null;
+  admin_notes: string | null;
+  business_id: number | null;
+  created_at: string;
+};
+
+export async function fetchMyNodeApplication(): Promise<NodeApplication | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/node-applications/mine`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function submitNodeApplication(body: {
+  business_name: string;
+  address: string;
+  city?: string;
+  neighbourhood?: string;
+  description?: string;
+  instagram_handle?: string;
+}): Promise<{ id: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/node-applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    throw new Error(err.error ?? 'submit_failed');
+  }
+  return r.json();
+}

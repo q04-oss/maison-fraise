@@ -3145,4 +3145,96 @@ router.get('/fulfillment', requirePin, async (_req: Request, res: Response) => {
   }
 });
 
+// ─── Node Applications ───────────────────────────────────────────────────────
+
+// GET /api/admin/node-applications — list pending applications
+router.get('/node-applications', async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT na.id, na.status, na.business_name, na.address, na.city,
+             na.neighbourhood, na.description, na.instagram_handle,
+             na.admin_notes, na.created_at,
+             u.email AS applicant_email, u.display_name AS applicant_name
+      FROM node_applications na
+      JOIN users u ON u.id = na.applicant_user_id
+      ORDER BY na.created_at ASC
+    `);
+    res.json((rows as any).rows ?? rows);
+  } catch (err) {
+    logger.error('admin node-applications GET error: ' + String(err));
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/admin/node-applications/:id/approve
+router.post('/node-applications/:id/approve', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
+  const { admin_notes, latitude, longitude } = req.body;
+
+  try {
+    const [app] = ((await db.execute(sql`
+      SELECT * FROM node_applications WHERE id = ${id} AND status = 'pending'
+    `)) as any).rows ?? [];
+    if (!app) { res.status(404).json({ error: 'not_found_or_not_pending' }); return; }
+
+    // Create the business row
+    const [biz] = await db.insert(businesses).values({
+      name: app.business_name,
+      type: 'partner',
+      address: app.address,
+      city: app.city ?? 'Montreal',
+      neighbourhood: app.neighbourhood ?? null,
+      description: app.description ?? null,
+      instagram_handle: app.instagram_handle ?? null,
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      checkin_token: randomUUID(),
+      approved_by_admin: true,
+      founding_patron_id: app.applicant_user_id,
+      allows_walkin: false,
+    }).returning();
+
+    // Link user as shop account for this business
+    await db.update(users)
+      .set({ business_id: biz.id, is_shop: true })
+      .where(eq(users.id, app.applicant_user_id));
+
+    // Mark application approved
+    await db.execute(sql`
+      UPDATE node_applications
+      SET status = 'approved', business_id = ${biz.id},
+          admin_notes = ${admin_notes ?? null}, reviewed_at = now()
+      WHERE id = ${id}
+    `);
+
+    res.json({ business_id: biz.id });
+  } catch (err) {
+    logger.error('admin node-applications approve error: ' + String(err));
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/admin/node-applications/:id/reject
+router.post('/node-applications/:id/reject', async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
+  const { admin_notes } = req.body;
+
+  try {
+    const result = await db.execute(sql`
+      UPDATE node_applications
+      SET status = 'rejected', admin_notes = ${admin_notes ?? null}, reviewed_at = now()
+      WHERE id = ${id} AND status = 'pending'
+      RETURNING id
+    `);
+    const updated = ((result as any).rows ?? result);
+    if (!updated.length) { res.status(404).json({ error: 'not_found_or_not_pending' }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error('admin node-applications reject error: ' + String(err));
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 export default router;

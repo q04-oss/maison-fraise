@@ -56,6 +56,7 @@ import discoveryRouter from './routes/discovery';
 import menuRecommendationRouter from './routes/menu-recommendation';
 import staffRouter from './routes/staff';
 import walkinRouter from './routes/walkin';
+import nodeApplicationsRouter from './routes/node-applications';
 import waitlistRouter from './routes/standing-order-waitlist';
 import transfersRouter from './routes/standing-order-transfers';
 import tiersRouter from './routes/standing-order-tiers';
@@ -178,6 +179,7 @@ app.use('/api/discovery', discoveryRouter);
 app.use('/api/menu-recommendation', menuRecommendationRouter);
 app.use('/api/staff', staffRouter);
 app.use('/api/walkin', walkinRouter);
+app.use('/api/node-applications', nodeApplicationsRouter);
 
 // GET /api/batches?location_id=&variety_id= — live batch availability for the iOS order flow
 app.get('/api/batches', async (req, res) => {
