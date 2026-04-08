@@ -271,17 +271,17 @@ export default function HomePanel() {
                             <Text style={[styles.stock, { color: isSoldOut ? '#FF3B30' : stockLow ? '#FF3B30' : c.muted }]}>
                               {isSoldOut ? 'sold out' : stockLow ? 'almost gone' : `${v.stock_remaining} left`}
                             </Text>
+                            <View style={styles.batchBarWrap}>
+                              <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
+                                <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, ((batchStatus[v.id]?.queued_boxes ?? 0) / (batchStatus[v.id]?.min_quantity ?? 4)) * 100)}%` }]} />
+                              </View>
+                              <Text style={[styles.batchBarLabel, { color: c.muted }]}>
+                                {batchStatus[v.id]?.queued_boxes ?? 0} of {batchStatus[v.id]?.min_quantity ?? 4} queued
+                              </Text>
+                            </View>
                             {v.image_url && (
                               <Image source={{ uri: v.image_url }} style={[styles.thumb, { backgroundColor: c.border }]} />
                             )}
-                          </View>
-                          <View style={styles.batchBarWrap}>
-                            <View style={[styles.batchBarTrack, { backgroundColor: c.border }]}>
-                              <View style={[styles.batchBarFill, { backgroundColor: c.accent, width: `${Math.min(100, ((batchStatus[v.id]?.queued_boxes ?? 0) / (batchStatus[v.id]?.min_quantity ?? 4)) * 100)}%` }]} />
-                            </View>
-                            <Text style={[styles.batchBarLabel, { color: c.muted }]}>
-                              {batchStatus[v.id]?.queued_boxes ?? 0} of {batchStatus[v.id]?.min_quantity ?? 4} boxes queued
-                            </Text>
                           </View>
                         </TouchableOpacity>
                       </React.Fragment>
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
   viewEventRow: { paddingHorizontal: SPACING.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   viewEventText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  batchBarWrap: { gap: 4, marginTop: 6 },
+  batchBarWrap: { flex: 1, gap: 3, marginHorizontal: 12 },
   batchBarTrack: { height: 2, borderRadius: 1, overflow: 'hidden' },
   batchBarFill: { height: 2, borderRadius: 1 },
   batchBarLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
