@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
@@ -16,7 +14,6 @@ type FirstTapResult = { streak_weeks?: number; streak_milestone?: boolean; bank_
 export default function VerifyNFCPanel() {
   const { goHome, showPanel } = usePanel();
   const c = useColors();
-  const insets = useSafeAreaInsets();
   const [state, setState] = useState<State>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
   const [firstTapResult, setFirstTapResult] = useState<FirstTapResult>(null);
@@ -366,7 +363,6 @@ export default function VerifyNFCPanel() {
     } catch (err: any) {
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
       setState('error');
-      TrueSheet.present('main-sheet', 1);
     }
   };
 
@@ -375,97 +371,37 @@ export default function VerifyNFCPanel() {
     return () => { cancelNfc(); };
   }, []);
 
-  if (state === 'error') {
-    return (
-      <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-        <View style={[styles.errorHeader, { borderBottomColor: c.border }]}>
-          <TouchableOpacity onPress={() => { cancelNfc(); goHome(); }} activeOpacity={0.7} style={styles.errorBack}>
-            <Text style={[styles.errorBackText, { color: c.accent }]}>←</Text>
-          </TouchableOpacity>
-          <Text style={[styles.errorTitle, { color: c.text }]}>Didn't catch it.</Text>
-          <View style={styles.errorBack} />
-        </View>
-        <View style={styles.errorBody}>
-          <Text style={[styles.subtitle, { color: c.muted }]}>{errorMsg}</Text>
-          <TouchableOpacity
-            style={[styles.retryBtn, { backgroundColor: c.card, borderColor: c.border }]}
-            onPress={scan}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.retryBtnText, { color: c.accent }]}>Try again</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>
-      <View style={styles.body}>
-        {state === 'scanning' && (
-          <>
-            <ActivityIndicator size="large" color={c.accent} />
-            <Text style={[styles.title, { color: c.text }]}>Hold your phone to the chip.</Text>
-            <Text style={[styles.subtitle, { color: c.muted }]}>Inside the lid of the box.</Text>
-          </>
-        )}
-
-        {state === 'success' && (
-          <>
-            <View style={[styles.badge, { backgroundColor: c.card, borderColor: c.border }]}>
-              <Text style={[styles.badgeIcon, { color: c.accent }]}>
-                {firstTapResult?.streak_milestone ? '🍓' : '✓'}
-              </Text>
-            </View>
-            <Text style={[styles.title, { color: c.text }]}>
-              {firstTapResult?.streak_milestone ? `${firstTapResult.streak_weeks}-week streak.` : 'Verified.'}
-            </Text>
-            {firstTapResult?.streak_milestone && (
-              <Text style={[styles.subtitle, { color: c.muted }]}>
-                You've tapped every week for {firstTapResult.streak_weeks} weeks straight.
-              </Text>
-            )}
-            {firstTapResult?.bank_days != null && firstTapResult.bank_days > 0 && (
-              <Text style={[styles.subtitle, { color: c.muted }]}>
-                {firstTapResult.bank_days} days of {firstTapResult.tier ?? 'standard'} access added.
-              </Text>
-            )}
-          </>
-        )}
-      </View>
-
-      <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => { cancelNfc(); goHome(); }} activeOpacity={0.7} style={styles.headerLeft}>
+          <Text style={[styles.headerBackText, { color: c.accent }]}>←</Text>
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: c.text }]}>
+          {state === 'error' ? "Didn’t catch it." : 'box fraise'}
+        </Text>
         <TouchableOpacity
-          style={[styles.cancelBtn, { borderColor: c.border }]}
-          onPress={() => { cancelNfc(); goHome(); }}
+          onPress={state === 'error' ? scan : undefined}
+          disabled={state !== 'error'}
           activeOpacity={0.7}
+          style={styles.headerRight}
         >
-          <Text style={[styles.cancelBtnText, { color: c.muted }]}>Cancel</Text>
+          {state === 'error' && (
+            <Text style={[styles.retryText, { color: c.accent }]}>Try again</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  errorHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 24, paddingBottom: 14 },
-  errorBack: { width: 40 },
-  errorBackText: { fontSize: 28, lineHeight: 34 },
-  errorTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: fonts.playfair },
-  errorBody: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, alignItems: 'center', gap: SPACING.md },
-  body: { flex: 1, padding: SPACING.md, alignItems: 'center', justifyContent: 'center', gap: SPACING.md },
-  badge: {
-    width: 72, height: 72, borderRadius: 36,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  badgeIcon: { fontSize: 32 },
-  title: { fontSize: 28, fontFamily: fonts.playfair, textAlign: 'center' },
-  subtitle: { fontSize: 14, fontFamily: fonts.dmSans, textAlign: 'center', lineHeight: 22 },
-  retryBtn: { borderRadius: 14, paddingVertical: 12, paddingHorizontal: 28, borderWidth: StyleSheet.hairlineWidth },
-  retryBtnText: { fontSize: 14, fontFamily: fonts.playfair },
-  footer: { padding: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth },
-  cancelBtn: { borderRadius: 16, paddingVertical: 16, alignItems: 'center', borderWidth: StyleSheet.hairlineWidth },
-  cancelBtnText: { fontSize: 15, fontFamily: fonts.dmSans },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 24, paddingBottom: 14 },
+  headerLeft: { width: 72 },
+  headerRight: { width: 72, alignItems: 'flex-end' },
+  headerBackText: { fontSize: 28, lineHeight: 34 },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 18, fontFamily: fonts.playfair },
+  retryText: { fontSize: 13, fontFamily: fonts.dmSans },
 });
