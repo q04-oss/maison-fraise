@@ -191,6 +191,150 @@ export async function sendOrderReady(params: {
   });
 }
 
+export async function sendOrderQueued(params: {
+  to: string;
+  varietyName: string;
+  chocolate: string;
+  finish: string;
+  quantity: number;
+  totalCents: number;
+}) {
+  const { to, varietyName, chocolate, finish, quantity, totalCents } = params;
+  const resolvedTo = await resolveEmailAddress(to);
+  const total = (totalCents / 100).toFixed(2);
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Your order is in the queue. We'll notify you as soon as enough demand comes in to make your batch. Your card won't be charged until then.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      ${row('Strawberry', varietyName)}
+      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
+      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${row('Quantity', String(quantity))}
+      ${row('Amount held', `CA$${total}`)}
+    </table>
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      If your batch doesn't fill within 7 days, your hold will be released and you won't be charged.
+    </p>
+  `;
+  await resend.emails.send({
+    from: FROM, to: resolvedTo, replyTo: REPLY_TO,
+    subject: `You're in the queue — ${varietyName}`,
+    html: baseTemplate(content, 'You\'re in the queue.'),
+  });
+}
+
+export async function sendBatchTriggered(params: {
+  to: string;
+  varietyName: string;
+  chocolate: string;
+  finish: string;
+  quantity: number;
+  totalCents: number;
+  deliveryDate: string;
+  locationName: string;
+}) {
+  const { to, varietyName, chocolate, finish, quantity, totalCents, deliveryDate, locationName } = params;
+  const resolvedTo = await resolveEmailAddress(to);
+  const total = (totalCents / 100).toFixed(2);
+  const d = new Date(deliveryDate + 'T12:00:00');
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Your batch is confirmed. Your card has been charged and your strawberries will be ready for collection on <strong style="color:#F2F2F7;">${dateStr}</strong>.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      ${row('Strawberry', varietyName)}
+      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
+      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${row('Quantity', String(quantity))}
+      ${row('Collection', `${dateStr} · ${locationName}`)}
+    </table>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background:#C9973A;border-radius:12px;padding:18px 22px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td><p style="margin:0;font-size:10px;color:rgba(12,12,14,0.55);letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Total charged</p></td>
+              <td align="right"><p style="margin:0;font-size:22px;color:#0C0C0E;font-style:italic;font-family:Georgia,'Times New Roman',serif;">CA$${total}</p></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      We'll have them freshly dipped and ready. See you then.
+    </p>
+  `;
+  await resend.emails.send({
+    from: FROM, to: resolvedTo, replyTo: REPLY_TO,
+    subject: `Your batch is confirmed — ready ${dateStr}`,
+    html: baseTemplate(content, 'Batch confirmed.'),
+  });
+}
+
+export async function sendBatchReady(params: {
+  to: string;
+  varietyName: string;
+  chocolate: string;
+  finish: string;
+  quantity: number;
+  deliveryDate: string;
+  locationName: string;
+}) {
+  const { to, varietyName, chocolate, finish, quantity, deliveryDate, locationName } = params;
+  const resolvedTo = await resolveEmailAddress(to);
+  const d = new Date(deliveryDate + 'T12:00:00');
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateStr = `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Your strawberries are freshly dipped and ready for collection at <strong style="color:#F2F2F7;">${locationName}</strong>.
+    </p>
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      ${row('Strawberry', varietyName)}
+      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
+      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${row('Quantity', String(quantity))}
+      ${row('Location', locationName)}
+      ${row('Ready date', dateStr)}
+    </table>
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      Strawberries are best enjoyed fresh. Pick up within 3 days.
+    </p>
+  `;
+  await resend.emails.send({
+    from: FROM, to: resolvedTo, replyTo: REPLY_TO,
+    subject: `Your strawberries are ready — ${locationName}`,
+    html: baseTemplate(content, 'Ready for pickup.'),
+  });
+}
+
+export async function sendOrderCancelled(params: {
+  to: string;
+  varietyName: string;
+  quantity: number;
+}) {
+  const { to, varietyName, quantity } = params;
+  const resolvedTo = await resolveEmailAddress(to);
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Your queued order for ${quantity}× <strong style="color:#F2F2F7;">${varietyName}</strong> didn't fill within 7 days. Your payment hold has been released — no charge was made.
+    </p>
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.38);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      You're welcome to order again any time.
+    </p>
+  `;
+  await resend.emails.send({
+    from: FROM, to: resolvedTo, replyTo: REPLY_TO,
+    subject: `Order cancelled — ${varietyName}`,
+    html: baseTemplate(content, 'Order not filled.'),
+  });
+}
+
 export async function sendContractOffer(params: {
   to: string;
   businessName: string;

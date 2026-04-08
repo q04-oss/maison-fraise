@@ -100,6 +100,9 @@ import SubmitARVideoPanel from './panels/SubmitARVideoPanel';
 import TastingFeedPanel from './panels/TastingFeedPanel';
 import ArtAuctionPanel from './panels/ArtAuctionPanel';
 import NfcWritePanel from './panels/NfcWritePanel';
+import WalkInPanel from './panels/WalkInPanel';
+import WalkInWritePanel from './panels/WalkInWritePanel';
+import WalkInInventoryPanel from './panels/WalkInInventoryPanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -200,10 +203,13 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'tasting-feed': TastingFeedPanel,
   'art-auctions': ArtAuctionPanel,
   'nfc-write': NfcWritePanel,
+  'walk-in': WalkInPanel,
+  'walk-in-write': WalkInWritePanel,
+  'walk-in-inventory': WalkInInventoryPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
-  'nfc-write', 'verified', 'standingOrder', 'partner-detail', 'order-history',
+  'nfc-write', 'walk-in', 'walk-in-write', 'walk-in-inventory', 'verified', 'standingOrder', 'partner-detail', 'order-history',
   'search', 'receipt', 'verifyNFC', 'conversations', 'messageThread', 'jobDetail',
   'popup-detail', 'collectif-list', 'collectif-detail', 'collectif-create',
   'market', 'market-stall', 'portal', 'tokens', 'token-detail', 'tournaments', 'tournament-detail',

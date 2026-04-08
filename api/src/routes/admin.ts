@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { eq, isNull, sql, and, lte, sum, gte, desc, inArray, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments, contentTokens, venturePosts, ventureRevenueSplits, earningsLedger } from '../db/schema';
+import { orders, varieties, timeSlots, campaigns, campaignSignups, businesses, users, legitimacyEvents, locations, popupRsvps, popupNominations, djOffers, portraits, popupRequests, employmentContracts, contractRequests, businessVisits, referralCodes, editorialPieces, membershipFunds, memberships, membershipWaitlist, portalAccess, portalContent, tokens, tokenTrades, tokenTradeOffers, seasonPatronages, patronTokens, greenhouses, provenanceTokens, locationFunding, collectifs, collectifCommitments, contentTokens, venturePosts, ventureRevenueSplits, earningsLedger, batches } from '../db/schema';
 import { logger } from '../lib/logger';
 import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
@@ -3099,6 +3099,49 @@ router.post('/market-dates', requirePin, async (req: Request, res: Response) => 
   } catch (err) {
     logger.error('[admin] POST /market-dates', err);
     res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// GET /api/admin/fulfillment — triggered batches pending your action (source strawberries)
+router.get('/fulfillment', requirePin, async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        batch_id: batches.id,
+        variety_name: varieties.name,
+        location_name: locations.name,
+        quantity_total: batches.quantity_total,
+        delivery_date: batches.delivery_date,
+        triggered_at: batches.triggered_at,
+        ready_at: batches.ready_at,
+        notes: batches.notes,
+      })
+      .from(batches)
+      .innerJoin(varieties, eq(batches.variety_id, varieties.id))
+      .innerJoin(locations, eq(batches.location_id, locations.id))
+      .where(and(isNotNull(batches.triggered_at), isNull(batches.ready_at), isNull(batches.cancelled_at)))
+      .orderBy(batches.triggered_at);
+
+    // For each triggered batch, also count how many orders are paid vs collected
+    const enriched = await Promise.all(rows.map(async (b) => {
+      const statusCounts = await db.execute(sql`
+        SELECT status, COUNT(*)::int AS count
+        FROM orders
+        WHERE batch_id = ${b.batch_id}
+        GROUP BY status
+      `);
+      const counts: Record<string, number> = {};
+      ((statusCounts as any).rows ?? statusCounts).forEach((r: any) => { counts[r.status] = r.count; });
+      return {
+        ...b,
+        orders_paid: counts['paid'] ?? 0,
+        orders_collected: counts['collected'] ?? 0,
+      };
+    }));
+
+    res.json(enriched);
+  } catch {
+    res.status(500).json({ error: 'internal' });
   }
 });
 

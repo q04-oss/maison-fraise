@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { eq, and } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
-import { orders, users, legitimacyEvents, varieties, standingOrders } from '../db/schema';
+import { orders, users, legitimacyEvents, varieties, standingOrders, batches } from '../db/schema';
 import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 import { fireWebhook } from '../lib/webhooks';
@@ -86,7 +86,7 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
     await db.transaction(async (tx) => {
       // Atomic claim: only succeeds if nfc_token_used is still false
       const [claimed] = await tx.update(orders)
-        .set({ nfc_token_used: true, nfc_verified_at: now })
+        .set({ nfc_token_used: true, nfc_verified_at: now, status: 'collected' })
         .where(and(eq(orders.id, order.id), eq(orders.nfc_token_used, false)))
         .returning({ id: orders.id });
 
@@ -205,6 +205,17 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
+    // Batch info for AR storytelling
+    let batchInfo: { delivery_date: string | null; triggered_at: Date | null; notes: string | null } | null = null;
+    if (order.batch_id) {
+      const [batchRow] = await db.select({
+        delivery_date: batches.delivery_date,
+        triggered_at: batches.triggered_at,
+        notes: batches.notes,
+      }).from(batches).where(eq(batches.id, order.batch_id));
+      if (batchRow) batchInfo = batchRow;
+    }
+
     // Feature 3: Collectif pickups today (via collectif_commitments as membership proxy)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -319,6 +330,10 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
       next_standing_order: nextStandingOrder,
       // Feature D: collectif member names
       collectif_member_names: collectifMemberNames,
+      // Batch provenance
+      batch_delivery_date: batchInfo?.delivery_date ?? null,
+      batch_triggered_at: batchInfo?.triggered_at ?? null,
+      batch_notes: batchInfo?.notes ?? null,
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });

@@ -55,6 +55,7 @@ import eveningTokensRouter from './routes/evening-tokens';
 import discoveryRouter from './routes/discovery';
 import menuRecommendationRouter from './routes/menu-recommendation';
 import staffRouter from './routes/staff';
+import walkinRouter from './routes/walkin';
 import waitlistRouter from './routes/standing-order-waitlist';
 import transfersRouter from './routes/standing-order-transfers';
 import tiersRouter from './routes/standing-order-tiers';
@@ -84,7 +85,7 @@ import artRouter from './routes/art';
 import artAdminRouter from './routes/art-admin';
 import { logger } from './lib/logger';
 import { db } from './db';
-import { editorialPieces, users, notifications, memberships } from './db/schema';
+import { editorialPieces, users, notifications, memberships, batches, varieties as varietiesTable } from './db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { sendPushNotification } from './lib/push';
 import { requireUser } from './lib/auth';
@@ -176,6 +177,36 @@ app.use('/api/evening-tokens', eveningTokensRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/menu-recommendation', menuRecommendationRouter);
 app.use('/api/staff', staffRouter);
+app.use('/api/walkin', walkinRouter);
+
+// GET /api/batches?location_id=&variety_id= — live batch availability for the iOS order flow
+app.get('/api/batches', async (req, res) => {
+  const locationId = parseInt(String(req.query.location_id), 10);
+  const varietyId = parseInt(String(req.query.variety_id), 10);
+  if (!locationId || !varietyId) { res.status(400).json({ error: 'location_id and variety_id required' }); return; }
+  try {
+    const rows = await db
+      .select({
+        id: batches.id,
+        quantity_remaining: batches.quantity_remaining,
+        variety_name: varietiesTable.name,
+        price_cents: varietiesTable.price_cents,
+      })
+      .from(batches)
+      .innerJoin(varietiesTable, eq(batches.variety_id, varietiesTable.id))
+      .where(and(
+        eq(batches.location_id, locationId),
+        eq(batches.variety_id, varietyId),
+        eq(batches.published, true),
+        sql`${batches.quantity_remaining} > 0`,
+      ))
+      .orderBy(batches.created_at);
+    res.json(rows);
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 app.use('/api/standing-order-waitlist', waitlistRouter);
 app.use('/api/standing-order-transfers', transfersRouter);
 app.use('/api/standing-order-tiers', tiersRouter);
@@ -228,6 +259,10 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/operator', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/operator.html'));
+});
+
+app.get('/chocolatier', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/chocolatier.html'));
 });
 
 app.get('/privacy', (_req, res) => {

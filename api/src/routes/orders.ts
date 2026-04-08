@@ -3,12 +3,13 @@ import { eq, sql, and, desc, isNotNull } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import crypto from 'crypto';
 import { db } from '../db';
-import { orders, varieties, timeSlots, legitimacyEvents, users, referralCodes, locations, seasonPatronages, patronTokens, messages, businesses } from '../db/schema';
+import { orders, varieties, timeSlots, batches, legitimacyEvents, users, referralCodes, locations, seasonPatronages, patronTokens, messages, businesses } from '../db/schema';
 import { stripe } from '../lib/stripe';
-import { sendOrderConfirmation } from '../lib/resend';
+import { sendOrderConfirmation, sendOrderQueued } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
 import { logger } from '../lib/logger';
 import { requireUser } from '../lib/auth';
+import { checkAndTriggerBatch } from '../lib/batchTrigger';
 
 const router = Router();
 
@@ -22,7 +23,6 @@ router.post('/', async (req: Request, res: Response) => {
   const {
     variety_id,
     location_id,
-    time_slot_id,
     chocolate,
     finish,
     quantity,
@@ -32,7 +32,7 @@ router.post('/', async (req: Request, res: Response) => {
     gift_note,
   } = req.body;
 
-  if (!variety_id || !location_id || !time_slot_id || !chocolate || !finish || !quantity || !customer_email) {
+  if (!variety_id || !location_id || !chocolate || !finish || !quantity || !customer_email) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
@@ -46,43 +46,23 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    // In review mode, skip stock and slot capacity checks
-    if (!isReview) {
-      if (variety.stock_remaining < quantity) {
-        res.status(400).json({ error: 'Insufficient stock' });
-        return;
-      }
-
-      const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id));
-      if (!slot) {
-        res.status(404).json({ error: 'Time slot not found' });
-        return;
-      }
-      if (slot.capacity - slot.booked < quantity) {
-        res.status(400).json({ error: 'Time slot is full' });
-        return;
-      }
-    }
-
     const total_cents = variety.price_cents * quantity;
 
     let stripePaymentIntentId: string;
     let clientSecret: string;
 
     if (isReview) {
-      // Skip Stripe entirely in review mode
       stripePaymentIntentId = `review_${randomUUID()}`;
       clientSecret = 'review_secret';
     } else {
+      // Manual capture: authorizes the card now, captures only when batch triggers
       const paymentIntent = await stripe.paymentIntents.create({
         amount: total_cents,
         currency: 'cad',
+        capture_method: 'manual',
         receipt_email: customer_email,
-        metadata: {
-          variety_id: String(variety_id),
-          time_slot_id: String(time_slot_id),
-        },
-      }, { idempotencyKey: `order-${customer_email}-${variety_id}-${time_slot_id}-${quantity}` });
+        metadata: { variety_id: String(variety_id), location_id: String(location_id) },
+      }, { idempotencyKey: `order-${customer_email}-${variety_id}-${location_id}-${Date.now()}` });
       stripePaymentIntentId = paymentIntent.id;
       clientSecret = paymentIntent.client_secret!;
     }
@@ -92,7 +72,6 @@ router.post('/', async (req: Request, res: Response) => {
       .values({
         variety_id,
         location_id,
-        time_slot_id,
         chocolate,
         finish,
         quantity,
@@ -116,64 +95,30 @@ router.post('/', async (req: Request, res: Response) => {
 // POST /api/orders/:id/confirm — mark order paid after client-side Stripe confirmation
 router.post('/:id/confirm', async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
-  if (isNaN(id)) {
-    res.status(400).json({ error: 'Invalid order id' });
-    return;
-  }
+  if (isNaN(id)) { res.status(400).json({ error: 'Invalid order id' }); return; }
 
   const isReview = isReviewRequest(req);
 
   try {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
-    if (!order) {
-      res.status(404).json({ error: 'Order not found' });
-      return;
-    }
-    if (order.status !== 'pending') {
-      // Already processed — return the full order so iOS app can read id, nfc_token, total_cents
-      res.json(order);
-      return;
-    }
+    if (!order) { res.status(404).json({ error: 'Order not found' }); return; }
+    if (order.status !== 'pending') { res.json(order); return; }
 
-    // Verify with Stripe that payment was actually collected before marking paid.
     if (!isReview && order.stripe_payment_intent_id) {
       const pi = await stripe.paymentIntents.retrieve(order.stripe_payment_intent_id);
-      if (pi.status !== 'succeeded') {
+      // Accept requires_capture (manual) or succeeded (immediate — legacy/review)
+      if (pi.status !== 'requires_capture' && pi.status !== 'succeeded') {
         res.status(402).json({ error: 'payment_not_confirmed' });
         return;
       }
     }
 
-    const nfc_token = randomUUID();
-
-    // Atomically mark order paid, decrement stock, and increment slot booking
-    // Re-check stock inside the transaction to prevent race conditions
-    await db.transaction(async (tx) => {
-      await tx.update(orders).set({ status: 'paid', nfc_token }).where(eq(orders.id, id));
-      if (!isReview) {
-        const result = await tx
-          .update(varieties)
-          .set({ stock_remaining: sql`${varieties.stock_remaining} - ${order.quantity}` })
-          .where(and(eq(varieties.id, order.variety_id), sql`${varieties.stock_remaining} >= ${order.quantity}`))
-          .returning({ stock_remaining: varieties.stock_remaining });
-        if (result.length === 0) {
-          throw new Error('sold_out');
-        }
-        await tx
-          .update(timeSlots)
-          .set({ booked: sql`${timeSlots.booked} + ${order.quantity}` })
-          .where(eq(timeSlots.id, order.time_slot_id));
-      }
-    });
-
-    const [updated] = await db.select().from(orders).where(eq(orders.id, id));
-
-    // User upsert + legitimacy event — non-blocking, don't fail the response
+    // User upsert + legitimacy
     let dbUserId: number | undefined;
     try {
-      const existingUsers = await db.select({ id: users.id }).from(users).where(eq(users.email, order.customer_email));
-      if (existingUsers.length > 0) {
-        dbUserId = existingUsers[0].id;
+      const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, order.customer_email));
+      if (existing) {
+        dbUserId = existing.id;
       } else {
         const [newUser] = await db.insert(users).values({ email: order.customer_email }).returning({ id: users.id });
         dbUserId = newUser.id;
@@ -181,81 +126,39 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
       if (!isReview && dbUserId) {
         await db.insert(legitimacyEvents).values({ user_id: dbUserId, event_type: 'order_placed', weight: 1 });
       }
-    } catch (userErr) {
-      logger.error('User upsert/legitimacy error (non-fatal)', userErr);
+    } catch (e) { logger.error('User upsert error (non-fatal)', e); }
+
+    if (isReview) {
+      // Review mode: charge immediately, skip queue
+      const nfc_token = randomUUID();
+      await db.update(orders).set({ status: 'paid', nfc_token, queued_at: new Date(), payment_captured: true }).where(eq(orders.id, id));
+      const [updated] = await db.select().from(orders).where(eq(orders.id, id));
+      res.json({ ...updated, user_db_id: dbUserId });
+      return;
     }
 
-    // Open shop thread — fire-and-forget
-    if (dbUserId && !isReview) {
-      (async () => {
-        try {
-          const [location] = await db.select({ business_id: locations.id }).from(locations).where(eq(locations.id, order.location_id));
-          if (!location) return;
-          // Find the shop user account linked to this business
-          const [shopUser] = await db
-            .select({ id: users.id, display_name: users.display_name, push_token: users.push_token })
-            .from(users)
-            .where(and(eq(users.is_shop, true), eq(users.business_id, location.business_id ?? order.location_id)));
-          if (!shopUser) return;
-          const [variety] = await db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, order.variety_id));
-          const [slot] = await db.select({ time: timeSlots.time, date: timeSlots.date }).from(timeSlots).where(eq(timeSlots.id, order.time_slot_id));
-          const timeStr = slot?.time ? slot.time.substring(0, 5) : '';
-          const body = `Order received — ${variety?.name ?? 'your order'} ready at ${timeStr}. See you then.`;
-          await db.insert(messages).values({
-            sender_id: shopUser.id,
-            recipient_id: dbUserId,
-            body,
-            order_id: order.id,
-          });
-          if (shopUser.push_token) {
-            sendPushNotification(shopUser.push_token, {
-              title: 'New order',
-              body: `Order #${order.id} placed`,
-              data: { screen: 'messages', user_id: dbUserId },
-            }).catch(() => {});
-          }
-        } catch (threadErr) {
-          logger.error('Order thread creation failed (non-fatal)', threadErr);
-        }
-      })();
+    // Mark as queued — card is authorized, not yet captured
+    await db.update(orders).set({ status: 'queued', queued_at: new Date() }).where(eq(orders.id, id));
+
+    // Send "you're in the queue" email
+    const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
+    if (variety) {
+      sendOrderQueued({
+        to: order.customer_email,
+        varietyName: variety.name,
+        chocolate: order.chocolate,
+        finish: order.finish,
+        quantity: order.quantity,
+        totalCents: order.total_cents,
+      }).catch(() => {});
     }
 
-    // Send confirmation email — fire-and-forget
-    if (!isReview) {
-      const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, order.time_slot_id));
-      const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
-      if (slot && variety) {
-        sendOrderConfirmation({
-          to: order.customer_email,
-          varietyName: variety.name,
-          chocolate: order.chocolate,
-          finish: order.finish,
-          quantity: order.quantity,
-          isGift: order.is_gift,
-          totalCents: order.total_cents,
-          slotDate: slot.date,
-          slotTime: slot.time,
-        }).catch((err: unknown) => logger.error('Confirmation email failed', err));
-      }
+    // Check if threshold is met — may immediately trigger
+    const { triggered, deliveryDate } = await checkAndTriggerBatch(order.variety_id, order.location_id);
 
-      // Send low stock alert to active workers when stock drops to 3 or fewer
-      if (variety && variety.stock_remaining <= 3) {
-        const activeWorkers = await db
-          .select({ push_token: users.push_token })
-          .from(users)
-          .where(and(eq(users.worker_status, 'active'), isNotNull(users.push_token)));
-        for (const worker of activeWorkers) {
-          if (worker.push_token) {
-            sendPushNotification(worker.push_token, {
-              title: 'Low Stock',
-              body: `${variety.name} is down to ${variety.stock_remaining} remaining`,
-            }).catch((err: unknown) => logger.error('Low stock push failed', err));
-          }
-        }
-      }
-    }
-
-    res.json({ ...updated, nfc_token, user_db_id: dbUserId });
+    // Fetch final state of this order (may now be 'paid' if batch just triggered)
+    const [updated] = await db.select().from(orders).where(eq(orders.id, id));
+    res.json({ ...updated, delivery_date: deliveryDate ?? null, user_db_id: dbUserId });
   } catch (err) {
     logger.error('Order confirm error', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -268,7 +171,6 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
     variety_id,
     quantity,
     location_id,
-    time_slot_id,
     chocolate,
     finish,
     is_gift,
@@ -276,7 +178,7 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
     customer_email,
   } = req.body;
 
-  if (!variety_id || !quantity || !location_id || !time_slot_id || !chocolate || !finish || !customer_email) {
+  if (!variety_id || !quantity || !location_id || !chocolate || !finish || !customer_email) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
@@ -328,7 +230,6 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
         variety_id: String(variety_id),
         quantity: String(quantity),
         location_id: String(location_id),
-        time_slot_id: String(time_slot_id),
         chocolate: String(chocolate),
         finish: String(finish),
         is_gift: String(is_gift ?? false),
@@ -351,11 +252,11 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
 router.post('/pay-with-balance', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
   const {
-    variety_id, location_id, time_slot_id,
+    variety_id, location_id,
     chocolate, finish, quantity, is_gift, gift_note, push_token,
   } = req.body;
 
-  if (!variety_id || !location_id || !time_slot_id || !chocolate || !finish || !quantity) {
+  if (!variety_id || !location_id || !chocolate || !finish || !quantity) {
     res.status(400).json({ error: 'Missing required fields' }); return;
   }
 
@@ -368,10 +269,6 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
     if (!variety || !variety.active) { res.status(404).json({ error: 'Variety not found' }); return; }
 
     if (variety.stock_remaining < quantity) { res.status(409).json({ error: 'insufficient_stock', available: variety.stock_remaining }); return; }
-
-    const [slot] = await db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id));
-    if (!slot) { res.status(404).json({ error: 'Time slot not found' }); return; }
-    if (slot.capacity - slot.booked < quantity) { res.status(400).json({ error: 'Time slot is full' }); return; }
 
     let total_cents = variety.price_cents * quantity;
 
@@ -390,75 +287,35 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
       .returning({ ad_balance_cents: users.ad_balance_cents });
     if (!deducted.length) { res.status(402).json({ error: 'insufficient_balance' }); return; }
 
-    const nfc_token = randomUUID();
-
-    // Create order + confirm atomically
+    // Create order in queued state (balance is already deducted above as the "hold")
     const [order] = await db.insert(orders).values({
-      variety_id, location_id, time_slot_id, chocolate, finish,
+      variety_id, location_id, chocolate, finish,
       quantity, is_gift: is_gift ?? false, total_cents,
       stripe_payment_intent_id: `balance_${randomUUID()}`,
-      status: 'paid', customer_email: currentUser.email,
+      status: 'queued', queued_at: new Date(),
+      customer_email: currentUser.email,
       push_token: push_token ?? null, gift_note: gift_note ?? null,
-      nfc_token, discount_applied,
+      discount_applied, payment_captured: true,
     }).returning();
-
-    // Stock + slot update
-    await db.transaction(async (tx) => {
-      const result = await tx.update(varieties)
-        .set({ stock_remaining: sql`${varieties.stock_remaining} - ${quantity}` })
-        .where(and(eq(varieties.id, variety_id), sql`${varieties.stock_remaining} >= ${quantity}`))
-        .returning({ stock_remaining: varieties.stock_remaining });
-      if (!result.length) throw new Error('sold_out');
-      await tx.update(timeSlots)
-        .set({ booked: sql`${timeSlots.booked} + ${quantity}` })
-        .where(eq(timeSlots.id, time_slot_id));
-    });
 
     // Legitimacy event
     await db.insert(legitimacyEvents).values({ user_id: userId, event_type: 'order_placed', weight: 1 }).catch(() => {});
 
-    // Confirmation email
-    const [slotRow] = await db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id));
-    if (slotRow && variety) {
-      sendOrderConfirmation({
-        to: currentUser.email,
-        varietyName: variety.name,
-        chocolate: order.chocolate,
-        finish: order.finish,
-        quantity: order.quantity,
-        isGift: order.is_gift,
-        totalCents: total_cents,
-        slotDate: slotRow.date,
-        slotTime: slotRow.time,
-      }).catch(() => {});
-    }
+    // Queue email
+    sendOrderQueued({
+      to: currentUser.email,
+      varietyName: variety.name,
+      chocolate: order.chocolate,
+      finish: order.finish,
+      quantity: order.quantity,
+      totalCents: total_cents,
+    }).catch(() => {});
 
-    // Shop thread
-    (async () => {
-      try {
-        const [location] = await db.select({ business_id: locations.id }).from(locations).where(eq(locations.id, location_id));
-        if (!location) return;
-        const [shopUser] = await db.select({ id: users.id, display_name: users.display_name, push_token: users.push_token })
-          .from(users).where(and(eq(users.is_shop, true), eq(users.business_id, location.business_id ?? location_id)));
-        if (!shopUser) return;
-        const [varietyRow] = await db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, variety_id));
-        const [slotData] = await db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id));
-        const timeStr = slotData?.time ? slotData.time.substring(0, 5) : '';
-        await db.insert(messages).values({
-          sender_id: shopUser.id, recipient_id: userId,
-          body: `Order received — ${varietyRow?.name ?? 'your order'} ready at ${timeStr}. See you then.`,
-          order_id: order.id,
-        });
-        if (shopUser.push_token) {
-          sendPushNotification(shopUser.push_token, {
-            title: 'New order', body: `Order #${order.id} placed`,
-            data: { screen: 'messages', user_id: userId },
-          }).catch(() => {});
-        }
-      } catch { /* non-fatal */ }
-    })();
+    // Check if this tips over the threshold
+    const { triggered, deliveryDate } = await checkAndTriggerBatch(variety_id, location_id);
+    const [updated] = await db.select().from(orders).where(eq(orders.id, order.id));
 
-    res.status(201).json({ ...order, user_db_id: userId });
+    res.status(201).json({ ...updated, delivery_date: deliveryDate ?? null, user_db_id: userId });
   } catch (err) {
     logger.error('Balance order error: ' + String(err));
     res.status(500).json({ error: String(err) });

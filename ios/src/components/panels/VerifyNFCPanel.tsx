@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
-import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions } from '../../lib/api';
+import { verifyNfc, collectMarketOrderByNfc, verifyNfcReorder, fetchStaffOrderByNfc, fetchMarketStallAR, staffMarkPrepare, staffMarkReady, staffFlagOrder, fetchVarietyProfile, fetchActiveDropForVariety, bulkPrepareOrders, fetchMyScannedVarieties, fetchCollectifRank, fetchPickupGrid, saveTastingRating, fetchNearbyArNotes, postArNote, fetchOpenFarmVisits, computeUnlockedAchievements, fetchPersonalBestFlavor, fetchTastingWordCloud, fetchBatchMembers, fetchVarietyStreakLeaders, fetchCurrentChallenge, fetchBundleSuggestion, fetchUpcomingDrop, addToGiftRegistry, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchArPoem, fetchSolarIrradiance, fetchLotCompanions, fetchWalkInToken } from '../../lib/api';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions, getTodayHealthContext } from '../../lib/HealthKitService';
 
@@ -56,6 +56,53 @@ export default function VerifyNFCPanel() {
           await ARBoxModule.presentAR(marketPayload);
         }
         showPanel('market-orders');
+        return;
+      }
+
+      // Walk-in purchase tag
+      if (token.startsWith('fraise-walkin-')) {
+        const data = await fetchWalkInToken(token).catch(() => null);
+        if (!data) { setErrorMsg('Tag not recognised.'); setState('error'); return; }
+        if (data.claimed) {
+          const myEmail = await AsyncStorage.getItem('user_email');
+          if (myEmail && myEmail === data.owner_email) {
+            // Owner scanning their own box — run the full reorder AR flow
+            const reorderData = await verifyNfcReorder(token);
+            setState('success');
+            const arPayload: ARVarietyData = {
+              variety_id: reorderData.variety_id,
+              variety_name: reorderData.variety_name ?? null,
+              farm: reorderData.farm ?? null,
+              harvest_date: reorderData.harvest_date ?? null,
+              quantity: reorderData.quantity,
+              chocolate: reorderData.chocolate,
+              finish: reorderData.finish,
+              card_type: 'variety',
+              order_count: reorderData.order_count ?? 0,
+              tasting_word_cloud: [], batch_members: [], lot_companions: [],
+            } as any;
+            await ARBoxModule.presentAR(arPayload);
+            goHome();
+          } else {
+            // Someone else's box — show remaining inventory at this location
+            setState('success');
+            showPanel('walk-in-inventory', { location_id: data.location_id, location_name: data.location_name });
+          }
+        } else {
+          setState('success');
+          showPanel('walk-in', { walk_in_token: token });
+        }
+        return;
+      }
+
+      // Generic thank-you tag: any user scans → AR overlay
+      if (token === 'fraise-thankyou') {
+        setState('success');
+        await ARBoxModule.presentAR({
+          variety_id: 0, variety_name: null, farm: null, harvest_date: null,
+          quantity: 0, chocolate: '', finish: '', card_type: 'thankyou',
+        } as any);
+        goHome();
         return;
       }
 
@@ -307,6 +354,10 @@ export default function VerifyNFCPanel() {
           solar_data: solarData ?? null,
           // Social expanded
           lot_companions: (lotCompanions as any[]) ?? [],
+          // Batch provenance
+          batch_delivery_date: reorderData.batch_delivery_date ?? null,
+          batch_triggered_at: reorderData.batch_triggered_at ?? null,
+          batch_notes: reorderData.batch_notes ?? null,
         };
         setState('success');
         const arResult = await ARBoxModule.presentAR(arPayload);

@@ -121,7 +121,7 @@ export default function GiftNotePanel() {
       <View style={[styles.footer, { borderTopColor: c.border, paddingBottom: insets.bottom || SPACING.md }]}>
         <TouchableOpacity
           style={[styles.cta, { backgroundColor: note.trim() ? c.accent : c.card, borderWidth: note.trim() ? 0 : StyleSheet.hairlineWidth, borderColor: c.border }]}
-          onPress={() => { setOrder({ gift_note: note.trim() || null }); showPanel('when'); }}
+          onPress={() => { setOrder({ gift_note: note.trim() || null }); showPanel('review'); }}
           activeOpacity={0.8}
         >
           <Text style={[styles.ctaText, { color: note.trim() ? '#fff' : c.muted }]}>

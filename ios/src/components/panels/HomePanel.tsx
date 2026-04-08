@@ -8,8 +8,6 @@ import { usePanel, Variety } from '../../context/PanelContext';
 import { fetchVarieties, fetchTodayStats } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES } from '../../data/seed';
-import ARBoxModule from '../../lib/NativeARBoxModule';
-import { useApp } from '../../../App';
 
 const SHEET_NAME = 'main-sheet';
 
@@ -21,8 +19,6 @@ function formatHarvestDate(iso: string): string {
 
 export default function HomePanel() {
   const { setVarieties, setActiveLocation, varieties, activeLocation, businesses, sheetHeight, setPanelData, jumpToPanel, showPanel, order, setOrder } = usePanel();
-  const { reviewMode } = useApp();
-
   const now = new Date();
   const otherLocations = businesses.filter((b: any) => {
     if (b.id === activeLocation?.id) return false;
@@ -144,94 +140,6 @@ export default function HomePanel() {
                 </Text>
               )}
               <Text style={[styles.emptyHint, { color: c.muted }]}>tap a location on the map</Text>
-              <TouchableOpacity
-                onPress={() => showPanel('market')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>market →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showPanel('order-history')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>order history →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showPanel('tokens')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>tokens →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => showPanel('tournaments')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>tournaments →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('market-home')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>fraise.market →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('my-profile')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>my profile →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('evening-tokens')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>evening tokens →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('discovery')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>discover →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('verifyNFC')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>scan your box →</Text>
-              </TouchableOpacity>
-              {reviewMode && (
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  onPress={() => ARBoxModule.presentAR({
-                    variety_id: 1, variety_name: 'Albion', farm: 'Domaine Lacroix',
-                    harvest_date: '2026-04-05', quantity: 2, chocolate: 'dark', finish: 'floral',
-                    brix_score: 11.4, growing_method: 'organic', altitude_m: 320,
-                    soil_type: 'sandy loam', farm_photo_url: null,
-                    tasting_notes: ['bright', 'citrus', 'sweet'],
-                    variety_description: 'A classic Californian variety with bright acidity and rich sweetness.',
-                    carbon_footprint_kg: 0.12, sunlight_hours: 8,
-                    pairing_suggestions: ['dark chocolate', 'aged brie'],
-                    collectif_name: null, show_referral_bubble: false,
-                    tasting_word_cloud: [], batch_members: [], lot_companions: [],
-                  }).catch(() => {})}
-                >
-                  <Text style={[styles.collectifLinkText, { color: c.accent }]}>try ar →</Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity onPress={() => showPanel('staff-orders')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>staff →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('standing-order-renewal')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>renewal →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('waitlist')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>waitlist →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('drops')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>drops →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('variety-passport')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>passport →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('fraise-chat-inbox')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>inbox →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('leaderboard')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>leaderboard →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('farm-visits')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>farm visits →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('seasonal-calendar')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>seasons →</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => showPanel('editorial-feed')} activeOpacity={0.7}>
-                <Text style={[styles.collectifLinkText, { color: c.muted }]}>editorial →</Text>
-              </TouchableOpacity>
             </View>
 
           ) : (
@@ -374,25 +282,6 @@ export default function HomePanel() {
                   })
                 )}
               </View>
-              {/* ── Quick navigation ── */}
-              <View style={styles.quickNavRow}>
-                {[
-                  { label: 'market', panel: 'market-home' },
-                  { label: 'profile', panel: 'my-profile' },
-                  { label: 'history', panel: 'order-history' },
-                  { label: 'tokens', panel: 'tokens' },
-                  { label: 'scan box', panel: 'verifyNFC' },
-                ].map(({ label, panel }) => (
-                  <TouchableOpacity
-                    key={panel}
-                    style={[styles.quickNavChip, { borderColor: c.border }]}
-                    onPress={() => showPanel(panel as any)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.quickNavChipText, { color: c.muted, fontFamily: fonts.dmMono }]}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
             </>
           )}
           <View style={{ height: 40 }} />
@@ -455,9 +344,4 @@ const styles = StyleSheet.create({
   nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
   viewEventRow: { paddingHorizontal: SPACING.md, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   viewEventText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  collectifLink: { marginTop: 20 },
-  collectifLinkText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  quickNavRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingVertical: SPACING.md, paddingHorizontal: SPACING.sm },
-  quickNavChip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
-  quickNavChipText: { fontSize: 11, letterSpacing: 1 },
 });

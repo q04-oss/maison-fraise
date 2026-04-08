@@ -318,6 +318,13 @@ export default function StaffOrdersPanel() {
             <Text style={[styles.footerText, { color: c.muted, fontFamily: fonts.dmMono }]}>
               {totalOrders} orders  ·  {readyCount} ready  ·  {collectedCount} collected
             </Text>
+            <TouchableOpacity
+              style={[styles.genericTagBtn, { borderColor: c.accent }]}
+              onPress={() => showPanel('nfc-write', { nfc_token: 'fraise-thankyou' })}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.genericTagBtnText, { color: c.accent, fontFamily: fonts.dmMono }]}>WRITE GENERIC TAG</Text>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -390,6 +397,9 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingHorizontal: SPACING.md,
     alignItems: 'center',
+    gap: 10,
   },
   footerText: { fontSize: 11, letterSpacing: 0.5 },
+  genericTagBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 16, paddingVertical: 8 },
+  genericTagBtnText: { fontSize: 10, letterSpacing: 1.5 },
 });

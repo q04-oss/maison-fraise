@@ -129,10 +129,15 @@ export async function cancelStandingOrder(id: number) {
   return res.json();
 }
 
+export async function fetchLiveBatches(locationId: number, varietyId: number): Promise<Array<{ id: number; quantity_remaining: number; variety_name: string; price_cents: number }>> {
+  const res = await fetch(`${BASE_URL}/api/batches?location_id=${locationId}&variety_id=${varietyId}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function createOrder(body: {
   variety_id: number;
   location_id: number;
-  time_slot_id: number;
   chocolate: string;
   finish: string;
   quantity: number;
@@ -159,7 +164,6 @@ export async function createOrder(body: {
 export async function payOrderWithBalance(body: {
   variety_id: number;
   location_id: number;
-  time_slot_id: number;
   chocolate: string;
   finish: string;
   quantity: number;
@@ -198,7 +202,7 @@ export async function confirmOrder(orderId: number) {
     total_cents: number;
     variety_id: number;
     location_id: number;
-    time_slot_id: number;
+    batch_id: number | null;
     chocolate: string;
     finish: string;
     quantity: number;
@@ -2905,6 +2909,18 @@ export async function verifyNfcReorder(nfc_token: string): Promise<{
   last_variety?: { id: number; name: string; farm: string; harvest_date: string } | null;
   next_standing_order?: { variety_name: string; days_until: number } | null;
   collectif_member_names?: string[];
+  // Fields used by VerifyNFCPanel but typed loosely via API
+  streak_weeks?: number | null;
+  season_start?: string | null;
+  season_end?: string | null;
+  collectif_milestone_pct?: number | null;
+  last_scan_date?: string | null;
+  last_scan_rating?: number | null;
+  last_scan_note?: string | null;
+  // Batch provenance
+  batch_delivery_date?: string | null;
+  batch_triggered_at?: string | null;
+  batch_notes?: string | null;
 }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/verify/reorder`, {
@@ -3871,4 +3887,51 @@ export async function fetchMyArtContributions(): Promise<{ painted: any[]; colle
   const r = await fetch(`${BASE_URL}/api/art/my-contributions`, { headers: auth });
   if (!r.ok) return { painted: [], collected: [] };
   return r.json();
+}
+
+
+export async function fetchWalkInToken(token: string): Promise<any> {
+  const r = await fetch(`${BASE_URL}/api/walkin/${encodeURIComponent(token)}`);
+  if (r.status === 404) throw new Error('not_found');
+  if (r.status === 410) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'gone'); }
+  if (!r.ok) throw new Error('fetch_failed');
+  return r.json();
+}
+
+export async function fetchWalkInInventory(locationId: number): Promise<any[]> {
+  const r = await fetch(`${BASE_URL}/api/walkin/inventory?location_id=${locationId}`);
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function createWalkInOrder(token: string, body: {
+  chocolate: string;
+  finish: string;
+  customer_email: string;
+  push_token?: string;
+}): Promise<{ order: any; client_secret: string }> {
+  const r = await fetch(`${BASE_URL}/api/walkin/${encodeURIComponent(token)}/order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (r.status === 410) throw new Error('already_claimed');
+  if (!r.ok) throw new Error('order_failed');
+  return r.json();
+}
+
+export async function createWalkInTokens(pin: string, location_id: number, variety_id: number, count: number): Promise<string[]> {
+  const auth = await authHeader();
+  const tokens: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const r = await fetch(`${BASE_URL}/api/staff/walkin-tokens`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-staff-pin': pin, ...auth },
+      body: JSON.stringify({ location_id, variety_id }),
+    });
+    if (!r.ok) throw new Error('token_creation_failed');
+    const { token } = await r.json();
+    tokens.push(token);
+  }
+  return tokens;
 }

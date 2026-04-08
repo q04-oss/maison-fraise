@@ -124,6 +124,10 @@ export interface ARVarietyData {
   // Social expanded
   lot_companions?: Array<{ id: number; display_name: string; portrait_url: string | null; current_streak_weeks: number; social_tier: string | null }>;
   streak_milestone?: boolean;
+  // Batch provenance
+  batch_delivery_date?: string | null;
+  batch_triggered_at?: string | null;
+  batch_notes?: string | null;
 }
 
 // Feature E: Staff AR
