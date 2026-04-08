@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, SafeAreaView, Alert, TextInput, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useColors, fonts } from '../theme';
 import { SPACING } from '../theme';
-import { applyReferralCode } from '../lib/api';
+import { applyReferralCode, demoLogin } from '../lib/api';
 
 const { width: W } = Dimensions.get('window');
 
@@ -36,12 +36,34 @@ export default function OnboardingScreen({ onDone }: Props) {
   const c = useColors();
   const [step, setStep] = useState(0);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [demoEmail, setDemoEmail] = useState('');
+  const [demoPassword, setDemoPassword] = useState('');
+  const [demoLoading, setDemoLoading] = useState(false);
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
   React.useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => setIsLoggedIn(!!id));
   }, []);
+
+  const handleDemoLogin = async () => {
+    if (!demoEmail.trim() || !demoPassword) return;
+    setDemoLoading(true);
+    try {
+      const result = await demoLogin(demoEmail.trim(), demoPassword);
+      await AsyncStorage.multiSet([
+        ['auth_token', result.token],
+        ['user_db_id', String(result.user_id)],
+        ['verified', 'true'],
+        ['onboarding_done', '1'],
+      ]);
+      onDone();
+    } catch {
+      Alert.alert('', 'Invalid credentials.');
+    } finally {
+      setDemoLoading(false);
+    }
+  };
 
   const handleReferralCode = () => {
     Alert.prompt('Referral Code', 'Enter your code for 10% off your first order', async (code) => {
@@ -101,6 +123,38 @@ export default function OnboardingScreen({ onDone }: Props) {
         )}
 
         {isLast && (
+          <View style={styles.demoBlock}>
+            <TextInput
+              style={[styles.demoInput, { borderColor: c.border, color: c.text, backgroundColor: c.panelBg }]}
+              placeholder="Email"
+              placeholderTextColor={c.muted}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              value={demoEmail}
+              onChangeText={setDemoEmail}
+            />
+            <TextInput
+              style={[styles.demoInput, { borderColor: c.border, color: c.text, backgroundColor: c.panelBg }]}
+              placeholder="Password"
+              placeholderTextColor={c.muted}
+              secureTextEntry
+              value={demoPassword}
+              onChangeText={setDemoPassword}
+            />
+            <TouchableOpacity
+              style={[styles.demoBtn, { borderColor: c.border }]}
+              onPress={handleDemoLogin}
+              disabled={demoLoading}
+              activeOpacity={0.7}
+            >
+              {demoLoading
+                ? <ActivityIndicator size="small" color={c.muted} />
+                : <Text style={[styles.demoBtnText, { color: c.muted }]}>SIGN IN</Text>}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isLast && (
           <TouchableOpacity onPress={handleSkip} style={styles.skipBtn}>
             <Text style={[styles.skipText, { color: c.muted }]}>Skip</Text>
           </TouchableOpacity>
@@ -124,6 +178,10 @@ const styles = StyleSheet.create({
   btnText: { fontFamily: fonts.dmMono, fontSize: 12, letterSpacing: 2, color: '#0C0C0E' },
   referralBtn: { marginTop: 16, paddingVertical: 6, alignItems: 'center' },
   referralText: { fontFamily: fonts.dmMono, fontSize: 12, textAlign: 'center' },
-  skipBtn: { marginTop: 20, paddingVertical: 8 },
+  skipBtn: { marginTop: 12, paddingVertical: 8 },
   skipText: { fontFamily: fonts.dmSans, fontSize: 13 },
+  demoBlock: { width: '100%', gap: 10, marginTop: 24 },
+  demoInput: { width: '100%', borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontFamily: fonts.dmSans, fontSize: 14 },
+  demoBtn: { width: '100%', borderWidth: 1, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  demoBtnText: { fontFamily: fonts.dmMono, fontSize: 12, letterSpacing: 1.5 },
 });

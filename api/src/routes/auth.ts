@@ -205,26 +205,25 @@ router.post('/operator', async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/demo — demo login for Apple reviewers
+const DEMO_EMAIL = 'demo@boxfraise.com';
+const DEMO_PASSWORD = 'fraise2026';
 router.post('/demo', async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  const demoEmail = process.env.DEMO_EMAIL;
-  const demoPassword = process.env.DEMO_PASSWORD;
-  if (!demoEmail || !demoPassword) {
-    res.status(503).json({ error: 'demo_unavailable' }); return;
-  }
-  if (email !== demoEmail || password !== demoPassword) {
-    logger.warn('Demo login rejected', { passwordMatch: password === demoPassword });
+  if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
     res.status(401).json({ error: 'invalid_credentials' }); return;
   }
   try {
-    const existing = await db.execute<{ id: number }>(sql`SELECT id FROM users WHERE email = ${demoEmail} LIMIT 1`);
+    const existing = await db.execute<{ id: number }>(sql`SELECT id FROM users WHERE email = ${DEMO_EMAIL} LIMIT 1`);
     const rows = (existing as any).rows ?? existing;
     let userId: number;
     if (rows.length > 0) {
       userId = rows[0].id;
     } else {
+      const code = await uniqueUserCode();
       const inserted = await db.execute<{ id: number }>(sql`
-        INSERT INTO users (email, display_name, verified) VALUES (${demoEmail}, 'Demo User', true) RETURNING id
+        INSERT INTO users (email, display_name, verified, user_code, apple_user_id)
+        VALUES (${DEMO_EMAIL}, 'Demo', true, ${code}, 'demo_reviewer')
+        RETURNING id
       `);
       const insertedRows = (inserted as any).rows ?? inserted;
       userId = insertedRows[0].id;

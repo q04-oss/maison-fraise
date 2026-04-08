@@ -820,49 +820,24 @@ const nameInputRef = useRef<TextInput>(null);
             {workerAccess === 'approved' && (
               <>
                 <View style={[styles.divider, { backgroundColor: c.border }]} />
-                {true ? (
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('nfc-write', { nfc_token: 'fraise-thankyou' })} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>WRITE GENERIC TAG</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
+                {location?.allows_walkin && (
                   <>
-                    <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('nfc-write', { nfc_token: 'fraise-thankyou' })} activeOpacity={0.7}>
-                      <Text style={[styles.label, { color: c.muted }]}>WRITE GENERIC TAG</Text>
-                      <Text style={[styles.label, { color: c.accent }]}>→</Text>
-                    </TouchableOpacity>
-                    {location?.allows_walkin && (
-                      <>
-                        <View style={[styles.divider, { backgroundColor: c.border }]} />
-                        <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('walk-in-write')} activeOpacity={0.7}>
-                          <Text style={[styles.label, { color: c.muted }]}>WRITE WALK-IN TAGS</Text>
-                          <Text style={[styles.label, { color: c.accent }]}>→</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
                     <View style={[styles.divider, { backgroundColor: c.border }]} />
-                    <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('staff-orders')} activeOpacity={0.7}>
-                      <Text style={[styles.label, { color: c.muted }]}>STAFF ORDERS</Text>
+                    <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('walk-in-write')} activeOpacity={0.7}>
+                      <Text style={[styles.label, { color: c.muted }]}>WRITE WALK-IN TAGS</Text>
                       <Text style={[styles.label, { color: c.accent }]}>→</Text>
                     </TouchableOpacity>
                   </>
-                ) : workerAccess === 'pending' ? (
-                  <>
-                    <View style={[styles.workerRequestRow, { borderColor: c.border }]}>
-                      <Text style={[styles.label, { color: c.muted }]}>WORKER ACCESS</Text>
-                      <Text style={[styles.workerRequestStatus, { color: c.muted }]}>Request pending</Text>
-                    </View>
-                  </>
-                ) : workerAccess === 'denied' ? (
-                  <>
-                    <View style={[styles.workerRequestRow, { borderColor: c.border }]}>
-                      <Text style={[styles.label, { color: c.muted }]}>WORKER ACCESS</Text>
-                      <Text style={[styles.workerRequestStatus, { color: '#C0392B' }]}>Not approved</Text>
-                    </View>
-                  </>
-                ) : workerAccess === 'ineligible' ? (
-                  <>
-                    <View style={[styles.workerRequestRow, { borderColor: c.border }]}>
-                      <Text style={[styles.label, { color: c.muted }]}>WORKER ACCESS</Text>
-                      <Text style={[styles.workerRequestStatus, { color: c.muted }]}>Visit this location to be eligible</Text>
-                    </View>
-                  </>
-                ) : null}
+                )}
+                <View style={[styles.divider, { backgroundColor: c.border }]} />
+                <TouchableOpacity style={styles.inboxBtn} onPress={() => showPanel('staff-orders')} activeOpacity={0.7}>
+                  <Text style={[styles.label, { color: c.muted }]}>STAFF ORDERS</Text>
+                  <Text style={[styles.label, { color: c.accent }]}>→</Text>
+                </TouchableOpacity>
               </>
             )}
 
