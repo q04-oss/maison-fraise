@@ -503,7 +503,23 @@ export async function fetchFollowerCount(userId: number) {
   return res.json() as Promise<{ follower_count: number }>;
 }
 
-export async function verifyNfc(nfc_token: string) {
+export async function verifyNfc(nfc_token: string): Promise<{
+  verified: boolean;
+  user_id: number;
+  auth_token?: string;
+  fraise_chat_email?: string | null;
+  is_dj?: boolean;
+  quantity?: number;
+  variety_id?: number;
+  variety_name?: string | null;
+  farm?: string | null;
+  harvest_date?: string | null;
+  tier?: string | null;
+  bank_days?: number;
+  credits_added_days?: number;
+  streak_weeks?: number;
+  streak_milestone?: boolean;
+}> {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/verify/nfc`, {
     method: 'POST',
