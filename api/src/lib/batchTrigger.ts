@@ -64,18 +64,24 @@ export async function checkAndTriggerBatch(
       }
     }
 
-    // Sum all valid queued orders for this variety + location
-    const queued = await db
-      .select()
-      .from(orders)
-      .where(and(
-        eq(orders.variety_id, variety_id),
-        eq(orders.location_id, location_id),
-        eq(orders.status, 'queued'),
-      ));
+    // Atomically claim all queued orders for this batch by transitioning to 'capturing'
+    // This prevents two concurrent workers from processing the same queue
+    const claimResult = await db.execute(sql`
+      UPDATE orders SET status = 'capturing'
+      WHERE variety_id = ${variety_id}
+        AND location_id = ${location_id}
+        AND status = 'queued'
+      RETURNING *
+    `);
+    const queued = (claimResult as any).rows ?? claimResult;
 
-    const totalQueued = queued.reduce((sum, o) => sum + o.quantity, 0);
+    const totalQueued = queued.reduce((sum: number, o: any) => sum + o.quantity, 0);
     if (totalQueued < MIN_QUANTITY) {
+      // Not enough — revert claimed orders back to queued
+      if (queued.length > 0) {
+        const ids = queued.map((o: any) => o.id);
+        await db.execute(sql`UPDATE orders SET status = 'queued' WHERE id = ANY(${ids})`);
+      }
       return { triggered: false };
     }
 

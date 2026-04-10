@@ -40,11 +40,14 @@ membershipsRouter.post('/payment-intent', requireUser, async (req: Request, res:
 
     const amount_cents = TIER_AMOUNTS[tier];
 
-    const pi = await stripe.paymentIntents.create({
-      amount: amount_cents,
-      currency: 'cad',
-      metadata: { type: 'membership', tier, user_id: String(userId) },
-    });
+    const pi = await stripe.paymentIntents.create(
+      {
+        amount: amount_cents,
+        currency: 'cad',
+        metadata: { type: 'membership', tier, user_id: String(userId) },
+      },
+      { idempotencyKey: `membership-${userId}-${tier}` },
+    );
 
     await db.insert(memberships).values({
       user_id: userId,
@@ -52,7 +55,7 @@ membershipsRouter.post('/payment-intent', requireUser, async (req: Request, res:
       status: 'pending',
       amount_cents,
       stripe_payment_intent_id: pi.id,
-    });
+    }).onConflictDoNothing();
 
     res.json({ client_secret: pi.client_secret, tier, amount_cents });
   } catch (err) {
@@ -206,18 +209,35 @@ membershipsRouter.post('/renew', requireUser, async (req: Request, res: Response
       const renews = new Date(now);
       renews.setFullYear(renews.getFullYear() + 1);
 
-      await db.update(memberships).set({
-        status: 'active',
-        started_at: now,
-        renews_at: renews,
-      }).where(and(eq(memberships.user_id, userId), or(eq(memberships.status, 'active'), eq(memberships.status, 'expired'))));
+      const covered = await db.transaction(async (tx) => {
+        // Lock earnings rows to prevent concurrent renewal races
+        const [locked] = await tx.execute<{ available: number }>(sql`
+          SELECT COALESCE(SUM(CASE WHEN type = 'credit' THEN amount_cents ELSE -amount_cents END), 0)::integer AS available
+          FROM earnings_ledger WHERE user_id = ${userId} FOR UPDATE
+        `);
+        const lockedAvailable = Number((locked as any).available ?? 0);
+        if (lockedAvailable < full_amount_cents) return false;
 
-      await db.insert(earningsLedger).values({
-        user_id: userId,
-        amount_cents: credit_applied,
-        type: 'debit',
-        description: `Applied to ${tier} membership renewal`,
+        await tx.insert(earningsLedger).values({
+          user_id: userId,
+          amount_cents: credit_applied,
+          type: 'debit',
+          description: `Applied to ${tier} membership renewal`,
+        });
+
+        await tx.update(memberships).set({
+          status: 'active',
+          started_at: now,
+          renews_at: renews,
+        }).where(and(eq(memberships.user_id, userId), or(eq(memberships.status, 'active'), eq(memberships.status, 'expired'))));
+
+        return true;
       });
+
+      if (!covered) {
+        res.status(402).json({ error: 'insufficient_balance' });
+        return;
+      }
 
       res.json({ ok: true, credit_applied, charge_amount: 0, fully_covered: true });
       return;

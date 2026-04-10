@@ -46,18 +46,6 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       // New order flow — PI created by POST /api/orders/payment-intent (no pre-created order row)
       if (!type && pi.metadata?.variety_id && pi.metadata?.customer_email) {
-        // Idempotency check — skip if order already created for this payment intent
-        const existing = await db
-          .select({ id: orders.id })
-          .from(orders)
-          .where(eq(orders.payment_intent_id, pi.id))
-          .limit(1);
-        if (existing.length > 0) {
-          logger.info('Duplicate webhook, skipping');
-          res.json({ received: true });
-          return;
-        }
-
         const variety_id = parseInt(pi.metadata.variety_id, 10);
         const quantity = parseInt(pi.metadata.quantity, 10);
         const location_id = parseInt(pi.metadata.location_id, 10);
@@ -87,8 +75,16 @@ router.post('/webhook', async (req: Request, res: Response) => {
         // Generate NFC token
         const nfc_token = crypto.randomBytes(4).toString('hex');
 
-        // Decrement stock (guarded) and insert order atomically
+        // Idempotency check inside transaction (SELECT FOR UPDATE prevents duplicate concurrent deliveries)
         const newOrder = await db.transaction(async (tx) => {
+          const [existing] = await tx
+            .select({ id: orders.id })
+            .from(orders)
+            .where(eq(orders.payment_intent_id, pi.id))
+            .for('update')
+            .limit(1);
+          if (existing) return null; // duplicate delivery
+
           const stockResult = await tx
             .update(varieties)
             .set({ stock_remaining: sql`${varieties.stock_remaining} - ${quantity}` })
@@ -121,6 +117,12 @@ router.post('/webhook', async (req: Request, res: Response) => {
             .returning();
           return inserted;
         });
+
+        if (!newOrder) {
+          logger.info('Duplicate webhook, skipping');
+          res.json({ received: true });
+          return;
+        }
 
         logger.info(`Order ${newOrder.id} created + paid via payment_intent webhook`);
 
@@ -473,7 +475,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
         const { ownerCents, cutCents } = calculateCut(amount);
 
-        await db.insert(portalAccess).values({
+        const [insertedAccess] = await db.insert(portalAccess).values({
           buyer_id: buyerId,
           owner_id: ownerId,
           amount_cents: amount,
@@ -481,7 +483,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
           source,
           stripe_payment_intent_id: pi.id,
           expires_at: expiresAt,
-        });
+        }).onConflictDoNothing().returning({ id: portalAccess.id });
+
+        if (!insertedAccess) {
+          // Duplicate webhook delivery — access row already exists, skip fund credit
+          res.json({ received: true });
+          return;
+        }
 
         // Credit owner's membership fund
         await db.execute(sql`
@@ -864,23 +872,27 @@ router.post('/webhook', async (req: Request, res: Response) => {
         if (!isNaN(visitId) && !isNaN(hostUserId)) {
           const code = String(Math.floor(1000 + Math.random() * 9000));
           const expires = new Date(Date.now() + 15 * 60 * 1000);
-          await db.update(toiletVisits).set({ paid: true, access_code: code, access_code_expires_at: expires })
-            .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)));
-          // Credit host
-          await db.update(users)
-            .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${amountCents}` })
-            .where(eq(users.id, hostUserId));
-          // Notify host
-          const [host] = await db.select({ push_token: users.push_token })
-            .from(users).where(eq(users.id, hostUserId));
-          if (host?.push_token) {
-            sendPushNotification(host.push_token, {
-              title: 'Someone is visiting your toilet',
-              body: `CA$${(amountCents / 100).toFixed(2)} earned from "${listingTitle}"`,
-              data: { screen: 'terminal' },
-            }).catch(() => {});
+          const updateResult = await db.update(toiletVisits)
+            .set({ paid: true, access_code: code, access_code_expires_at: expires })
+            .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)))
+            .returning({ id: toiletVisits.id });
+          // Only credit host if the paid=false guard matched (prevents double-credit on webhook retry)
+          if (updateResult.length > 0) {
+            await db.update(users)
+              .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${amountCents}` })
+              .where(eq(users.id, hostUserId));
+            // Notify host
+            const [host] = await db.select({ push_token: users.push_token })
+              .from(users).where(eq(users.id, hostUserId));
+            if (host?.push_token) {
+              sendPushNotification(host.push_token, {
+                title: 'Someone is visiting your toilet',
+                body: `CA$${(amountCents / 100).toFixed(2)} earned from "${listingTitle}"`,
+                data: { screen: 'terminal' },
+              }).catch(() => {});
+            }
+            logger.info(`Personal toilet visit ${visitId} paid, host ${hostUserId} credited ${amountCents}c`);
           }
-          logger.info(`Personal toilet visit ${visitId} paid, host ${hostUserId} credited ${amountCents}c`);
         }
       }
     }

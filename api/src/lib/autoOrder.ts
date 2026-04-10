@@ -26,6 +26,18 @@ type DB = PostgresJsDatabase<typeof schema>;
 
 export async function checkAndTriggerAutoOrder(userId: number, db: DB): Promise<void> {
   try {
+    // Serialize per-user using an advisory lock to prevent concurrent auto-order races
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(${userId})`);
+      await checkAndTriggerAutoOrderInner(userId, tx as unknown as DB);
+    });
+  } catch (err: any) {
+    if (!err?.expected) logger.error('checkAndTriggerAutoOrder error', err);
+  }
+}
+
+async function checkAndTriggerAutoOrderInner(userId: number, db: DB): Promise<void> {
+  try {
     // 1. Get the user's fund balance
     const [fund] = await db
       .select({ balance_cents: membershipFunds.balance_cents })

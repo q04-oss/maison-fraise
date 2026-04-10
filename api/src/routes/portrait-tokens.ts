@@ -154,6 +154,10 @@ router.post('/:id/view', requireUser, async (req: Request, res: Response) => {
       .where(and(eq(users.business_id, bizId), eq(users.is_shop, true)));
     if (!shopUser) { res.json({ ok: true, earned_cents: 0 }); return; }
 
+    // Only the shop user for the licensed business may register views — prevents arbitrary users draining ad balance
+    const viewerId = (req as any).userId as number;
+    if (viewerId !== shopUser.id) { res.status(403).json({ error: 'shop_user_only' }); return; }
+
     // Debit business 2x, credit owner 1x (platform keeps 1x implicitly)
     const [debited] = await db.update(users)
       .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${rateCents * 2}` })
@@ -280,36 +284,43 @@ router.post('/listings/:id/buy', requireUser, async (req: Request, res: Response
     const royaltyCents = Math.round(listing.asking_price_cents * 0.15);
     const sellerProceedsCents = listing.asking_price_cents - royaltyCents;
 
-    // Debit buyer with WHERE guard
-    const [buyerUpdate] = await db
-      .update(users)
-      .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${listing.asking_price_cents}` })
-      .where(
-        and(
-          eq(users.id, buyerId),
-          sql`${users.ad_balance_cents} >= ${listing.asking_price_cents}`,
-        ),
-      )
-      .returning({ ad_balance_cents: users.ad_balance_cents });
+    const result = await db.transaction(async (tx) => {
+      // Atomically claim the listing — prevents two concurrent buyers from both succeeding
+      const [claimed] = await tx.update(portraitTokenListings)
+        .set({ status: 'sold', buyer_user_id: buyerId, sold_at: new Date() })
+        .where(and(eq(portraitTokenListings.id, listingId), eq(portraitTokenListings.status, 'listed')))
+        .returning({ token_id: portraitTokenListings.token_id, seller_user_id: portraitTokenListings.seller_user_id });
+      if (!claimed) return null;
 
-    if (!buyerUpdate) { res.status(402).json({ error: 'insufficient_balance' }); return; }
+      // Debit buyer with WHERE guard
+      const [buyerUpdate] = await tx
+        .update(users)
+        .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${listing.asking_price_cents}` })
+        .where(
+          and(
+            eq(users.id, buyerId),
+            sql`${users.ad_balance_cents} >= ${listing.asking_price_cents}`,
+          ),
+        )
+        .returning({ ad_balance_cents: users.ad_balance_cents });
+      if (!buyerUpdate) throw Object.assign(new Error('insufficient_balance'), { status: 402 });
 
-    // Credit seller
-    await db.update(users)
-      .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${sellerProceedsCents}` })
-      .where(eq(users.id, listing.seller_user_id));
+      // Credit seller
+      await tx.update(users)
+        .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${sellerProceedsCents}` })
+        .where(eq(users.id, listing.seller_user_id));
 
-    // Transfer token ownership
-    await db.update(portraitTokens)
-      .set({ owner_id: buyerId, status: 'active' })
-      .where(eq(portraitTokens.id, listing.token_id));
+      // Transfer token ownership
+      await tx.update(portraitTokens)
+        .set({ owner_id: buyerId, status: 'active' })
+        .where(eq(portraitTokens.id, listing.token_id));
 
-    // Update listing
-    await db.update(portraitTokenListings)
-      .set({ status: 'sold', buyer_user_id: buyerId, sold_at: new Date() })
-      .where(eq(portraitTokenListings.id, listingId));
+      return claimed;
+    });
 
-    // Push notify seller
+    if (!result) { res.status(409).json({ error: 'listing_not_active' }); return; }
+
+    // Push notify seller (outside transaction — fire-and-forget)
     const [seller] = await db.select({ push_token: users.push_token })
       .from(users).where(eq(users.id, listing.seller_user_id));
     if (seller?.push_token) {

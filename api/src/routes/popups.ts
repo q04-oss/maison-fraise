@@ -65,7 +65,7 @@ router.post('/:id/rsvp', requireUser, async (req: Request, res: Response) => {
       const [{ paid_count }] = await db
         .select({ paid_count: sql<number>`cast(count(*) as int)` })
         .from(popupRsvps)
-        .where(and(eq(popupRsvps.popup_id, popup_id), eq(popupRsvps.status, 'paid')));
+        .where(and(eq(popupRsvps.popup_id, popup_id), sql`${popupRsvps.status} IN ('paid', 'pending')`));
       if (paid_count >= popup.capacity) {
         const [rsvp] = await db.insert(popupRsvps).values({
           popup_id, user_id, status: 'waitlist',
@@ -123,15 +123,19 @@ router.delete('/:id/rsvp', requireUser, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'RSVP not found' });
       return;
     }
-    // Refund if paid
+    // Refund if paid — only cancel after refund succeeds
     if (rsvp.status === 'paid' && rsvp.stripe_payment_intent_id) {
       try {
         await stripe.refunds.create({ payment_intent: rsvp.stripe_payment_intent_id });
+        await db.update(popupRsvps).set({ status: 'cancelled' }).where(eq(popupRsvps.id, rsvp.id));
       } catch (refundErr) {
         logger.error('Refund failed', refundErr);
+        res.status(502).json({ error: 'Refund failed — RSVP not cancelled' });
+        return;
       }
+    } else {
+      await db.update(popupRsvps).set({ status: 'cancelled' }).where(eq(popupRsvps.id, rsvp.id));
     }
-    await db.update(popupRsvps).set({ status: 'cancelled' }).where(eq(popupRsvps.id, rsvp.id));
 
     // Promote first waitlisted user if this was a paid RSVP
     if (rsvp.status === 'paid') {
@@ -206,7 +210,7 @@ router.post('/:id/checkin', requireUser, async (req: Request, res: Response) => 
     }
 
     // Verify NFC token matches the popup's checkin token (if configured)
-    if (popup.checkin_token && nfc_token && popup.checkin_token !== nfc_token) {
+    if (popup.checkin_token && (!nfc_token || popup.checkin_token !== nfc_token)) {
       res.status(403).json({ error: 'Invalid check-in token' });
       return;
     }

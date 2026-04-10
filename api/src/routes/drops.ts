@@ -156,15 +156,28 @@ router.post('/:id/claim', requireUser, async (req: Request, res: Response) => {
   if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
   const userId = (req as any).userId as number;
   try {
-    // Atomic decrement
-    const claimed = await db.execute(sql`
+    // Insert claim FIRST to guard idempotency — if duplicate, reject before touching stock
+    const claimInsert = await db.execute(sql`
+      INSERT INTO drop_claims (drop_id, user_id, payment_intent_id)
+      VALUES (${id}, ${userId}, 'pending')
+      ON CONFLICT (drop_id, user_id) DO NOTHING
+      RETURNING id
+    `);
+    if (!((claimInsert as any).rows ?? claimInsert)[0]) {
+      res.status(409).json({ error: 'already_claimed' });
+      return;
+    }
+
+    // Atomic stock decrement
+    const decremented = await db.execute(sql`
       UPDATE variety_drops SET quantity = quantity - 1
       WHERE id = ${id} AND quantity > 0 AND status = 'open'
       RETURNING id, price_cents, name
     `);
-    const drop = ((claimed as any).rows ?? claimed)[0];
+    const drop = ((decremented as any).rows ?? decremented)[0];
     if (!drop) {
-      // Stock exhausted — auto-join waitlist
+      // Stock exhausted — rollback the claim placeholder and join waitlist instead
+      await db.execute(sql`DELETE FROM drop_claims WHERE drop_id=${id} AND user_id=${userId} AND payment_intent_id='pending'`);
       await db.execute(sql`
         INSERT INTO drop_waitlist (drop_id, user_id) VALUES (${id}, ${userId})
         ON CONFLICT DO NOTHING
@@ -177,11 +190,11 @@ router.post('/:id/claim', requireUser, async (req: Request, res: Response) => {
       amount: drop.price_cents,
       currency: 'cad',
       metadata: { type: 'drop_claim', drop_id: String(id), user_id: String(userId) },
-    });
+      idempotencyKey: `drop-claim-${id}-${userId}`,
+    } as any);
     await db.execute(sql`
-      INSERT INTO drop_claims (drop_id, user_id, payment_intent_id)
-      VALUES (${id}, ${userId}, ${pi.id})
-      ON CONFLICT (drop_id, user_id) DO NOTHING
+      UPDATE drop_claims SET payment_intent_id = ${pi.id}
+      WHERE drop_id = ${id} AND user_id = ${userId} AND payment_intent_id = 'pending'
     `);
     res.json({ client_secret: pi.client_secret });
   } catch (err) {

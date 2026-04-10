@@ -154,40 +154,48 @@ router.post('/', requireUser, async (req: any, res: Response) => {
   if (!name) { res.status(400).json({ error: 'name is required' }); return; }
   const type = ceo_type === 'dorotka' ? 'dorotka' : 'human';
 
-  try {
-    const [venture] = await db
-      .insert(ventures)
-      .values({
-        name,
-        description: description ?? null,
-        ceo_type: type,
-        ceo_user_id: type === 'human' ? req.userId : null,
-        created_by: req.userId,
-      })
-      .returning();
-
-    // Creator becomes owner-member
-    await db.insert(ventureMembers).values({
-      venture_id: venture.id,
-      user_id: req.userId,
-      role: 'owner',
-    });
-
-    // Persist revenue splits if provided
-    if (Array.isArray(revenue_splits) && revenue_splits.length > 0) {
-      const totalBps = revenue_splits.reduce((s: number, r: any) => s + (r.share_bps ?? 0), 0);
-      if (totalBps > 10000) {
-        res.status(400).json({ error: 'revenue_splits_exceed_100_percent' });
-        return;
-      }
-      await db.insert(ventureRevenueSplits).values(
-        revenue_splits.map((r: any) => ({
-          venture_id: venture.id,
-          user_id: r.user_id,
-          share_bps: r.share_bps,
-        }))
-      );
+  // Validate revenue_splits BEFORE any DB writes
+  if (Array.isArray(revenue_splits) && revenue_splits.length > 0) {
+    const totalBps = revenue_splits.reduce((s: number, r: any) => s + (r.share_bps ?? 0), 0);
+    if (totalBps > 10000) {
+      res.status(400).json({ error: 'revenue_splits_exceed_100_percent' });
+      return;
     }
+  }
+
+  try {
+    const venture = await db.transaction(async (tx) => {
+      const [v] = await tx
+        .insert(ventures)
+        .values({
+          name,
+          description: description ?? null,
+          ceo_type: type,
+          ceo_user_id: type === 'human' ? req.userId : null,
+          created_by: req.userId,
+        })
+        .returning();
+
+      // Creator becomes owner-member
+      await tx.insert(ventureMembers).values({
+        venture_id: v.id,
+        user_id: req.userId,
+        role: 'owner',
+      });
+
+      // Persist revenue splits if provided
+      if (Array.isArray(revenue_splits) && revenue_splits.length > 0) {
+        await tx.insert(ventureRevenueSplits).values(
+          revenue_splits.map((r: any) => ({
+            venture_id: v.id,
+            user_id: r.user_id,
+            share_bps: r.share_bps,
+          }))
+        );
+      }
+
+      return v;
+    });
 
     res.status(201).json(await enrichVenture(venture));
   } catch {

@@ -272,6 +272,12 @@ router.get('/identity-session', requireVerifiedUser, async (req: Request, res: R
       return;
     }
 
+    // Guard: session exists but fee was never paid — orphaned session
+    if (!feePaid) {
+      res.json({ already_verified: false, fee_paid: false, session: null });
+      return;
+    }
+
     // Create a fresh ephemeral key for the existing session
     const ephemeralKey = await (stripe as any).ephemeralKeys.create(
       { verification_session: user.identity_session_id },
