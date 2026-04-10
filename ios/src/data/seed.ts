@@ -59,7 +59,7 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 1.0,
-    freshnessColor: '#C4973A',
+    freshnessColor: '#007AFF',
     isPreOrder: true,
   },
   {
@@ -75,7 +75,7 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 0.72,
-    freshnessColor: '#1C3A2A',
+    freshnessColor: '#007AFF',
   },
   {
     id: 'seascape',
@@ -90,13 +90,22 @@ export const STRAWBERRIES: Strawberry[] = [
     tab: 'CANADIAN',
     flag: '🇨🇦',
     freshnessLevel: 0.48,
-    freshnessColor: '#1C3A2A',
+    freshnessColor: '#007AFF',
   },
 ];
 
 export const CHOCOLATES: Chocolate[] = [
   {
-    id: 'guanaja',
+    id: 'none',
+    name: 'No chocolate',
+    source: 'Plain strawberry',
+    description: 'The strawberry, unadorned.',
+    tagline: 'As nature intended.',
+    swatchColor: '#E8D5C4',
+    tag: 'PLAIN',
+  },
+  {
+    id: 'guanaja_70',
     name: 'Guanaja 70%',
     source: 'Valrhona, Rhône Valley',
     description: 'Complex. Slightly bitter. A long finish.',
@@ -104,7 +113,7 @@ export const CHOCOLATES: Chocolate[] = [
     swatchColor: '#3D1F0F',
   },
   {
-    id: 'caraibe',
+    id: 'caraibe_66',
     name: 'Caraïbe 66%',
     source: 'Valrhona, Rhône Valley',
     description: 'Rounder. More forgiving.',
@@ -112,21 +121,12 @@ export const CHOCOLATES: Chocolate[] = [
     swatchColor: '#7A3B12',
   },
   {
-    id: 'jivara',
+    id: 'jivara_40',
     name: 'Jivara 40% Lait',
     source: 'Valrhona, Rhône Valley',
     description: 'Milk chocolate with caramel notes.',
     tagline: 'For those who know.',
     swatchColor: '#A67C52',
-  },
-  {
-    id: 'ivoire',
-    name: 'Ivoire Blanc',
-    source: 'Valrhona, Rhône Valley',
-    description: 'White. Vanilla-forward.',
-    tagline: 'Not on the menu. You found it.',
-    swatchColor: '#D4B896',
-    tag: 'HIDDEN',
   },
 ];
 
@@ -138,14 +138,14 @@ export const FINISHES: Finish[] = [
     tagline: 'Honest.',
   },
   {
-    id: 'fleur-de-sel',
+    id: 'fleur_de_sel',
     name: 'Fleur de Sel',
     description: 'Three flakes of Île de Ré salt.',
     tagline: 'Most people choose this one.',
     tag: 'RECOMMENDED',
   },
   {
-    id: 'or-fin',
+    id: 'or_fin',
     name: 'Or Fin',
     description: 'A touch of gold leaf at the shoulder.',
     tagline: 'Occasions only.',
@@ -174,17 +174,21 @@ export const TIME_SLOTS: TimeSlot[] = [
   { time: '17:00', slots: 4 },
 ];
 
-export function getDateOptions(): { label: string; dayNum: number; dayName: string }[] {
+export function getDateOptions(): { label: string; dayNum: number; dayName: string; isoDate: string }[] {
   const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const result = [];
   const today = new Date();
   for (let i = 0; i < 7; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() + i);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     result.push({
       label: i === 0 ? 'TODAY' : days[d.getDay()],
       dayNum: d.getDate(),
       dayName: days[d.getDay()],
+      isoDate: `${year}-${month}-${day}`,
     });
   }
   return result;
