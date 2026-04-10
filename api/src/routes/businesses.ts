@@ -292,6 +292,7 @@ router.get('/:id/placed-history', async (req: Request, res: Response) => {
 // POST /api/businesses/:id/tip — Stripe tip for placed user
 router.post('/:id/tip', requireUser, async (req: Request, res: Response) => {
   const business_id = parseInt(req.params.id, 10);
+  const userId: number = (req as any).userId;
   const { amount_cents } = req.body;
   if (isNaN(business_id) || !amount_cents || amount_cents < 100) {
     res.status(400).json({ error: 'amount_cents (min 100) is required' });
@@ -304,6 +305,11 @@ router.post('/:id/tip', requireUser, async (req: Request, res: Response) => {
       .where(and(eq(employmentContracts.business_id, business_id), eq(employmentContracts.status, 'active')));
     if (!contract) {
       res.status(404).json({ error: 'No placed user at this business' });
+      return;
+    }
+    // Prevent self-tipping
+    if (contract.user_id === userId) {
+      res.status(400).json({ error: 'cannot_tip_self' });
       return;
     }
     const pi = await stripe.paymentIntents.create({
@@ -330,7 +336,7 @@ router.get('/:id/proximity', requireUser, async (req: Request, res: Response) =>
     const [visit] = await db
       .select({ id: businessVisits.id })
       .from(businessVisits)
-      .where(eq(businessVisits.business_id, businessId))
+      .where(and(eq(businessVisits.business_id, businessId), eq(businessVisits.visitor_user_id, userId)))
       .limit(1);
 
     const hasVisited = !!visit;

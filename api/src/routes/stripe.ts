@@ -169,7 +169,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
             // Excess payment enhances the token on top of the base
             const seed = parseInt(nfc_token, 16);
             const visuals = computeTokenVisuals(seed, isNaN(excessCents) ? 0 : excessCents);
-            const tokenNumber = await getNextTokenNumber(variety_id, db, tokens, eq);
+            const tokenNumber = await getNextTokenNumber(variety_id, db, tokens, eq, sql);
 
             const [mintedToken] = await db
               .insert(tokens)

@@ -13,6 +13,9 @@ export function effectiveTier(balanceTier: SocialTier, ceiling: SocialTier): Soc
 }
 
 export function tierMeets(tier: SocialTier, required: SocialTier): boolean {
+  // If no requirement, everyone qualifies. If requirement exists but no tier, deny.
+  if (!required) return true;
+  if (!tier) return false;
   return tierRank(tier) >= tierRank(required);
 }
 

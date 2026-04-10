@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { eq, and, desc, ilike, or } from 'drizzle-orm';
+import crypto from 'crypto';
 import { db } from '../db';
 import { editorialPieces, users, earningsLedger } from '../db/schema';
 import { currentBankSeconds, tierFromBalance, effectiveTier, tierCommissionRate } from '../lib/socialTier';
@@ -216,7 +217,15 @@ router.post('/:id/write', requireUser, async (req: Request, res: Response) => {
 
 function requireAdmin(req: Request, res: Response, next: Function) {
   const key = req.headers['x-admin-key'];
-  if (!key || key !== process.env.ADMIN_SECRET) {
+  const secret = process.env.ADMIN_SECRET;
+  if (!key || !secret) {
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  // Timing-safe comparison to prevent timing attacks
+  const keyBuf = Buffer.from(typeof key === 'string' ? key : String(key));
+  const secretBuf = Buffer.from(secret);
+  if (keyBuf.length !== secretBuf.length || !crypto.timingSafeEqual(keyBuf, secretBuf)) {
     res.status(403).json({ error: 'forbidden' });
     return;
   }
@@ -317,6 +326,11 @@ router.post('/admin/:id/decline', requireAdmin, async (req: Request, res: Respon
 
     if (!piece) { res.status(404).json({ error: 'not_found' }); return; }
 
+    const declinableStatuses = ['abstract_submitted', 'submitted'];
+    if (!declinableStatuses.includes(piece.status)) {
+      res.status(409).json({ error: 'cannot_decline_in_current_status' }); return;
+    }
+
     const newStatus = piece.status === 'abstract_submitted' ? 'abstract_declined' : 'declined';
 
     await db
@@ -365,29 +379,37 @@ router.post('/admin/:id/publish', requireAdmin, async (req: Request, res: Respon
     );
     const rate = tierCommissionRate(effectiveTier(tierFromBalance(authorBalance), author?.social_tier ?? null));
 
-    await db
-      .update(editorialPieces)
-      .set({
-        status: 'published',
-        published_at: new Date(),
-        commission_cents: commission_cents ?? null,
-        editor_note: editor_note ?? null,
-        updated_at: new Date(),
-      })
-      .where(eq(editorialPieces.id, id));
+    const credited = await db.transaction(async (tx) => {
+      // Gate on status='submitted' inside the transaction to prevent concurrent double-publish
+      const [published] = await tx
+        .update(editorialPieces)
+        .set({
+          status: 'published',
+          published_at: new Date(),
+          commission_cents: commission_cents ?? null,
+          editor_note: editor_note ?? null,
+          updated_at: new Date(),
+        })
+        .where(and(eq(editorialPieces.id, id), eq(editorialPieces.status, 'submitted')))
+        .returning({ id: editorialPieces.id });
 
-    if (commission_cents && typeof commission_cents === 'number' && commission_cents > 0) {
-      const payout = Math.round(commission_cents * rate);
-      await db.insert(earningsLedger).values({
-        user_id: piece.author_user_id,
-        amount_cents: payout,
-        type: 'credit',
-        description: `Editorial commission — piece #${id} (${Math.round(rate * 100)}% tier rate)`,
-      });
-    }
+      if (!published) throw Object.assign(new Error('already_published'), { status: 409 });
+
+      if (commission_cents && typeof commission_cents === 'number' && commission_cents > 0) {
+        const payout = Math.round(commission_cents * rate);
+        await tx.insert(earningsLedger).values({
+          user_id: piece.author_user_id,
+          amount_cents: payout,
+          type: 'credit',
+          description: `Editorial commission — piece #${id} (${Math.round(rate * 100)}% tier rate)`,
+        });
+      }
+      return true;
+    });
 
     res.json({ ok: true });
-  } catch {
+  } catch (err: any) {
+    if (err?.status === 409) { res.status(409).json({ error: err.message }); return; }
     res.status(500).json({ error: 'internal_error' });
   }
 });

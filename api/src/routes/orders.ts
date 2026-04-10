@@ -15,7 +15,7 @@ const router = Router();
 
 function isReviewRequest(req: Request): boolean {
   const pin = req.headers['x-review-mode'];
-  return typeof pin === 'string' && pin === process.env.REVIEW_PIN && !!process.env.REVIEW_PIN;
+  return typeof pin === 'string' && !!process.env.REVIEW_PIN && pin === process.env.REVIEW_PIN;
 }
 
 // POST /api/orders — create order + Stripe payment intent
@@ -37,12 +37,26 @@ router.post('/', async (req: Request, res: Response) => {
     return;
   }
 
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    res.status(400).json({ error: 'quantity must be a positive integer' });
+    return;
+  }
+
   const isReview = isReviewRequest(req);
 
   try {
     const [variety] = await db.select().from(varieties).where(eq(varieties.id, variety_id));
     if (!variety || !variety.active) {
       res.status(404).json({ error: 'Variety not found' });
+      return;
+    }
+
+    if (!isReview && variety.stock_remaining <= 0) {
+      res.status(409).json({ error: 'sold_out' });
+      return;
+    }
+    if (!isReview && variety.stock_remaining < quantity) {
+      res.status(409).json({ error: 'insufficient_stock', available: variety.stock_remaining });
       return;
     }
 
@@ -102,6 +116,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
   try {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) { res.status(404).json({ error: 'Order not found' }); return; }
+    // Idempotent: return current state for any non-pending order
     if (order.status !== 'pending') { res.json(order); return; }
 
     if (!isReview && order.stripe_payment_intent_id) {
@@ -129,7 +144,7 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
     } catch (e) { logger.error('User upsert error (non-fatal)', e); }
 
     if (isReview) {
-      // Review mode: charge immediately, skip queue
+      // Review mode: charge immediately, skip queue (Apple reviewer account only)
       const nfc_token = randomUUID();
       await db.update(orders).set({ status: 'paid', nfc_token, queued_at: new Date(), payment_captured: true }).where(eq(orders.id, id));
       const [updated] = await db.select().from(orders).where(eq(orders.id, id));
@@ -138,7 +153,17 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
     }
 
     // Mark as queued — card is authorized, not yet captured
-    await db.update(orders).set({ status: 'queued', queued_at: new Date() }).where(eq(orders.id, id));
+    const [queued] = await db.update(orders)
+      .set({ status: 'queued', queued_at: new Date() })
+      .where(and(eq(orders.id, id), eq(orders.status, 'pending')))
+      .returning({ id: orders.id });
+
+    if (!queued) {
+      // Lost the race — another request already transitioned this order; return current state
+      const [current] = await db.select().from(orders).where(eq(orders.id, id));
+      res.json({ ...current, user_db_id: dbUserId });
+      return;
+    }
 
     // Check if threshold is met — may immediately trigger
     const [variety] = await db.select().from(varieties).where(eq(varieties.id, order.variety_id));
@@ -188,6 +213,11 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
 
   if (!variety_id || !quantity || !location_id || !chocolate || !finish || !customer_email) {
     res.status(400).json({ error: 'Missing required fields' });
+    return;
+  }
+
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    res.status(400).json({ error: 'quantity must be a positive integer' });
     return;
   }
 
@@ -268,6 +298,10 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
     res.status(400).json({ error: 'Missing required fields' }); return;
   }
 
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    res.status(400).json({ error: 'quantity must be a positive integer' }); return;
+  }
+
   try {
     const [currentUser] = await db.select({ email: users.email, ad_balance_cents: users.ad_balance_cents, referred_by_code: users.referred_by_code })
       .from(users).where(eq(users.id, userId)).limit(1);
@@ -288,23 +322,25 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
       if (!prior) { total_cents = Math.round(total_cents * 0.9); discount_applied = true; }
     }
 
-    // Atomically deduct balance — fails if insufficient
-    const deducted = await db.update(users)
-      .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${total_cents}` })
-      .where(and(eq(users.id, userId), sql`${users.ad_balance_cents} >= ${total_cents}`))
-      .returning({ ad_balance_cents: users.ad_balance_cents });
-    if (!deducted.length) { res.status(402).json({ error: 'insufficient_balance' }); return; }
+    // Atomically deduct balance and insert order in one transaction
+    const order = await db.transaction(async (tx) => {
+      const deducted = await tx.update(users)
+        .set({ ad_balance_cents: sql`${users.ad_balance_cents} - ${total_cents}` })
+        .where(and(eq(users.id, userId), sql`${users.ad_balance_cents} >= ${total_cents}`))
+        .returning({ ad_balance_cents: users.ad_balance_cents });
+      if (!deducted.length) throw Object.assign(new Error('insufficient_balance'), { status: 402 });
 
-    // Create order in queued state (balance is already deducted above as the "hold")
-    const [order] = await db.insert(orders).values({
-      variety_id, location_id, chocolate, finish,
-      quantity, is_gift: is_gift ?? false, total_cents,
-      stripe_payment_intent_id: `balance_${randomUUID()}`,
-      status: 'queued', queued_at: new Date(),
-      customer_email: currentUser.email,
-      push_token: push_token ?? null, gift_note: gift_note ?? null,
-      discount_applied, payment_captured: true,
-    }).returning();
+      const [inserted] = await tx.insert(orders).values({
+        variety_id, location_id, chocolate, finish,
+        quantity, is_gift: is_gift ?? false, total_cents,
+        stripe_payment_intent_id: `balance_${randomUUID()}`,
+        status: 'queued', queued_at: new Date(),
+        customer_email: currentUser.email,
+        push_token: push_token ?? null, gift_note: gift_note ?? null,
+        discount_applied, payment_captured: true,
+      }).returning();
+      return inserted;
+    });
 
     // Legitimacy event
     await db.insert(legitimacyEvents).values({ user_id: userId, event_type: 'order_placed', weight: 1 }).catch(() => {});
@@ -326,9 +362,10 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
     const [updated] = await db.select().from(orders).where(eq(orders.id, order.id));
 
     res.status(201).json({ ...updated, delivery_date: deliveryDate ?? null, user_db_id: userId });
-  } catch (err) {
-    logger.error('Balance order error: ' + String(err));
-    res.status(500).json({ error: String(err) });
+  } catch (err: any) {
+    if (err?.status === 402) { res.status(402).json({ error: 'insufficient_balance' }); return; }
+    logger.error('Balance order error: ' + String(err?.message ?? err));
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

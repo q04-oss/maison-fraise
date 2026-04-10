@@ -72,10 +72,10 @@ router.post('/varieties/:id/review', requireUser, async (req: Request, res: Resp
   }
 
   try {
-    // Verify user has tapped this variety
+    // Verify user has tapped this variety (join via email since orders stores customer_email)
     const [tapped] = await db.execute(sql`
       SELECT 1 FROM orders o
-      JOIN users u ON u.apple_user_id = o.apple_id
+      JOIN users u ON u.email = o.customer_email
       WHERE u.id = ${userId} AND o.variety_id = ${variety_id} AND o.nfc_token_used = true
       LIMIT 1
     `);
@@ -180,6 +180,7 @@ router.get('/tasting-feed', async (req: Request, res: Response) => {
 router.post('/tasting-feed/:id/react', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   const entry_id = parseInt(req.params.id, 10);
+  if (isNaN(entry_id)) { res.status(400).json({ error: 'invalid_id' }); return; }
   const { emoji } = req.body;
   if (!emoji || typeof emoji !== 'string' || emoji.length > 8) {
     res.status(400).json({ error: 'invalid_emoji' }); return;

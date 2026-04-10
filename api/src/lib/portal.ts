@@ -14,8 +14,21 @@ export function isIdentityActive(user: {
   verification_renewal_due_at: Date | string | null;
 }): boolean {
   if (!user.identity_verified) return false;
-  const now = new Date();
-  if (user.identity_verified_expires_at && now > new Date(user.identity_verified_expires_at)) return false;
-  if (user.verification_renewal_due_at && now > new Date(user.verification_renewal_due_at)) return false;
+
+  // Fail closed: malformed date strings produce NaN comparisons that silently bypass expiry.
+  // Parse explicitly and treat invalid dates as expired.
+  const toEpoch = (value: Date | string | null): number | null => {
+    if (value === null) return null;
+    const ts = value instanceof Date ? value.getTime() : Date.parse(value as string);
+    return Number.isFinite(ts) ? ts : NaN; // NaN signals malformed
+  };
+
+  const nowMs = Date.now();
+  const expiresAt = toEpoch(user.identity_verified_expires_at);
+  if (expiresAt !== null && (Number.isNaN(expiresAt) || nowMs >= expiresAt)) return false;
+
+  const renewalDue = toEpoch(user.verification_renewal_due_at);
+  if (renewalDue !== null && (Number.isNaN(renewalDue) || nowMs >= renewalDue)) return false;
+
   return true;
 }

@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { requireUser } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -13,7 +14,7 @@ db.execute(sql`CREATE TABLE IF NOT EXISTS collectif_challenges (
   target_count integer NOT NULL DEFAULT 3,
   started_at timestamptz DEFAULT now(),
   ends_at timestamptz
-)`).catch(() => {});
+)`).catch((err) => { logger.error('collectif_challenges DDL failed:', err); });
 
 db.execute(sql`CREATE TABLE IF NOT EXISTS user_challenge_progress (
   id serial PRIMARY KEY,
@@ -22,7 +23,7 @@ db.execute(sql`CREATE TABLE IF NOT EXISTS user_challenge_progress (
   progress integer DEFAULT 0,
   completed_at timestamptz,
   UNIQUE(user_id, challenge_id)
-)`).catch(() => {});
+)`).catch((err) => { logger.error('user_challenge_progress DDL failed:', err); });
 
 // GET /api/collectif-challenges/current — most recent active challenge with user's progress
 router.get('/current', requireUser, async (req: Request, res: Response) => {
@@ -36,8 +37,9 @@ router.get('/current', requireUser, async (req: Request, res: Response) => {
       FROM collectif_challenges cc
       LEFT JOIN user_challenge_progress ucp
         ON ucp.challenge_id = cc.id AND ucp.user_id = ${userId}
-      WHERE cc.ends_at > now() OR cc.ends_at IS NULL
-      ORDER BY cc.started_at DESC
+      WHERE (cc.ends_at > now() OR cc.ends_at IS NULL)
+        AND (cc.started_at <= now() OR cc.started_at IS NULL)
+      ORDER BY cc.started_at DESC NULLS LAST, cc.id DESC
       LIMIT 1
     `);
     const challenge = ((rows as any).rows ?? rows)[0] ?? null;

@@ -30,7 +30,7 @@ async function uniqueUserCode(): Promise<string> {
     code = generateUserCode();
     attempts++;
   }
-  return code;
+  throw new Error('Failed to generate unique user code after 10 attempts');
 }
 
 // Self-healing: ensure columns added in later migrations exist
@@ -144,7 +144,14 @@ async function handleAppleSignIn(req: Request, res: Response) {
       }
 
       // 3. Brand new user — create account
-      const userCode = await uniqueUserCode();
+      let userCode: string;
+      try {
+        userCode = await uniqueUserCode();
+      } catch (codeErr) {
+        logger.error('uniqueUserCode exhausted: ' + String(codeErr));
+        res.status(503).json({ error: 'service_unavailable' });
+        return;
+      }
       const [created] = await db
         .insert(users)
         .values({
@@ -205,11 +212,13 @@ router.post('/operator', async (req: Request, res: Response) => {
 });
 
 // POST /api/auth/demo — demo login for Apple reviewers
-const DEMO_EMAIL = 'reviewer@boxfraise.com';
-const DEMO_PASSWORD = 'BoxFraise2025!';
+// Credentials must be set via DEMO_EMAIL / DEMO_PASSWORD env vars — no hardcoded fallback
+const DEMO_EMAIL = process.env.DEMO_EMAIL;
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD;
 router.post('/demo', async (req: Request, res: Response) => {
   const { email, password } = req.body;
-  if (email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
+  // Fail closed if env vars are not configured
+  if (!DEMO_EMAIL || !DEMO_PASSWORD || email !== DEMO_EMAIL || password !== DEMO_PASSWORD) {
     res.status(401).json({ error: 'invalid_credentials' }); return;
   }
   try {

@@ -41,6 +41,9 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
   if (!variety_id && !variety_name_requested) {
     res.status(400).json({ error: 'variety_id or variety_name_requested required' }); return;
   }
+  if (!Number.isInteger(quantity) || quantity < 1) {
+    res.status(400).json({ error: 'quantity must be a positive integer' }); return;
+  }
   try {
     const result = await db.execute(sql`
       INSERT INTO preorders (user_id, variety_id, variety_name_requested, quantity, notes)
@@ -59,10 +62,15 @@ router.delete('/:id', requireUser, async (req: Request, res: Response) => {
   if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
   const userId = (req as any).userId as number;
   try {
-    await db.execute(sql`
+    const result = await db.execute(sql`
       UPDATE preorders SET status='cancelled'
       WHERE id=${id} AND user_id=${userId} AND status='pending'
+      RETURNING id
     `);
+    const updated = ((result as any).rows ?? result);
+    if (!updated.length) {
+      res.status(404).json({ error: 'not_found_or_not_cancellable' }); return;
+    }
     res.json({ cancelled: true });
   } catch (err) {
     res.status(500).json({ error: 'internal' });

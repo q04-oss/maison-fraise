@@ -12,7 +12,7 @@ const STEPS = [
     kanji: '旬',
     title: 'Box Fraise',
     subtitle: 'A seasonal strawberry atelier in Montréal.',
-    body: 'We source directly from small farms and offer curated varieties by the box — chocolate-dipped, finished with fleur de sel or or fin.',
+    body: 'We source directly from small farms and offer curated varieties by the box — chocolate-dipped, finished with fleur de sel or fin (gold leaf).',
   },
   {
     kanji: '場',
