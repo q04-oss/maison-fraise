@@ -79,23 +79,13 @@ router.post('/connect/onboard', requireUser, async (req: Request, res: Response)
   }
 });
 
-// GET /api/ads/connect/return — Stripe redirects here after onboarding
+// GET /api/ads/connect/return — Stripe redirects here after onboarding (public, no auth header)
+// Stripe hits this URL from its hosted onboarding page and cannot supply a Bearer token,
+// so requireUser cannot be used here. The endpoint deep-links back to the app; the app
+// then calls GET /api/ads/connect/status (authenticated) to refresh the onboarding state.
 router.get('/connect/return', async (req: Request, res: Response) => {
-  const userId = parseInt(req.query.user_id as string, 10);
-  if (isNaN(userId)) { res.status(400).send('Invalid user'); return; }
-  try {
-    const [user] = await db.select({ stripe_connect_account_id: users.stripe_connect_account_id })
-      .from(users).where(eq(users.id, userId));
-    if (user?.stripe_connect_account_id) {
-      const account = await stripe.accounts.retrieve(user.stripe_connect_account_id);
-      if (account.details_submitted) {
-        await db.update(users).set({ stripe_connect_onboarded: true }).where(eq(users.id, userId));
-      }
-    }
-    res.redirect('boxfraise://connect-complete');
-  } catch {
-    res.redirect('boxfraise://connect-complete');
-  }
+  // Deep-link back to app — authenticated status refresh happens client-side via /connect/status
+  res.redirect('boxfraise://connect-complete');
 });
 
 // GET /api/ads/connect/refresh — if onboarding link expired, generate new one
@@ -289,33 +279,53 @@ router.post('/impressions/:id/respond', requireUser, async (req: Request, res: R
     if (!impression) { res.status(404).json({ error: 'not found' }); return; }
     if (impression.accepted !== null) { res.status(409).json({ error: 'already_responded' }); return; }
 
-    await db.update(adImpressions).set({ accepted, responded_at: new Date() })
-      .where(eq(adImpressions.id, impressionId));
-
     let newBalance = 0;
-    if (accepted) {
-      // Deduct from campaign budget, credit user
-      await db.update(adCampaigns)
-        .set({ spent_cents: sql`${adCampaigns.spent_cents} + ${impression.payout_cents}` })
-        .where(eq(adCampaigns.id, impression.campaign_id));
 
-      const [updatedUser] = await db.update(users)
-        .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${impression.payout_cents}` })
-        .where(eq(users.id, userId))
-        .returning({ ad_balance_cents: users.ad_balance_cents });
-      newBalance = updatedUser?.ad_balance_cents ?? 0;
+    await db.transaction(async (tx) => {
+      // Conditional update: only proceed if impression is still unanswered
+      const [updated] = await tx.update(adImpressions)
+        .set({ accepted, responded_at: new Date() })
+        .where(and(
+          eq(adImpressions.id, impressionId),
+          eq(adImpressions.user_id, userId),
+          sql`${adImpressions.accepted} IS NULL`,
+        ))
+        .returning({ id: adImpressions.id });
+      if (!updated) throw Object.assign(new Error('already_responded'), { status: 409 });
 
-      // Auto-deactivate campaign if budget exhausted
-      const [campaign] = await db.select({ budget_cents: adCampaigns.budget_cents, spent_cents: adCampaigns.spent_cents, value_cents: adCampaigns.value_cents })
-        .from(adCampaigns).where(eq(adCampaigns.id, impression.campaign_id));
-      if (campaign && (campaign.budget_cents - campaign.spent_cents) < campaign.value_cents) {
-        await db.update(adCampaigns).set({ active: false }).where(eq(adCampaigns.id, impression.campaign_id));
+      if (accepted) {
+        // Atomic conditional debit — eliminates the read-then-write race where two concurrent
+        // accepts both pass the budget check before either has written the debit
+        const [debited] = await tx.update(adCampaigns)
+          .set({ spent_cents: sql`${adCampaigns.spent_cents} + ${impression.payout_cents}` })
+          .where(and(
+            eq(adCampaigns.id, impression.campaign_id),
+            sql`${adCampaigns.budget_cents} - ${adCampaigns.spent_cents} >= ${impression.payout_cents}`,
+          ))
+          .returning({
+            budget_cents: adCampaigns.budget_cents,
+            spent_cents: adCampaigns.spent_cents,
+            value_cents: adCampaigns.value_cents,
+          });
+
+        if (!debited) throw Object.assign(new Error('budget_exhausted'), { status: 409 });
+
+        const [updatedUser] = await tx.update(users)
+          .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${impression.payout_cents}` })
+          .where(eq(users.id, userId))
+          .returning({ ad_balance_cents: users.ad_balance_cents });
+        newBalance = updatedUser?.ad_balance_cents ?? 0;
+
+        // Auto-deactivate campaign if budget now exhausted (use post-debit values from RETURNING)
+        if ((debited.budget_cents - debited.spent_cents) < debited.value_cents) {
+          await tx.update(adCampaigns).set({ active: false }).where(eq(adCampaigns.id, impression.campaign_id));
+        }
       }
-
-    }
+    });
 
     res.json({ ok: true, new_balance_cents: newBalance });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.status === 409) { res.status(409).json({ error: err.message }); return; }
     logger.error(`Impression respond error: ${String(err)}`);
     res.status(500).json({ error: 'internal' });
   }
@@ -335,8 +345,10 @@ router.get('/available', requireUser, async (req: Request, res: Response) => {
         sql`${adCampaigns.budget_cents} > ${adCampaigns.spent_cents}`,
       ));
 
+    const MAX_ADS_PER_REQUEST = 5;
     const result = [];
     for (const campaign of activeCampaigns) {
+      if (result.length >= MAX_ADS_PER_REQUEST) break;
       // Skip if user already responded to this campaign
       const [existing] = await db.select({ id: adImpressions.id, accepted: adImpressions.accepted })
         .from(adImpressions)

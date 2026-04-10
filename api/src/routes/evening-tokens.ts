@@ -110,9 +110,12 @@ router.post('/:bookingId/confirm', requireUser, async (req: Request, res: Respon
 
     if (mintedNow) {
       // Create NFC connection between the two users (enables messaging)
+      // Canonicalize pair order to (min, max) to match the unique index on nfc_connections
+      const canonA = Math.min(token.user_a_id, token.user_b_id);
+      const canonB = Math.max(token.user_a_id, token.user_b_id);
       await db.insert(nfcConnections).values({
-        user_a: token.user_a_id,
-        user_b: token.user_b_id,
+        user_a: canonA,
+        user_b: canonB,
       }).onConflictDoNothing();
 
       // Update both users' dinner_invite cards to 'minted'

@@ -169,29 +169,37 @@ router.post('/webhook', async (req: Request, res: Response) => {
             // Excess payment enhances the token on top of the base
             const seed = parseInt(nfc_token, 16);
             const visuals = computeTokenVisuals(seed, isNaN(excessCents) ? 0 : excessCents);
-            const tokenNumber = await getNextTokenNumber(variety_id, db, tokens, eq);
 
-            const [mintedToken] = await db
-              .insert(tokens)
-              .values({
-                token_number: tokenNumber,
-                variety_id: newOrder.variety_id,
-                order_id: newOrder.id,
-                original_owner_id: orderUser.id,
-                current_owner_id: orderUser.id,
-                excess_amount_cents: isNaN(excessCents) ? 0 : excessCents,
-                visual_size: visuals.size,
-                visual_color: visuals.color,
-                visual_seeds: visuals.seeds,
-                visual_irregularity: visuals.irregularity,
-                nfc_token: nfc_token,
-                variety_name: variety?.name ?? '',
-                location_name: location?.name ?? '',
-                token_type: isChocolate ? 'chocolate' : 'standard',
-                partner_name: isChocolate ? (orderBusiness?.partner_name ?? null) : null,
-                location_type: isChocolate ? (orderBusiness?.location_type ?? null) : null,
-              })
-              .returning();
+            // getNextTokenNumber uses pg_advisory_xact_lock which only holds for the
+            // duration of a transaction — wrap the number allocation and the INSERT
+            // together so the lock covers both and concurrent mints cannot collide
+            const mintedToken = await db.transaction(async (tx) => {
+              const tokenNumber = await getNextTokenNumber(variety_id, tx, tokens, eq, sql);
+              const [inserted] = await tx
+                .insert(tokens)
+                .values({
+                  token_number: tokenNumber,
+                  variety_id: newOrder.variety_id,
+                  order_id: newOrder.id,
+                  original_owner_id: orderUser.id,
+                  current_owner_id: orderUser.id,
+                  excess_amount_cents: isNaN(excessCents) ? 0 : excessCents,
+                  visual_size: visuals.size,
+                  visual_color: visuals.color,
+                  visual_seeds: visuals.seeds,
+                  visual_irregularity: visuals.irregularity,
+                  nfc_token: nfc_token,
+                  variety_name: variety?.name ?? '',
+                  location_name: location?.name ?? '',
+                  token_type: isChocolate ? 'chocolate' : 'standard',
+                  partner_name: isChocolate ? (orderBusiness?.partner_name ?? null) : null,
+                  location_type: isChocolate ? (orderBusiness?.location_type ?? null) : null,
+                })
+                .returning();
+              return inserted;
+            });
+
+            const tokenNumber = mintedToken.token_number;
 
             await db
               .update(orders)

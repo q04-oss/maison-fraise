@@ -7,6 +7,12 @@ import { requireUser } from '../lib/auth';
 
 const router = Router();
 
+// Ensure unique constraint on canonical (user_a, user_b) pair — inserts canonicalize to (min, max)
+db.execute(sql`
+  CREATE UNIQUE INDEX IF NOT EXISTS nfc_connections_pair_unique
+  ON nfc_connections (LEAST(user_a, user_b), GREATEST(user_a, user_b))
+`).catch(() => {});
+
 function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const bytes = randomBytes(6);
@@ -60,31 +66,39 @@ router.post('/confirm', requireUser, async (req: Request, res: Response) => {
   }
 
   try {
-    // Check no existing connection in either direction
-    const [existing] = await db
-      .select({ id: nfcConnections.id })
-      .from(nfcConnections)
-      .where(
-        or(
-          and(eq(nfcConnections.user_a, userId), eq(nfcConnections.user_b, otherUserId)),
-          and(eq(nfcConnections.user_a, otherUserId), eq(nfcConnections.user_b, userId)),
-        ),
-      )
-      .limit(1);
+    // Atomically consume the token and insert the connection in one transaction.
+    // This prevents the race where two concurrent confirmers both read the same token,
+    // pass validation, and each insert a connection before either deletes the token.
+    let inserted: { id: number } | undefined;
+    try {
+      inserted = await db.transaction(async (tx) => {
+        // Claim the token by deleting it — if another request got here first the delete
+        // returns no rows and we abort, giving a clean 409 without inserting anything
+        const deleted = await tx.delete(nfcPairingTokens)
+          .where(eq(nfcPairingTokens.token, token))
+          .returning({ id: nfcPairingTokens.id });
+        if (deleted.length === 0) throw Object.assign(new Error('already_connected'), { status: 409 });
 
-    if (existing) {
-      await db.delete(nfcPairingTokens).where(eq(nfcPairingTokens.token, token));
+        // Canonicalize pair order (min, max) so the unique index covers both directions
+        const canonA = Math.min(userId, otherUserId);
+        const canonB = Math.max(userId, otherUserId);
+        const [conn] = await tx.insert(nfcConnections).values({
+          user_a: canonA,
+          user_b: canonB,
+          location: location ?? null,
+        }).onConflictDoNothing().returning({ id: nfcConnections.id });
+        if (!conn) throw Object.assign(new Error('already_connected'), { status: 409 });
+        return conn;
+      });
+    } catch (txErr: any) {
+      if (txErr?.status === 409) { res.status(409).json({ error: 'already_connected' }); return; }
+      throw txErr;
+    }
+
+    if (!inserted) {
       res.status(409).json({ error: 'already_connected' });
       return;
     }
-
-    await db.insert(nfcConnections).values({
-      user_a: userId,
-      user_b: otherUserId,
-      location: location ?? null,
-    });
-
-    await db.delete(nfcPairingTokens).where(eq(nfcPairingTokens.token, token));
 
     // Get the other user's profile
     const [otherUser] = await db
