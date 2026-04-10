@@ -75,16 +75,10 @@ router.post('/webhook', async (req: Request, res: Response) => {
         // Generate NFC token
         const nfc_token = crypto.randomBytes(4).toString('hex');
 
-        // Idempotency check inside transaction (SELECT FOR UPDATE prevents duplicate concurrent deliveries)
+        // Idempotency: attempt INSERT with ON CONFLICT DO NOTHING inside a transaction.
+        // SELECT FOR UPDATE cannot block phantom inserts on an empty result set in PostgreSQL,
+        // so we rely on the UNIQUE constraint on payment_intent_id instead.
         const newOrder = await db.transaction(async (tx) => {
-          const [existing] = await tx
-            .select({ id: orders.id })
-            .from(orders)
-            .where(eq(orders.payment_intent_id, pi.id))
-            .for('update')
-            .limit(1);
-          if (existing) return null; // duplicate delivery
-
           const stockResult = await tx
             .update(varieties)
             .set({ stock_remaining: sql`${varieties.stock_remaining} - ${quantity}` })
@@ -114,8 +108,15 @@ router.post('/webhook', async (req: Request, res: Response) => {
               nfc_token,
               discount_applied,
             })
+            .onConflictDoNothing()
             .returning();
+
+          // If nothing inserted, duplicate webhook — roll back stock decrement
+          if (!inserted) throw Object.assign(new Error('duplicate_webhook'), { expected: true });
           return inserted;
+        }).catch((err: any) => {
+          if (err?.expected && err?.message === 'duplicate_webhook') return null;
+          throw err;
         });
 
         if (!newOrder) {
@@ -475,28 +476,34 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
         const { ownerCents, cutCents } = calculateCut(amount);
 
-        const [insertedAccess] = await db.insert(portalAccess).values({
-          buyer_id: buyerId,
-          owner_id: ownerId,
-          amount_cents: amount,
-          platform_cut_cents: cutCents,
-          source,
-          stripe_payment_intent_id: pi.id,
-          expires_at: expiresAt,
-        }).onConflictDoNothing().returning({ id: portalAccess.id });
+        // Wrap access insert + fund credit in one transaction so a failed credit
+        // doesn't leave an access row without the corresponding fund balance.
+        const insertedAccess = await db.transaction(async (tx) => {
+          const [row] = await tx.insert(portalAccess).values({
+            buyer_id: buyerId,
+            owner_id: ownerId,
+            amount_cents: amount,
+            platform_cut_cents: cutCents,
+            source,
+            stripe_payment_intent_id: pi.id,
+            expires_at: expiresAt,
+          }).onConflictDoNothing().returning({ id: portalAccess.id });
+
+          if (!row) return null; // duplicate webhook — skip
+
+          await tx.execute(sql`
+            INSERT INTO membership_funds (user_id, balance_cents, cycle_start, updated_at)
+            VALUES (${ownerId}, ${ownerCents}, NOW(), NOW())
+            ON CONFLICT (user_id) DO UPDATE SET balance_cents = membership_funds.balance_cents + ${ownerCents}, updated_at = NOW()
+          `);
+          return row;
+        });
 
         if (!insertedAccess) {
-          // Duplicate webhook delivery — access row already exists, skip fund credit
+          // Duplicate webhook delivery
           res.json({ received: true });
           return;
         }
-
-        // Credit owner's membership fund
-        await db.execute(sql`
-          INSERT INTO membership_funds (user_id, balance_cents, cycle_start, updated_at)
-          VALUES (${ownerId}, ${ownerCents}, NOW(), NOW())
-          ON CONFLICT (user_id) DO UPDATE SET balance_cents = membership_funds.balance_cents + ${ownerCents}, updated_at = NOW()
-        `);
 
         // Notify owner
         const [portalOwner] = await db
@@ -872,16 +879,20 @@ router.post('/webhook', async (req: Request, res: Response) => {
         if (!isNaN(visitId) && !isNaN(hostUserId)) {
           const code = String(Math.floor(1000 + Math.random() * 9000));
           const expires = new Date(Date.now() + 15 * 60 * 1000);
-          const updateResult = await db.update(toiletVisits)
-            .set({ paid: true, access_code: code, access_code_expires_at: expires })
-            .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)))
-            .returning({ id: toiletVisits.id });
-          // Only credit host if the paid=false guard matched (prevents double-credit on webhook retry)
-          if (updateResult.length > 0) {
-            await db.update(users)
+          // Atomic: mark paid and credit host together so retries can't charge without crediting or credit twice
+          const credited = await db.transaction(async (tx) => {
+            const [updated] = await tx.update(toiletVisits)
+              .set({ paid: true, access_code: code, access_code_expires_at: expires })
+              .where(and(eq(toiletVisits.id, visitId), eq(toiletVisits.paid, false)))
+              .returning({ id: toiletVisits.id });
+            if (!updated) return false;
+            await tx.update(users)
               .set({ ad_balance_cents: sql`${users.ad_balance_cents} + ${amountCents}` })
               .where(eq(users.id, hostUserId));
-            // Notify host
+            return true;
+          });
+          if (credited) {
+            // Notify host (outside transaction — fire-and-forget)
             const [host] = await db.select({ push_token: users.push_token })
               .from(users).where(eq(users.id, hostUserId));
             if (host?.push_token) {

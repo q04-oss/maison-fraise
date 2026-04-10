@@ -229,7 +229,10 @@ membershipsRouter.post('/renew', requireUser, async (req: Request, res: Response
           status: 'active',
           started_at: now,
           renews_at: renews,
-        }).where(and(eq(memberships.user_id, userId), or(eq(memberships.status, 'active'), eq(memberships.status, 'expired'))));
+        }).where(and(
+          eq(memberships.id, existing.id),
+          or(eq(memberships.status, 'active'), eq(memberships.status, 'expired')),
+        ));
 
         return true;
       });

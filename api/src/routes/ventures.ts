@@ -155,12 +155,20 @@ router.post('/', requireUser, async (req: any, res: Response) => {
   const type = ceo_type === 'dorotka' ? 'dorotka' : 'human';
 
   // Validate revenue_splits BEFORE any DB writes
+  let normalizedSplits: Array<{ user_id: number; share_bps: number }> | null = null;
   if (Array.isArray(revenue_splits) && revenue_splits.length > 0) {
-    const totalBps = revenue_splits.reduce((s: number, r: any) => s + (r.share_bps ?? 0), 0);
+    for (const r of revenue_splits) {
+      if (typeof r.user_id !== 'number' || !Number.isInteger(r.share_bps) || r.share_bps < 0) {
+        res.status(400).json({ error: 'revenue_splits_invalid_entry' });
+        return;
+      }
+    }
+    const totalBps = revenue_splits.reduce((s: number, r: any) => s + r.share_bps, 0);
     if (totalBps > 10000) {
       res.status(400).json({ error: 'revenue_splits_exceed_100_percent' });
       return;
     }
+    normalizedSplits = revenue_splits.map((r: any) => ({ user_id: r.user_id as number, share_bps: r.share_bps as number }));
   }
 
   try {
@@ -184,9 +192,9 @@ router.post('/', requireUser, async (req: any, res: Response) => {
       });
 
       // Persist revenue splits if provided
-      if (Array.isArray(revenue_splits) && revenue_splits.length > 0) {
+      if (normalizedSplits && normalizedSplits.length > 0) {
         await tx.insert(ventureRevenueSplits).values(
-          revenue_splits.map((r: any) => ({
+          normalizedSplits.map((r) => ({
             venture_id: v.id,
             user_id: r.user_id,
             share_bps: r.share_bps,

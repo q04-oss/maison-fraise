@@ -123,22 +123,31 @@ router.delete('/:id/rsvp', requireUser, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'RSVP not found' });
       return;
     }
-    // Refund if paid — only cancel after refund succeeds
+    // Refund if paid — only cancel after refund succeeds; on failure, report 502 without cancelling
     if (rsvp.status === 'paid' && rsvp.stripe_payment_intent_id) {
+      let refunded = false;
       try {
         await stripe.refunds.create({ payment_intent: rsvp.stripe_payment_intent_id });
+        refunded = true;
+      } catch (refundErr: any) {
+        // If Stripe already refunded (duplicate), treat as success
+        if (refundErr?.code === 'charge_already_refunded') {
+          refunded = true;
+        } else {
+          logger.error('Refund failed', refundErr);
+          res.status(502).json({ error: 'Refund failed — RSVP not cancelled' });
+          return;
+        }
+      }
+      if (refunded) {
         await db.update(popupRsvps).set({ status: 'cancelled' }).where(eq(popupRsvps.id, rsvp.id));
-      } catch (refundErr) {
-        logger.error('Refund failed', refundErr);
-        res.status(502).json({ error: 'Refund failed — RSVP not cancelled' });
-        return;
       }
     } else {
       await db.update(popupRsvps).set({ status: 'cancelled' }).where(eq(popupRsvps.id, rsvp.id));
     }
 
-    // Promote first waitlisted user if this was a paid RSVP
-    if (rsvp.status === 'paid') {
+    // Promote first waitlisted user if a paid or pending RSVP was cancelled (frees a capacity slot)
+    if (rsvp.status === 'paid' || rsvp.status === 'pending') {
       try {
         const [nextWaitlisted] = await db
           .select()

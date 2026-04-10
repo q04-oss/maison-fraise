@@ -332,7 +332,11 @@ router.post('/listings/:id/buy', requireUser, async (req: Request, res: Response
     }
 
     res.json({ ok: true, token_id: listing.token_id });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.status === 402) {
+      res.status(402).json({ error: 'insufficient_balance' });
+      return;
+    }
     logger.error(`portrait-tokens /listings/:id/buy error: ${String(err)}`);
     res.status(500).json({ error: 'internal' });
   }

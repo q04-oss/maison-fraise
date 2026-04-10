@@ -64,13 +64,15 @@ export async function checkAndTriggerBatch(
       }
     }
 
-    // Atomically claim all queued orders for this batch by transitioning to 'capturing'
-    // This prevents two concurrent workers from processing the same queue
+    // Atomically claim all queued orders for this batch by transitioning to 'capturing'.
+    // Also apply the same cutoff predicate as the stale-order pass so a row that failed
+    // cancellation can't be picked up and double-processed.
     const claimResult = await db.execute(sql`
       UPDATE orders SET status = 'capturing'
       WHERE variety_id = ${variety_id}
         AND location_id = ${location_id}
         AND status = 'queued'
+        AND queued_at > ${cutoffTime.toISOString()}
       RETURNING *
     `);
     const queued = (claimResult as any).rows ?? claimResult;
@@ -89,18 +91,26 @@ export async function checkAndTriggerBatch(
     const now = new Date();
     const deliveryDate = toISODate(addDays(now, LEAD_DAYS));
 
-    const [batch] = await db.insert(batches).values({
-      location_id,
-      variety_id,
-      quantity_total: totalQueued,
-      quantity_remaining: 0,
-      published: false,
-      triggered_at: now,
-      delivery_date: deliveryDate,
-      lead_days: LEAD_DAYS,
-      min_quantity: MIN_QUANTITY,
-      cutoff_at: addDays(now, CUTOFF_DAYS),
-    }).returning();
+    let batch: { id: number };
+    try {
+      [batch] = await db.insert(batches).values({
+        location_id,
+        variety_id,
+        quantity_total: totalQueued,
+        quantity_remaining: 0,
+        published: false,
+        triggered_at: now,
+        delivery_date: deliveryDate,
+        lead_days: LEAD_DAYS,
+        min_quantity: MIN_QUANTITY,
+        cutoff_at: addDays(now, CUTOFF_DAYS),
+      }).returning();
+    } catch (batchErr) {
+      // Batch insert failed — revert all claimed rows so they can be retried
+      const ids = queued.map((o: any) => o.id);
+      await db.execute(sql`UPDATE orders SET status = 'queued' WHERE id = ANY(${ids})`).catch(() => {});
+      throw batchErr;
+    }
 
     const [variety] = await db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, variety_id));
     const [location] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, location_id));
@@ -144,6 +154,8 @@ export async function checkAndTriggerBatch(
         }
       } catch (e) {
         logger.error(`Failed to capture/update order ${order.id}: ${String(e)}`);
+        // Revert this order to queued so it is retried on the next trigger
+        await db.update(orders).set({ status: 'queued' }).where(eq(orders.id, order.id)).catch(() => {});
       }
     }
 
