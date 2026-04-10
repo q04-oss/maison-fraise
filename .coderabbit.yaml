@@ -1,0 +1,41 @@
+version: "2"
+
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  path_filters:
+    - "ios/src/**"
+    - "api/src/**"
+    - "!ios/node_modules/**"
+    - "!ios/dist/**"
+    - "!ios/android/**"
+    - "!ios/ios/**"
+  path_instructions:
+    - path: "ios/src/components/panels/**"
+      instructions: |
+        Review for:
+        - TrueSheet usage: sheet is always presented (dismissible=false, initialDetentIndex=1).
+          resize() must be used instead of present(). Flag any remaining present() calls.
+        - Stale closures: callbacks passed into long-lived async functions (NFC scan, timers)
+          must use useRef to avoid capturing stale state.
+        - React Native performance: unnecessary re-renders, missing memo/useCallback.
+    - path: "ios/src/screens/**"
+      instructions: |
+        Review for:
+        - Safe area handling: paddingTop should use hardcoded values near NFC panels,
+          not useSafeAreaInsets, which can shift content behind the Apple NFC sheet.
+        - Navigation consistency: all panel transitions should use TrueSheet.resize().
+    - path: "api/src/**"
+      instructions: |
+        Review for:
+        - Authentication: every route must verify JWT before accessing user data.
+        - Input validation: all user-supplied parameters must be validated.
+        - SQL injection: only parameterised queries via drizzle ORM — no raw string interpolation.
+        - Sensitive data: no passwords, tokens, or PII in logs.
+        - Rate limiting: auth endpoints should be rate-limited.
+
+language: "en-US"
