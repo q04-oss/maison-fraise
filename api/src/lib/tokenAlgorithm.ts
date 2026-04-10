@@ -26,9 +26,10 @@ export function computeTokenVisuals(seed: number, excessCents: number): TokenVis
   const basePalette      = rand() * 0.15;                // 0–0.15: stays in pale-pink family
 
   // Enhancement from excess — logarithmic, felt not linear
+  // log10(1 + dollars) ensures CA$0.01 and CA$1 have distinct values (no plateau)
   const dollars = excessCents / 100;
-  const logMax  = 7; // log10(10,000,000) — beyond this, max
-  const logVal  = Math.log10(Math.max(1, dollars));
+  const logMax  = Math.log10(1 + 10_000_000); // saturates at $10M
+  const logVal  = Math.log10(1 + Math.max(0, dollars));
   const ease    = excessCents > 0
     ? Math.pow(Math.min(1, Math.max(0, logVal / logMax)), 0.6)
     : 0;
@@ -119,10 +120,11 @@ export function computeContentTokenMechanic(
 }
 
 // Map rarity to a synthetic excessCents so computeTokenVisuals produces the right colour
+// legendary uses 10,000,000_00 (logMax=7 saturates at $10M) to guarantee max visual tier
 const RARITY_EXCESS: Record<Rarity, number> = {
   common:    0,
-  rare:      5000_00,  // ~$5,000 → mid-red
-  legendary: 100_000_00, // ~$100,000 → near-black blue max
+  rare:      5000_00,        // ~$5,000 → mid-red
+  legendary: 10_000_000_00,  // $10,000,000 → saturates at max (near black-blue)
 };
 
 export function contentTokenExcessForRarity(rarity: Rarity): number {
@@ -134,9 +136,18 @@ export async function getNextTokenNumber(
   db: any,
   tokensTable: any,
   eq: any,
+  sql: any,
 ): Promise<number> {
-  const existing = await db.select().from(tokensTable).where(eq(tokensTable.variety_id, varietyId));
-  return existing.length + 1;
+  // pg_advisory_xact_lock serializes concurrent allocations for the same variety.
+  // The lock is held until the surrounding transaction commits, so the MAX+1 read
+  // and the subsequent INSERT are atomic from the perspective of other callers.
+  // Callers MUST invoke this function inside db.transaction().
+  await db.execute(sql`SELECT pg_advisory_xact_lock(${varietyId}::bigint)`);
+  const [result] = await db
+    .select({ maxNum: sql`COALESCE(MAX(${tokensTable.token_number}), 0)` })
+    .from(tokensTable)
+    .where(eq(tokensTable.variety_id, varietyId));
+  return (result?.maxNum ?? 0) + 1;
 }
 
 export function composeTokenName(params: {

@@ -7,6 +7,12 @@ import { requireUser } from '../lib/auth';
 
 const router = Router();
 
+// Ensure unique constraint on canonical (user_a, user_b) pair — inserts canonicalize to (min, max)
+db.execute(sql`
+  CREATE UNIQUE INDEX IF NOT EXISTS nfc_connections_pair_unique
+  ON nfc_connections (LEAST(user_a, user_b), GREATEST(user_a, user_b))
+`).catch(() => {});
+
 function generateToken(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   const bytes = randomBytes(6);
@@ -78,13 +84,21 @@ router.post('/confirm', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
-    await db.insert(nfcConnections).values({
-      user_a: userId,
-      user_b: otherUserId,
+    // Canonicalize pair order (min, max) so a unique constraint on (user_a, user_b) covers both directions
+    const canonA = Math.min(userId, otherUserId);
+    const canonB = Math.max(userId, otherUserId);
+    const [inserted] = await db.insert(nfcConnections).values({
+      user_a: canonA,
+      user_b: canonB,
       location: location ?? null,
-    });
+    }).onConflictDoNothing().returning({ id: nfcConnections.id });
 
     await db.delete(nfcPairingTokens).where(eq(nfcPairingTokens.token, token));
+
+    if (!inserted) {
+      res.status(409).json({ error: 'already_connected' });
+      return;
+    }
 
     // Get the other user's profile
     const [otherUser] = await db

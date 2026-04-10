@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { eq, asc, and } from 'drizzle-orm';
+import { eq, asc, and, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { seasonPatronages, patronTokens, users } from '../db/schema';
 import { requireUser } from '../lib/auth';
@@ -116,25 +116,49 @@ router.post('/:id/claim', requireUser, async (req: any, res: Response) => {
 
     const total_cents = patronage.price_per_year_cents * years;
 
-    const pi = await stripe.paymentIntents.create({
-      amount: total_cents,
-      currency: 'cad',
-      metadata: {
-        type: 'patronage_claim',
-        patronage_id: String(id),
-        user_id: String(userId),
-        years: String(years),
-        price_per_year_cents: String(patronage.price_per_year_cents),
-        location_name: patronage.location_name,
-        season_year: String(patronage.season_year),
-      },
-    });
-
-    // Hold patronage while payment processes
-    await db
+    // Atomically hold the slot — prevents two concurrent requests both seeing 'available'
+    const [held] = await db
       .update(seasonPatronages)
-      .set({ status: 'pending' })
-      .where(eq(seasonPatronages.id, id));
+      .set({ status: 'pending', patron_user_id: userId })
+      .where(and(
+        eq(seasonPatronages.id, id),
+        eq(seasonPatronages.status, 'available'),
+        eq(seasonPatronages.approved_by_admin, true),
+      ))
+      .returning({ id: seasonPatronages.id });
+
+    if (!held) {
+      res.status(409).json({ error: 'patronage_not_available' });
+      return;
+    }
+
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.create({
+        amount: total_cents,
+        currency: 'cad',
+        metadata: {
+          type: 'patronage_claim',
+          patronage_id: String(id),
+          user_id: String(userId),
+          years: String(years),
+          price_per_year_cents: String(patronage.price_per_year_cents),
+          location_name: patronage.location_name,
+          season_year: String(patronage.season_year),
+        },
+      });
+    } catch (piErr) {
+      // Revert only if this request still owns the reservation
+      await db.update(seasonPatronages)
+        .set({ status: 'available', patron_user_id: null })
+        .where(and(eq(seasonPatronages.id, id), eq(seasonPatronages.patron_user_id, userId), eq(seasonPatronages.status, 'pending')));
+      throw piErr;
+    }
+
+    // Persist the payment intent ID so webhooks can identify and release failed claims
+    await db.update(seasonPatronages)
+      .set({ stripe_payment_intent_id: pi.id })
+      .where(and(eq(seasonPatronages.id, id), eq(seasonPatronages.patron_user_id, userId)));
 
     res.json({
       client_secret: pi.client_secret,
