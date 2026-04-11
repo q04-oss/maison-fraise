@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
+import { verifyMessage } from 'ethers';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, devices } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 if (!process.env.JWT_SECRET) {
@@ -61,6 +62,59 @@ export async function requireVerifiedUser(req: any, res: any, next: any) {
     if (user.banned) return res.status(403).json({ error: 'account_suspended' });
     if (!user.verified) return res.status(403).json({ error: 'verification_required' });
     req.userId = payload.userId;
+    return next();
+  } catch {
+    return res.status(500).json({ error: 'internal_error' });
+  }
+}
+
+// Express middleware — authenticates a Cardputer/hardware device.
+// Devices sign the current unix minute with their on-chip key (EIP-191 personal_sign).
+// Header format: Authorization: Fraise <address>:<hex_signature>
+// Allows a ±1 minute clock skew window.
+export async function requireDevice(req: any, res: any, next: any) {
+  const auth = req.headers['authorization'];
+  if (!auth?.startsWith('Fraise ')) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  const parts = auth.slice('Fraise '.length).split(':');
+  if (parts.length !== 2) return res.status(401).json({ error: 'malformed_auth' });
+
+  const [claimedAddress, signature] = parts;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(claimedAddress)) {
+    return res.status(401).json({ error: 'invalid_address' });
+  }
+
+  // Verify the signature covers the current minute (±1 min skew allowed)
+  const nowMinute = Math.floor(Date.now() / 60_000);
+  let verified = false;
+  for (const minute of [nowMinute - 1, nowMinute, nowMinute + 1]) {
+    try {
+      const recovered = verifyMessage(String(minute), signature);
+      if (recovered.toLowerCase() === claimedAddress.toLowerCase()) {
+        verified = true;
+        break;
+      }
+    } catch {
+      // invalid signature format — try next minute
+    }
+  }
+  if (!verified) return res.status(401).json({ error: 'invalid_signature' });
+
+  try {
+    const [device] = await db
+      .select({ id: devices.id, role: devices.role, user_id: devices.user_id })
+      .from(devices)
+      .where(eq(devices.device_address, claimedAddress.toLowerCase()))
+      .limit(1);
+
+    if (!device) return res.status(401).json({ error: 'device_not_registered' });
+
+    req.deviceId      = device.id;
+    req.deviceAddress = claimedAddress.toLowerCase();
+    req.deviceRole    = device.role;
+    req.deviceUserId  = device.user_id;
     return next();
   } catch {
     return res.status(500).json({ error: 'internal_error' });

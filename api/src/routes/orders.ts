@@ -8,7 +8,7 @@ import { stripe } from '../lib/stripe';
 import { sendOrderConfirmation, sendOrderQueued } from '../lib/resend';
 import { sendPushNotification } from '../lib/push';
 import { logger } from '../lib/logger';
-import { requireUser } from '../lib/auth';
+import { requireUser, requireDevice } from '../lib/auth';
 import { checkAndTriggerBatch, MIN_QUANTITY } from '../lib/batchTrigger';
 
 const router = Router();
@@ -488,6 +488,86 @@ router.get('/:id/receipt', requireUser, async (req: Request, res: Response) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Device collect endpoint ───────────────────────────────────────────────────
+
+// POST /api/orders/:nfc_token/collect
+// Called by employee/chocolatier Cardputer after scanning a customer's NFC tag.
+// Auth: Fraise <address>:<signature>  (device auth)
+router.post('/:nfc_token/collect', requireDevice, async (req: Request, res: Response) => {
+  const { nfc_token } = req.params;
+  const deviceRole: string = (req as any).deviceRole;
+
+  // Only operational devices may mark orders as collected
+  if (deviceRole !== 'employee' && deviceRole !== 'chocolatier') {
+    res.status(403).json({ ok: false, error: 'forbidden' });
+    return;
+  }
+
+  if (!nfc_token || !/^[0-9a-fA-F]{64}$/.test(nfc_token)) {
+    res.status(400).json({ ok: false, error: 'invalid_token' });
+    return;
+  }
+
+  try {
+    const [order] = await db
+      .select({
+        id: orders.id,
+        status: orders.status,
+        nfc_token_used: orders.nfc_token_used,
+        quantity: orders.quantity,
+        customer_name: users.display_name,
+        variety_name: varieties.name,
+        push_token: orders.push_token,
+      })
+      .from(orders)
+      .leftJoin(users, eq(orders.apple_id, users.apple_id))
+      .leftJoin(varieties, eq(orders.variety_id, varieties.id))
+      .where(eq(orders.nfc_token, nfc_token))
+      .limit(1);
+
+    if (!order) {
+      res.status(404).json({ ok: false, error: 'not_found' });
+      return;
+    }
+
+    if (order.nfc_token_used) {
+      res.status(409).json({ ok: false, error: 'already_claimed' });
+      return;
+    }
+
+    if (order.status !== 'paid' && order.status !== 'ready') {
+      res.status(409).json({ ok: false, error: 'not_ready' });
+      return;
+    }
+
+    await db
+      .update(orders)
+      .set({
+        status: 'collected',
+        nfc_token_used: true,
+        nfc_verified_at: new Date(),
+      })
+      .where(eq(orders.id, order.id));
+
+    // Notify customer
+    if (order.push_token) {
+      sendPushNotification(order.push_token, { title: '🍓 Collected', body: 'Your order has been picked up. Enjoy!' }).catch(() => {});
+    }
+
+    logger.info(`order ${order.id} collected by device ${(req as any).deviceAddress}`);
+
+    res.json({
+      ok: true,
+      customer_name: order.customer_name ?? 'Customer',
+      variety_name:  order.variety_name ?? 'Order',
+      quantity:      order.quantity,
+    });
+  } catch (err) {
+    logger.error('collect error', err);
+    res.status(500).json({ ok: false, error: 'internal' });
   }
 });
 

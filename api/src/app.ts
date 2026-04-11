@@ -66,6 +66,7 @@ import statsRouter from './routes/stats';
 import farmVisitsRouter from './routes/farm-visits';
 import seasonsRouter from './routes/seasons';
 import fraiseChatRouter from './routes/fraise-chat';
+import devicesRouter from './routes/devices';
 import webhooksRouter from './routes/webhooks';
 import varietyProfilesRouter from './routes/variety-profiles';
 import arNotesRouter from './routes/ar-notes';
@@ -177,6 +178,7 @@ app.use('/api/menu-recommendation', menuRecommendationRouter);
 app.use('/api/staff', staffRouter);
 app.use('/api/walkin', walkinRouter);
 app.use('/api/node-applications', nodeApplicationsRouter);
+app.use('/api/devices', devicesRouter);
 
 // GET /api/batches?location_id=&variety_id= — live batch availability for the iOS order flow
 app.get('/api/batches', async (req, res) => {

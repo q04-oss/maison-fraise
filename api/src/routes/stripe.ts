@@ -61,7 +61,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const variety_id = parseInt(pi.metadata.variety_id, 10);
         const quantity = parseInt(pi.metadata.quantity, 10);
         const location_id = parseInt(pi.metadata.location_id, 10);
-        const time_slot_id = parseInt(pi.metadata.time_slot_id, 10);
+        const time_slot_id = pi.metadata.time_slot_id ? parseInt(pi.metadata.time_slot_id, 10) : null;
 
         const VALID_CHOCOLATES = ['guanaja_70', 'caraibe_66', 'jivara_40', 'ivoire_blanc'] as const;
         const VALID_FINISHES = ['plain', 'fleur_de_sel', 'or_fin'] as const;
@@ -69,7 +69,8 @@ router.post('/webhook', async (req: Request, res: Response) => {
         const finish = pi.metadata.finish as typeof VALID_FINISHES[number];
 
         if (
-          isNaN(variety_id) || isNaN(quantity) || isNaN(location_id) || isNaN(time_slot_id) ||
+          isNaN(variety_id) || isNaN(quantity) || isNaN(location_id) ||
+          (time_slot_id !== null && isNaN(time_slot_id)) ||
           quantity < 1 || quantity > 100 ||
           !VALID_CHOCOLATES.includes(chocolate) ||
           !VALID_FINISHES.includes(finish)
@@ -129,10 +130,13 @@ router.post('/webhook', async (req: Request, res: Response) => {
           db.select({ id: users.id }).from(users).where(eq(users.email, customer_email)).limit(1),
           db.select({ id: users.id }).from(users).where(and(eq(users.is_shop, true), eq(users.business_id, location_id))).limit(1),
           db.select({ name: varieties.name }).from(varieties).where(eq(varieties.id, variety_id)).limit(1),
-          db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id)).limit(1),
+          time_slot_id !== null
+            ? db.select({ time: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id)).limit(1)
+            : Promise.resolve([]),
         ]).then(([[customerUser], [shopUser], [variety], [slot]]) => {
-          if (customerUser && shopUser && variety && slot) {
-            const body = `order confirmed — ${variety.name} · ${quantity > 1 ? `${quantity} boxes` : '1 box'} · pickup ${slot.time}`;
+          if (customerUser && shopUser && variety) {
+            const pickupStr = slot?.time ? ` · pickup ${slot.time}` : '';
+            const body = `order confirmed — ${variety.name} · ${quantity > 1 ? `${quantity} boxes` : '1 box'}${pickupStr}`;
             db.insert(messages).values({ sender_id: shopUser.id, recipient_id: customerUser.id, body }).catch(() => {});
           }
         }).catch(() => {});
@@ -151,10 +155,9 @@ router.post('/webhook', async (req: Request, res: Response) => {
               .select({ name: varieties.name, variety_type: varieties.variety_type })
               .from(varieties)
               .where(eq(varieties.id, variety_id));
-            const [location] = await db
-              .select({ name: timeSlots.time })
-              .from(timeSlots)
-              .where(eq(timeSlots.id, time_slot_id));
+            const [location] = time_slot_id !== null
+              ? await db.select({ name: timeSlots.time }).from(timeSlots).where(eq(timeSlots.id, time_slot_id))
+              : [undefined];
             const [orderBusiness] = await db
               .select({
                 partner_name: businesses.partner_name,
@@ -226,7 +229,9 @@ router.post('/webhook', async (req: Request, res: Response) => {
         // Send confirmation email (fire-and-forget)
         Promise.all([
           db.select().from(varieties).where(eq(varieties.id, variety_id)),
-          db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id)),
+          time_slot_id !== null
+            ? db.select().from(timeSlots).where(eq(timeSlots.id, time_slot_id))
+            : Promise.resolve([]),
         ]).then(([[variety], [slot]]) => {
           if (variety && slot) {
             sendOrderConfirmation({
