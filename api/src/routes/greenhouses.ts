@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { eq, and, isNull, desc } from 'drizzle-orm';
+import { eq, and, isNull, desc, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { greenhouses, provenanceTokens, users, greenhouseFunding } from '../db/schema';
 import { requireUser } from '../lib/auth';
@@ -92,7 +92,7 @@ router.get('/:id', async (req: Request, res: Response) => {
         ? {
             id: provenanceToken.id,
             minted_at: provenanceToken.minted_at,
-            provenance_ledger: JSON.parse(provenanceToken.provenance_ledger),
+            provenance_ledger: (() => { try { return JSON.parse(provenanceToken.provenance_ledger); } catch { return []; } })(),
           }
         : null,
     });
@@ -124,35 +124,49 @@ router.post('/:id/fund', requireUser, async (req: any, res: Response) => {
 
     if (!greenhouse) { res.status(404).json({ error: 'not_found' }); return; }
 
-    if (greenhouse.status !== 'funding') {
-      res.status(409).json({ error: 'greenhouse_not_in_funding_status' });
-      return;
-    }
+    // Atomically reserve the slot, enforcing all guards in one write to eliminate TOCTOU
+    const [reserved] = await db
+      .update(greenhouses)
+      .set({ founding_patron_id: userId })
+      .where(and(
+        eq(greenhouses.id, id),
+        eq(greenhouses.status, 'funding'),
+        eq(greenhouses.approved_by_admin, true),
+        isNull(greenhouses.founding_patron_id),
+      ))
+      .returning({ id: greenhouses.id, funding_goal_cents: greenhouses.funding_goal_cents });
 
-    if (!greenhouse.approved_by_admin) {
-      res.status(403).json({ error: 'not_approved' });
-      return;
-    }
-
-    if (greenhouse.founding_patron_id !== null) {
+    if (!reserved) {
+      // Determine specific reason for informative error
+      if (greenhouse.status !== 'funding') { res.status(409).json({ error: 'greenhouse_not_in_funding_status' }); return; }
+      if (!greenhouse.approved_by_admin) { res.status(403).json({ error: 'not_approved' }); return; }
       res.status(409).json({ error: 'greenhouse_already_funded' });
       return;
     }
 
-    const amount_cents = greenhouse.funding_goal_cents;
+    const amount_cents = reserved.funding_goal_cents;
 
-    const pi = await stripe.paymentIntents.create({
-      amount: amount_cents,
-      currency: 'cad',
-      metadata: {
-        type: 'greenhouse_fund',
-        greenhouse_id: String(id),
-        user_id: String(userId),
-        years: String(years),
-        greenhouse_name: greenhouse.name,
-        greenhouse_location: greenhouse.location,
-      },
-    });
+    let pi;
+    try {
+      pi = await stripe.paymentIntents.create({
+        amount: amount_cents,
+        currency: 'cad',
+        metadata: {
+          type: 'greenhouse_fund',
+          greenhouse_id: String(id),
+          user_id: String(userId),
+          years: String(years),
+          greenhouse_name: greenhouse.name,
+          greenhouse_location: greenhouse.location,
+        },
+      });
+    } catch (piErr) {
+      // Revert only if this request still owns the reservation
+      await db.update(greenhouses)
+        .set({ founding_patron_id: null })
+        .where(and(eq(greenhouses.id, id), eq(greenhouses.founding_patron_id, userId)));
+      throw piErr;
+    }
 
     await db.insert(greenhouseFunding).values({
       greenhouse_id: id,
