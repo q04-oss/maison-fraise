@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { readNfcToken, cancelNfc } from '../../lib/nfc';
 import { verifyNfc, verifyNfcReorder, fetchStaffOrderByNfc, staffMarkPrepare, staffMarkReady, staffFlagOrder, bulkPrepareOrders, fetchPickupGrid, fetchStaffExpiryGrid, fetchStaffSessionToday, fetchPostalHeatMap, fetchWalkInToken } from '../../lib/api';
+import * as Keychain from 'react-native-keychain';
 import ARBoxModule, { ARVarietyData } from '../../lib/NativeARBoxModule';
 import { logStrawberries, requestHealthKitPermissions } from '../../lib/HealthKitService';
 
@@ -21,8 +22,10 @@ export default function VerifyNFCPanel() {
   const [state, setState] = useState<State>('scanning');
   const [errorMsg, setErrorMsg] = useState('');
   const [firstTapResult, setFirstTapResult] = useState<FirstTapResult>(null);
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
-  const scan = async () => {
+  const scan = useCallback(async () => {
     setState('scanning');
     setErrorMsg('');
     try {
@@ -94,8 +97,10 @@ export default function VerifyNFCPanel() {
       const isStaff = await AsyncStorage.getItem('is_staff') === 'true';
       if (isStaff) {
         if (token === 'fraise-batch') {
+          if (!isMounted.current) return;
           setState('success');
-          const pin = await AsyncStorage.getItem('staff_pin') ?? '';
+          const pinCreds = await Keychain.getGenericPassword({ service: 'staff_pin' });
+          const pin = pinCreds ? pinCreds.password : '';
           const batchResult = await ARBoxModule.presentBatchScanAR();
           if (batchResult?.order_ids?.length) {
             await bulkPrepareOrders(batchResult.order_ids, pin).catch(() => {});
@@ -123,7 +128,8 @@ export default function VerifyNFCPanel() {
         };
         const actionResult = await ARBoxModule.presentStaffAR(staffPayload);
         if (actionResult) {
-          const pin = await AsyncStorage.getItem('staff_pin') ?? '';
+          const pinCreds = await Keychain.getGenericPassword({ service: 'staff_pin' });
+          const pin = pinCreds ? pinCreds.password : '';
           if (actionResult.action === 'prepare') {
             await staffMarkPrepare(pin, actionResult.order_id).catch(() => {});
           } else if (actionResult.action === 'ready') {
@@ -163,15 +169,16 @@ export default function VerifyNFCPanel() {
         setTimeout(() => showPanelRef.current('verified'), result.streak_milestone ? 2000 : 600);
       }
     } catch (err: any) {
+      if (!isMounted.current) return;
       setErrorMsg(err?.message ?? 'Scan failed. Try again.');
       setState('error');
     }
-  };
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => scan(), 350);
     return () => { clearTimeout(t); cancelNfc(); };
-  }, []);
+  }, [scan]);
 
   return (
     <View style={[styles.container, { backgroundColor: c.panelBg }]}>

@@ -9,12 +9,12 @@ if (!process.env.JWT_SECRET) {
 const SECRET = process.env.JWT_SECRET;
 
 export function signToken(userId: number): string {
-  return jwt.sign({ userId }, SECRET, { expiresIn: '90d' });
+  return jwt.sign({ userId }, SECRET, { algorithm: 'HS256', expiresIn: '90d' });
 }
 
 export function verifyToken(token: string): { userId: number } | null {
   try {
-    return jwt.verify(token, SECRET) as { userId: number };
+    return jwt.verify(token, SECRET, { algorithms: ['HS256'] }) as { userId: number };
   } catch {
     return null;
   }

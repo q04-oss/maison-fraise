@@ -178,15 +178,20 @@ router.post('/reorder', requireUser, async (req: Request, res: Response) => {
     const [order] = await db.select().from(orders).where(eq(orders.nfc_token, nfc_token));
 
     if (!order || !order.nfc_token_used) {
-      logger.warn(`verify/reorder: token not found or not used — token=${nfc_token} user=${user_id}`);
+      logger.warn(`verify/reorder: token not found or not used — token=${nfc_token.substring(0, 8)}... user=${user_id}`);
       res.status(403).json({ error: 'This token is invalid or has already been used.' });
       return;
     }
 
-    const [user] = await db.select().from(users).where(eq(users.id, user_id));
+    const [user] = await db.select({ email: users.email, verified: users.verified }).from(users).where(eq(users.id, user_id));
     if (!user || !user.verified) {
       logger.warn(`verify/reorder: user not verified — user=${user_id}`);
       res.status(403).json({ error: 'This token is invalid or has already been used.' });
+      return;
+    }
+
+    if (order.customer_email !== user.email) {
+      res.status(403).json({ error: 'Forbidden' });
       return;
     }
 
@@ -353,11 +358,15 @@ router.post('/split', requireUser, async (req: Request, res: Response) => {
       res.status(404).json({ error: 'order_not_found' }); return;
     }
 
+    if (!order.apple_id) {
+      res.status(403).json({ error: 'not_same_collectif' }); return;
+    }
+
     // Verify both users share a collectif
     const sharedRows = await db.execute(sql`
       SELECT 1 FROM collectif_commitments cc1
       JOIN collectif_commitments cc2 ON cc2.collectif_id = cc1.collectif_id AND cc2.user_id = ${user_id}
-      JOIN users u ON u.id = cc1.user_id AND u.apple_user_id = ${order.apple_id ?? ''}
+      JOIN users u ON u.id = cc1.user_id AND u.apple_user_id = ${order.apple_id}
       WHERE cc1.status = 'captured' AND cc2.status = 'captured'
       LIMIT 1
     `);

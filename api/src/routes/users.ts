@@ -18,7 +18,29 @@ router.get('/me', requireUser, async (req: Request, res: Response) => {
   const user_id = (req as any).userId as number;
 
   try {
-    const [user] = await db.select().from(users).where(eq(users.id, user_id));
+    const [user] = await db.select({
+      id: users.id,
+      email: users.email,
+      display_name: users.display_name,
+      verified: users.verified,
+      verified_at: users.verified_at,
+      is_dj: users.is_dj,
+      is_shop: users.is_shop,
+      user_code: users.user_code,
+      fraise_chat_email: users.fraise_chat_email,
+      ad_balance_cents: users.ad_balance_cents,
+      portal_opted_in: users.portal_opted_in,
+      is_dorotka: users.is_dorotka,
+      social_time_bank_seconds: users.social_time_bank_seconds,
+      social_time_bank_updated_at: users.social_time_bank_updated_at,
+      social_lifetime_credits_seconds: users.social_lifetime_credits_seconds,
+      social_tier: users.social_tier,
+      current_streak_weeks: users.current_streak_weeks,
+      longest_streak_weeks: users.longest_streak_weeks,
+      notification_prefs: users.notification_prefs,
+      business_id: users.business_id,
+      stripe_connect_onboarded: users.stripe_connect_onboarded,
+    }).from(users).where(eq(users.id, user_id));
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
@@ -122,7 +144,7 @@ router.get('/me/stats', requireUser, async (req: Request, res: Response) => {
 });
 
 // GET /api/users/search?q= — verified users only
-router.get('/search', async (req: Request, res: Response) => {
+router.get('/search', requireUser, async (req: Request, res: Response) => {
   const q = String(req.query.q ?? '').trim();
   if (q.length < 2) {
     res.status(400).json({ error: 'q must be at least 2 characters' });
@@ -235,7 +257,7 @@ router.get('/:id/follow-status', requireUser, async (req: Request, res: Response
   }
 });
 
-// PATCH /api/users/:id/dj — toggle own DJ status
+// PATCH /api/users/:id/dj — toggle DJ status (admin only)
 router.patch('/:id/dj', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
   const caller_id = (req as any).userId as number;
@@ -244,12 +266,12 @@ router.patch('/:id/dj', requireUser, async (req: Request, res: Response) => {
     res.status(400).json({ error: 'is_dj boolean is required' });
     return;
   }
-  if (user_id !== caller_id) {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
 
   try {
+    const [caller] = await db.select({ is_dorotka: users.is_dorotka }).from(users).where(eq(users.id, caller_id)).limit(1);
+    if (!caller?.is_dorotka) {
+      res.status(403).json({ error: 'Forbidden' }); return;
+    }
     await db.update(users).set({ is_dj }).where(eq(users.id, user_id));
     res.json({ success: true, is_dj });
   } catch (err) {
@@ -400,9 +422,11 @@ router.get('/:id/hosted-popups', async (req: Request, res: Response) => {
 });
 
 // GET /api/users/:id/contract-offer — pending contract offer
-router.get('/:id/contract-offer', async (req: Request, res: Response) => {
+router.get('/:id/contract-offer', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
+  const caller_id = (req as any).userId as number;
   if (isNaN(user_id)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+  if (user_id !== caller_id) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
     const rows = await db
       .select({
@@ -427,9 +451,11 @@ router.get('/:id/contract-offer', async (req: Request, res: Response) => {
 });
 
 // GET /api/users/:id/active-contract
-router.get('/:id/active-contract', async (req: Request, res: Response) => {
+router.get('/:id/active-contract', requireUser, async (req: Request, res: Response) => {
   const user_id = parseInt(req.params.id, 10);
+  const caller_id = (req as any).userId as number;
   if (isNaN(user_id)) { res.status(400).json({ error: 'Invalid user id' }); return; }
+  if (user_id !== caller_id) { res.status(403).json({ error: 'Forbidden' }); return; }
   try {
     const rows = await db
       .select({
@@ -736,7 +762,15 @@ router.get('/:id/nominations-given', async (req: Request, res: Response) => {
       .innerJoin(users, eq(popupNominations.nominee_id, users.id))
       .where(eq(popupNominations.nominator_id, user_id))
       .orderBy(desc(popupNominations.created_at));
-    res.json(rows.map(r => ({ ...r, nominee_name: r.nominee_name ?? r.nominee_email.split('@')[0] })));
+    res.json(rows.map(r => ({
+      id: r.id,
+      popup_id: r.popup_id,
+      popup_name: r.popup_name,
+      popup_starts_at: r.popup_starts_at,
+      nominee_id: r.nominee_id,
+      nominee_name: r.nominee_name ?? r.nominee_email.split('@')[0],
+      created_at: r.created_at,
+    })));
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

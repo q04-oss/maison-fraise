@@ -19,7 +19,7 @@ function isReviewRequest(req: Request): boolean {
 }
 
 // POST /api/orders — create order + Stripe payment intent
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requireUser, async (req: Request, res: Response) => {
   const {
     variety_id,
     location_id,
@@ -93,7 +93,8 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // POST /api/orders/:id/confirm — mark order paid after client-side Stripe confirmation
-router.post('/:id/confirm', async (req: Request, res: Response) => {
+router.post('/:id/confirm', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: 'Invalid order id' }); return; }
 
@@ -102,6 +103,13 @@ router.post('/:id/confirm', async (req: Request, res: Response) => {
   try {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
     if (!order) { res.status(404).json({ error: 'Order not found' }); return; }
+
+    // Assert order belongs to this authenticated user
+    const [caller] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
+    if (!caller || order.customer_email !== caller.email) {
+      res.status(403).json({ error: 'Forbidden' }); return;
+    }
+
     if (order.status !== 'pending') { res.json(order); return; }
 
     if (!isReview && order.stripe_payment_intent_id) {
