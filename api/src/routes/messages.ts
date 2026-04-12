@@ -443,10 +443,10 @@ router.get('/:userId', requireUser, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/messages — send a message
+// POST /api/messages — send a message (plaintext or E2E encrypted)
 router.post('/', requireUser, async (req: Request, res: Response) => {
   const senderId = (req as any).userId as number;
-  const { recipient_id, body } = req.body;
+  const { recipient_id, body, encrypted, ephemeral_key, sender_identity_key, one_time_pre_key_id } = req.body;
 
   if (!recipient_id || !body?.trim()) {
     res.status(400).json({ error: 'recipient_id and body are required' });
@@ -462,7 +462,15 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
 
     const [message] = await db
       .insert(messages)
-      .values({ sender_id: senderId, recipient_id, body: body.trim() })
+      .values({
+        sender_id: senderId,
+        recipient_id,
+        body: body.trim(),
+        encrypted: !!encrypted,
+        ephemeral_key: ephemeral_key ?? null,
+        sender_identity_key: sender_identity_key ?? null,
+        one_time_pre_key_id: one_time_pre_key_id ?? null,
+      })
       .returning();
 
     // Push notification to recipient

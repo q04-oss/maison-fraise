@@ -836,10 +836,38 @@ export const messages = pgTable('messages', {
   order_id: integer('order_id').references(() => orders.id),
   type: text('type').notNull().default('text'), // 'text' | 'offer' | 'order_confirm'
   metadata: jsonb('metadata').$type<Record<string, any> | null>(),
+  // E2E encryption fields — server stores ciphertext only
+  encrypted: boolean('encrypted').notNull().default(false),
+  ephemeral_key: text('ephemeral_key'),            // sender's ephemeral DH public key (base64)
+  sender_identity_key: text('sender_identity_key'), // sender's identity public key (base64)
+  one_time_pre_key_id: integer('one_time_pre_key_id'), // which OTP key was consumed
   created_at: timestamp('created_at').notNull().defaultNow(),
 }, (t) => ({
   idx_sender: index('messages_sender_idx').on(t.sender_id),
   idx_recipient: index('messages_recipient_idx').on(t.recipient_id),
+}));
+
+// ─── E2E Encryption Keys ──────────────────────────────────────────────────────
+
+export const userKeys = pgTable('user_keys', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id).unique(),
+  identity_key: text('identity_key').notNull(),          // X25519 public key, base64
+  signed_pre_key: text('signed_pre_key').notNull(),      // X25519 public key, base64
+  signed_pre_key_sig: text('signed_pre_key_sig').notNull(), // Ed25519 signature, base64
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const oneTimePreKeys = pgTable('one_time_pre_keys', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  key_id: integer('key_id').notNull(),
+  public_key: text('public_key').notNull(), // X25519 public key, base64
+  used: boolean('used').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+}, (t) => ({
+  idx_user_key: index('otpk_user_key_idx').on(t.user_id, t.key_id),
 }));
 
 // ─── BLE Beacons ─────────────────────────────────────────────────────────────
