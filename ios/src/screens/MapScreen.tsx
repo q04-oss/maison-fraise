@@ -578,15 +578,21 @@ export default function MapScreen() {
       </TouchableOpacity>
 
       {fabsVisible && (
-        <View style={[styles.fabStack, { bottom: fabBottom }]} pointerEvents="box-none">
+        <View style={[styles.fabPill, { bottom: fabBottom, backgroundColor: c.card }]} pointerEvents="box-none">
           <TouchableOpacity
-            style={[styles.fab, { backgroundColor: c.card }]}
+            style={styles.fabPillBtn}
             onPress={handleStrawberryPress}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
             <Text style={styles.fabIcon}>🍓</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.fab, { backgroundColor: c.card }]} onPress={handleLocateMe} onLongPress={() => { setPanelData({ openOrder: true }); jumpToPanel('terminal'); }} delayLongPress={500} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.fabPillBtn}
+            onPress={handleLocateMe}
+            onLongPress={() => { setPanelData({ openOrder: true }); jumpToPanel('terminal'); }}
+            delayLongPress={500}
+            activeOpacity={0.7}
+          >
             <Text style={styles.fabIcon}>↑</Text>
           </TouchableOpacity>
         </View>
@@ -613,23 +619,23 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 10,
   },
-  fabStack: {
+  fabPill: {
     position: 'absolute',
     right: 16,
-    gap: 12,
-    zIndex: 10,
-  },
-  fab: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 22,
+    overflow: 'hidden',
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
     elevation: 6,
+    zIndex: 10,
+  },
+  fabPillBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   fabIcon: { fontSize: 22 },
   arDemoBtn: {
