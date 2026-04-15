@@ -94,6 +94,25 @@ import { uploadMedia } from './lib/upload';
 const app = express();
 app.set('trust proxy', 1);
 
+// Drop bot probe requests early — keeps logs clean and skips all middleware
+app.use((req, res, next) => {
+  const p = req.path;
+  if (
+    p.startsWith('/wp-') ||
+    p.startsWith('/wordpress/') ||
+    p === '/xmlrpc.php' ||
+    p === '/.env' ||
+    p.startsWith('/.env.') ||
+    p.startsWith('/.git/') ||
+    p.startsWith('//wp') ||
+    p.startsWith('//feed') ||
+    p.startsWith('//xmlrpc')
+  ) {
+    return res.status(404).end();
+  }
+  next();
+});
+
 const limiter = rateLimit({ windowMs: 60_000, max: 120, standardHeaders: true, legacyHeaders: false });
 app.use('/api', limiter);
 
