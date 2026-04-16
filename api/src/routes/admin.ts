@@ -7,6 +7,7 @@ import { sendOrderReady, sendContractOffer, sendAuditionResult } from '../lib/re
 import { sendPushNotification } from '../lib/push';
 import { randomUUID } from 'crypto';
 import { stripe } from '../lib/stripe';
+import { requireUser } from '../lib/auth';
 
 const router = Router();
 
@@ -21,11 +22,16 @@ function requirePin(req: Request, res: Response, next: NextFunction): void {
   next();
 }
 
-// POST /api/admin/campaign-commission/payment-intent — public, no PIN required
-router.post('/campaign-commission/payment-intent', async (req: Request, res: Response) => {
-  const { amount_cents, campaign_name, user_id } = req.body;
+// POST /api/admin/campaign-commission/payment-intent — requires auth
+const MAX_COMMISSION_CENTS = 1_000_000; // $10,000 CAD cap
+router.post('/campaign-commission/payment-intent', requireUser, async (req: Request, res: Response) => {
+  const { amount_cents, campaign_name } = req.body;
   if (!amount_cents || !campaign_name) { res.status(400).json({ error: 'missing_fields' }); return; }
+  if (typeof amount_cents !== 'number' || amount_cents <= 0 || amount_cents > MAX_COMMISSION_CENTS) {
+    res.status(400).json({ error: 'invalid_amount' }); return;
+  }
   try {
+    const user_id = (req as any).userId;
     const pi = await stripe.paymentIntents.create({
       amount: amount_cents,
       currency: 'cad',
