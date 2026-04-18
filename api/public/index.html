@@ -393,6 +393,65 @@
       margin: 8px 0;
     }
 
+    /* ── PLATFORM ─────────────────────────────────────── */
+    .platform { padding: 100px 40px; }
+    .platform-inner { max-width: 960px; margin: 0 auto; }
+
+    .platform-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin-top: 60px;
+    }
+
+    .platform-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .platform-card.live {
+      border-color: rgba(201,151,58,0.28);
+    }
+
+    .platform-glyph {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--amber);
+      letter-spacing: 1px;
+      margin-bottom: 4px;
+    }
+
+    .platform-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      color: var(--text);
+    }
+
+    .platform-desc {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .platform-status {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: rgba(201,151,58,0.45);
+      margin-top: auto;
+    }
+
+    .platform-status.live-status {
+      color: rgba(201,151,58,0.8);
+    }
+
     /* ── COMING ───────────────────────────────────────── */
     .coming { padding: 100px 40px; }
     .coming-inner { max-width: 960px; margin: 0 auto; }
@@ -614,7 +673,7 @@
     <a href="#today">Today</a>
     <a href="#philosophy">The Greenhouse</a>
     <a href="#where">Where</a>
-    <a href="#today" class="nav-cta">Order on App</a>
+    <a href="https://testflight.apple.com/join/zJG1Wc5Y" class="nav-cta" target="_blank" rel="noopener">Download Beta</a>
   </div>
 </nav>
 
@@ -687,42 +746,69 @@
   </div>
 </section>
 
-<!-- COMING SOON -->
-<section class="coming" id="coming">
-  <div class="coming-inner">
-    <p class="section-eyebrow">What's Coming</p>
-    <h2 class="section-title">Beyond the strawberry.</h2>
+<!-- PLATFORM -->
+<section class="platform" id="platform">
+  <div class="platform-inner">
+    <p class="section-eyebrow">The Platform</p>
+    <h2 class="section-title">An economy around<br /><em>one ingredient.</em></h2>
     <p class="section-sub">
-      We are building a platform for people who want their home filled with beautiful, perishable things —
-      on a schedule, without the effort.
+      box fraise is not a shop. It is a membership, a social layer, a token, and a market —
+      built around the strawberry as a cultural object.
     </p>
-    <div class="coming-grid">
-      <div class="coming-card">
-        <div class="coming-icon">🍓</div>
-        <div class="coming-name">Greenhouse Reserve</div>
-        <div class="coming-desc">
-          Our own variety. Grown in-house. Not available anywhere else.
+    <div class="platform-grid">
+      <div class="platform-card live">
+        <div class="platform-glyph">01 / Ordering</div>
+        <div class="platform-name">The Board</div>
+        <div class="platform-desc">
+          Chocolate-dipped strawberries, made to order. Select variety, chocolate, and finish.
+          Collected at Marché Atwater, same morning.
+        </div>
+        <div class="platform-status live-status">Live now</div>
+      </div>
+      <div class="platform-card live">
+        <div class="platform-glyph">02 / Membership</div>
+        <div class="platform-name">Seven Tiers</div>
+        <div class="platform-desc">
+          Annual membership from Découverte to Or Absolu. Each tier unlocks deeper access —
+          to the platform, the social layer, and the harvest itself.
+        </div>
+        <div class="platform-status live-status">Live now</div>
+      </div>
+      <div class="platform-card live">
+        <div class="platform-glyph">03 / Social</div>
+        <div class="platform-name">NFC Time Bank</div>
+        <div class="platform-desc">
+          Each box tap credits platform time. Your tier is determined by how much time remains —
+          not by what you paid, but by how recently you bought.
+        </div>
+        <div class="platform-status live-status">Live now</div>
+      </div>
+      <div class="platform-card live">
+        <div class="platform-glyph">04 / Currency</div>
+        <div class="platform-name">Fraise (FRS)</div>
+        <div class="platform-desc">
+          A gold-backed digital currency. One Fraise equals one London Good Delivery bar —
+          400 troy ounces, held in allocated Swiss vault storage.
+        </div>
+        <div class="platform-status live-status">Live now</div>
+      </div>
+      <div class="platform-card">
+        <div class="platform-glyph">05 / Tokens</div>
+        <div class="platform-name">Strawberry Tokens</div>
+        <div class="platform-desc">
+          Generative SVGs tied to each variety. Numbered, tradeable, with provenance.
+          One token per box, permanently linked to the harvest it came from.
+        </div>
+        <div class="platform-status">In development</div>
+      </div>
+      <div class="platform-card">
+        <div class="platform-glyph">06 / Agriculture</div>
+        <div class="platform-name">Greenhouse Reserve</div>
+        <div class="platform-desc">
+          Our own variety. Grown in-house. Not sold anywhere else.
           The long-term project at the centre of everything we do.
         </div>
-        <div class="coming-soon">In development</div>
-      </div>
-      <div class="coming-card">
-        <div class="coming-icon">💐</div>
-        <div class="coming-name">Flower Subscriptions</div>
-        <div class="coming-desc">
-          Pre-schedule your flowers weeks or months in advance.
-          A standing order, refreshed on your terms. No clutter. Just flowers.
-        </div>
-        <div class="coming-soon">Coming soon</div>
-      </div>
-      <div class="coming-card">
-        <div class="coming-icon">📅</div>
-        <div class="coming-name">Long-Range Orders</div>
-        <div class="coming-desc">
-          Schedule strawberries and flowers together, far into the future.
-          For people who want a well-ordered life, not a spontaneous one.
-        </div>
-        <div class="coming-soon">Coming soon</div>
+        <div class="platform-status">In development</div>
       </div>
     </div>
   </div>
