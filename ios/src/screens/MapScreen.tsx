@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState, Linking } from 'react-native';
-import MapView, { Callout, Marker, UserLocationChangeEvent } from 'react-native-maps';
+import MapView, { Callout, CalloutSubview, Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -477,7 +477,7 @@ export default function MapScreen() {
             <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]}>
               <View style={styles.pinCollectionDot} />
             </View>
-            <Callout tooltip onPress={() => handleDirections(b)}>
+            <Callout tooltip>
               <View style={[styles.callout, { backgroundColor: c.card }]}>
                 <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
                 {!!b.address && (
@@ -489,7 +489,9 @@ export default function MapScreen() {
                 {!!formatDistance(b.lat, b.lng) && (
                   <Text style={[styles.calloutDistance, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
                 )}
-                <Text style={[styles.calloutDirections, { color: c.accent ?? '#c94f6d' }]}>get directions →</Text>
+                <CalloutSubview onPress={() => handleDirections(b)}>
+                  <Text style={[styles.calloutDirections, { color: c.accent ?? '#c94f6d' }]}>get directions →</Text>
+                </CalloutSubview>
               </View>
             </Callout>
           </Marker>
@@ -550,7 +552,7 @@ export default function MapScreen() {
                 </View>
               )
             }
-            <Callout tooltip onPress={() => handleDirections(b)}>
+            <Callout tooltip onPress={() => handlePartnerPress(b)}>
               <View style={[styles.callout, { backgroundColor: c.card }]}>
                 <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
                 {!!b.address && (
@@ -562,7 +564,9 @@ export default function MapScreen() {
                 {!!formatDistance(b.lat, b.lng) && (
                   <Text style={[styles.calloutDistance, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
                 )}
-                <Text style={[styles.calloutDirections, { color: c.accent ?? '#c94f6d' }]}>get directions →</Text>
+                <CalloutSubview onPress={() => handleDirections(b)}>
+                  <Text style={[styles.calloutDirections, { color: c.accent ?? '#c94f6d' }]}>get directions →</Text>
+                </CalloutSubview>
               </View>
             </Callout>
           </Marker>
