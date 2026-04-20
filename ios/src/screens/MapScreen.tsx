@@ -552,7 +552,7 @@ export default function MapScreen() {
                 </View>
               )
             }
-            <Callout tooltip onPress={() => handlePartnerPress(b)}>
+            <Callout tooltip>
               <View style={[styles.callout, { backgroundColor: c.card }]}>
                 <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
                 {!!b.address && (
