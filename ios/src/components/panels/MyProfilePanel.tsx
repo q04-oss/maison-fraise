@@ -189,7 +189,9 @@ export default function MyProfilePanel() {
               <Text style={[styles.sectionLabel, { color: c.muted }]}>STICKERS</Text>
               <View style={styles.stickerRow}>
                 {receivedGifts.map(g => (
-                  <Text key={g.id} style={styles.stickerEmoji}>🍓</Text>
+                  <View key={g.id} style={styles.stickerChip}>
+                    <Text style={styles.stickerEmoji}>🍓</Text>
+                  </View>
                 ))}
               </View>
             </View>
@@ -254,8 +256,15 @@ const styles = StyleSheet.create({
   balance: { fontFamily: fonts.playfair, fontSize: 32, marginTop: 4 },
   subLine: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 0.5, marginTop: 2 },
 
-  stickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  stickerEmoji: { fontSize: 28 },
+  stickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 10 },
+  stickerChip: {
+    width: 56, height: 56, borderRadius: 14,
+    backgroundColor: '#fff',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  stickerEmoji: { fontSize: 30 },
   navRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
