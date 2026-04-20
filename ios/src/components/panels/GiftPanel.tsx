@@ -30,9 +30,11 @@ export default function GiftPanel() {
 
   const businessId: number | null = panelData?.businessId ?? null;
   const businessName: string | null = panelData?.businessName ?? null;
+  const prefilledEmail: string | null = panelData?.recipientEmail ?? null;
+  const isOutreach: boolean = panelData?.isOutreach ?? false;
 
   const [giftType, setGiftType] = useState<GiftType>('digital');
-  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState(prefilledEmail ?? '');
   const [paying, setPaying] = useState(false);
   const [sent, setSent] = useState(false);
   const [userToken, setUserToken] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export default function GiftPanel() {
       const res = await fetch(`${API_BASE_URL}/api/gifts/payment-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${userToken}` },
-        body: JSON.stringify({ gift_type: giftType, recipient_email: trimmed, ...(businessId ? { business_id: businessId } : {}) }),
+        body: JSON.stringify({ gift_type: giftType, recipient_email: trimmed, ...(businessId ? { business_id: businessId } : {}), ...(isOutreach ? { is_outreach: true } : {}) }),
       });
       if (!res.ok) throw new Error('Failed to create gift');
       const { client_secret } = await res.json();
@@ -132,7 +134,7 @@ export default function GiftPanel() {
         <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]}>{businessName ? `${businessName}` : 'Send a sticker'}</Text>
+        <Text style={[styles.title, { color: c.text }]}>{isOutreach ? 'Introduce them' : businessName ?? 'Send a sticker'}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -156,21 +158,26 @@ export default function GiftPanel() {
         ))}
 
         {/* Recipient */}
-        <Text style={[styles.sectionLabel, { color: c.muted, marginTop: SPACING.lg }]}>RECIPIENT</Text>
+        <Text style={[styles.sectionLabel, { color: c.muted, marginTop: SPACING.lg }]}>
+          {isOutreach ? 'SENDING TO' : 'RECIPIENT'}
+        </Text>
         <View style={[styles.inputWrapper, { borderColor: c.border, backgroundColor: c.card }]}>
           <TextInput
-            style={[styles.input, { color: c.text }]}
+            style={[styles.input, { color: isOutreach ? c.muted : c.text }]}
             placeholder="Email address"
             placeholderTextColor={c.muted}
             value={recipientEmail}
-            onChangeText={setRecipientEmail}
+            onChangeText={isOutreach ? undefined : setRecipientEmail}
+            editable={!isOutreach}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
           />
         </View>
         <Text style={[styles.hint, { color: c.muted }]}>
-          They'll receive a claim code and a link to download the app. No account needed to receive it.
+          {isOutreach
+            ? `${businessName ?? 'They'} will receive a sticker and a note about Box Fraise.`
+            : "They'll receive a claim code and a link to download the app. No account needed to receive it."}
         </Text>
 
         <View style={{ height: 120 }} />

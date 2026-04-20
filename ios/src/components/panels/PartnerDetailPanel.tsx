@@ -69,7 +69,7 @@ function MenuSectionBlock({ section, c }: { section: MenuSection; c: any }) {
 }
 
 export default function PartnerDetailPanel() {
-  const { goBack, panelData } = usePanel();
+  const { goBack, panelData, showPanel } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
@@ -98,13 +98,9 @@ export default function PartnerDetailPanel() {
     Linking.openURL(contactInfo.url);
   };
 
-  const handleInvite = () => {
+  const handleSendSticker = () => {
     if (!biz.contact) return;
-    const subject = encodeURIComponent('quick question');
-    const body = encodeURIComponent(
-      `Hi there,\n\nI've been using a new app called Box Fraise and thought of you — it's a local platform and I think your spot would be a great fit.\n\nIt's still in early beta so it's a pretty small community right now, but that's kind of the point. If you're curious you can download it here:\nhttps://testflight.apple.com/join/zJG1Wc5Y\n\nThere's also a bit more context at fraise.box if you want the longer version.\n\nNo pressure either way — just wanted to flag it.\n\nWarmly,`
-    );
-    Linking.openURL(`mailto:${biz.contact}?subject=${subject}&body=${body}`);
+    showPanel('gift', { recipientEmail: biz.contact, businessName: biz.name, isOutreach: true });
   };
 
   const activeMenu = menus[activeTab];
@@ -186,8 +182,8 @@ export default function PartnerDetailPanel() {
         ))}
 
         {isEmail && (
-          <TouchableOpacity style={styles.inviteRow} onPress={handleInvite} activeOpacity={0.7}>
-            <Text style={[styles.inviteText, { color: c.muted }]}>Invite to Box Fraise →</Text>
+          <TouchableOpacity style={styles.inviteRow} onPress={handleSendSticker} activeOpacity={0.7}>
+            <Text style={[styles.inviteText, { color: c.muted }]}>Send them a sticker →</Text>
           </TouchableOpacity>
         )}
 

@@ -1568,6 +1568,7 @@ export const gifts = pgTable('gifts', {
   // Sticker marketplace — which business sticker was sent
   sticker_business_id: integer('sticker_business_id').references(() => businesses.id),
   business_revenue_cents: integer('business_revenue_cents'), // 25% of amount, held for payout
+  is_outreach: boolean('is_outreach').notNull().default(false), // sent to a non-platform business as an intro
   // Digital fulfillment
   claimed_by_user_id: integer('claimed_by_user_id').references(() => users.id),
   claimed_at: timestamp('claimed_at'),

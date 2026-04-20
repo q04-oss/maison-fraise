@@ -21,7 +21,7 @@ const BUSINESS_CUT = 0.25; // 25% of sale goes to the business
 // POST /api/gifts/payment-intent
 // Creates a Stripe PI and a pending gift record. Returns the client secret.
 router.post('/payment-intent', requireUser, async (req: any, res: Response) => {
-  const { gift_type, recipient_email, business_id } = req.body;
+  const { gift_type, recipient_email, business_id, is_outreach } = req.body;
   const sender_user_id: number = req.userId;
 
   if (!['digital', 'physical', 'bundle'].includes(gift_type)) {
@@ -58,6 +58,7 @@ router.post('/payment-intent', requireUser, async (req: any, res: Response) => {
       status: 'pending',
       sticker_business_id,
       business_revenue_cents,
+      is_outreach: !!is_outreach,
     }).returning({ id: gifts.id });
 
     const pi = await stripe.paymentIntents.create({

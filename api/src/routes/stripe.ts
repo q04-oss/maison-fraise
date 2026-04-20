@@ -6,7 +6,7 @@ import { stripe } from '../lib/stripe';
 import { db } from '../db';
 import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
-import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification } from '../lib/resend';
+import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification, sendOutreachNotification } from '../lib/resend';
 import { logger } from '../lib/logger';
 import { TIER_LABELS } from '../lib/membership';
 import { calculateCut } from '../lib/portal';
@@ -898,15 +898,25 @@ router.post('/webhook', async (req: Request, res: Response) => {
                 businessName = biz?.name;
               }
               if (gift.recipient_email) {
-                sendGiftNotification({
-                  to: gift.recipient_email,
-                  senderName,
-                  giftType: gift.gift_type as 'digital' | 'physical' | 'bundle',
-                  claimToken: gift.claim_token,
-                  businessName,
-                }).catch((err) => logger.error('Failed to send gift email:', err));
+                if (gift.is_outreach && businessName) {
+                  sendOutreachNotification({
+                    to: gift.recipient_email,
+                    senderName,
+                    giftType: gift.gift_type as 'digital' | 'physical' | 'bundle',
+                    claimToken: gift.claim_token,
+                    businessName,
+                  }).catch((err) => logger.error('Failed to send outreach email:', err));
+                } else {
+                  sendGiftNotification({
+                    to: gift.recipient_email,
+                    senderName,
+                    giftType: gift.gift_type as 'digital' | 'physical' | 'bundle',
+                    claimToken: gift.claim_token,
+                    businessName,
+                  }).catch((err) => logger.error('Failed to send gift email:', err));
+                }
               }
-              logger.info(`Gift ${giftId} paid, notification sent to ${gift.recipient_email}`);
+              logger.info(`Gift ${giftId} paid, outreach=${gift.is_outreach}, notification sent to ${gift.recipient_email}`);
             }
           }
         }

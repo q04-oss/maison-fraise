@@ -570,4 +570,72 @@ export async function sendGiftNotification(params: {
   });
 }
 
+export async function sendOutreachNotification(params: {
+  to: string;
+  senderName: string;
+  giftType: 'digital' | 'physical' | 'bundle';
+  claimToken: string;
+  businessName: string;
+}) {
+  const { to, senderName, giftType, claimToken, businessName } = params;
+  const TESTFLIGHT = 'https://testflight.apple.com/join/zJG1Wc5Y';
+  const claimUrl = `https://fraise.box/claim/${claimToken}`;
+
+  const stickerLabel = giftType === 'digital' ? 'a digital sticker'
+    : giftType === 'physical' ? 'a physical sticker pack'
+    : 'a digital + physical sticker bundle';
+
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Someone named <strong style="color:#F2F2F7;">${senderName}</strong> sent ${businessName} ${stickerLabel} through Box Fraise — and thought you might want to know about us.
+    </p>
+
+    <p style="margin:0 0 24px;font-size:15px;color:rgba(242,242,247,0.55);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Box Fraise is a local discovery platform — a small, early community of people who care about independent shops, cafés, and studios. We think ${businessName} would be a great fit.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background:#C9973A;border-radius:12px;padding:20px 24px;">
+          <p style="margin:0 0 6px;font-size:10px;color:rgba(12,12,14,0.55);letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Your sticker claim code</p>
+          <p style="margin:0;font-size:28px;color:#0C0C0E;font-family:'Courier New',Courier,monospace;letter-spacing:4px;">${claimToken}</p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0 0 20px;font-size:14px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Download the app to claim your sticker and see what Box Fraise is about. No pressure — just a hello from the community.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="padding-bottom:12px;">
+          <a href="${TESTFLIGHT}" style="display:block;background:#F2F2F7;border-radius:10px;padding:16px 22px;text-decoration:none;text-align:center;">
+            <span style="font-size:10px;color:#1A1A1C;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Download Box Fraise →</span>
+          </a>
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <a href="${claimUrl}" style="display:block;background:#1A1A1C;border:1px solid #2A2A2E;border-radius:10px;padding:16px 22px;text-decoration:none;text-align:center;">
+            <span style="font-size:10px;color:#8A8A8E;letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">Or claim on web →</span>
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0;font-size:12px;color:rgba(242,242,247,0.25);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      Box Fraise — fraise.box
+    </p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: REPLY_TO,
+    subject: `${senderName} sent ${businessName} a sticker`,
+    html: baseTemplate(content, 'Someone thinks you\'d be a good fit.'),
+  });
+}
+
 // @final-audit
