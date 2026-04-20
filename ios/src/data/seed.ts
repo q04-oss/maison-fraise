@@ -1800,6 +1800,66 @@ export const PARTNER_MENUS: Record<string, PartnerMenu[]> = {
     },
   ],
 
+  'Paper Birch Books': [
+    {
+      label: 'DRINKS',
+      sections: [
+        {
+          section: 'COFFEE: THE STANDARDS',
+          items: [
+            { item: 'Drip' },
+            { item: 'Espresso' },
+            { item: 'Macchiato' },
+            { item: 'Cortado' },
+            { item: 'Cappuccino' },
+            { item: 'Latte' },
+            { item: 'Americano' },
+          ],
+        },
+        {
+          section: 'SEASONAL',
+          items: [
+            { item: 'Speculoos Latte' },
+            { item: 'Maple Rooibos Tea Latte' },
+          ],
+        },
+        {
+          section: 'COFFEE + SOMETHING EXTRA',
+          items: [
+            { item: 'Vanilla Latte' },
+            { item: 'Cardamom Latte' },
+            { item: 'Mocha' },
+          ],
+        },
+        {
+          section: 'NOT COFFEE',
+          items: [
+            { item: 'Hot Chocolate' },
+            { item: 'London Fog' },
+            { item: 'Tea', description: 'Genmaicha · Milk Oolong · Jasmine · Cream of Earl Grey · Masala Chai · Lemon Rooibos · Berry Hibiscus · Mint Bliss · Butterfly Pea Flower · Gut Feeling · Immune Boost' },
+          ],
+        },
+        {
+          section: 'MICROGROUND TEA LATTES',
+          items: [
+            { item: 'Matcha' },
+            { item: 'Hojicha' },
+            { item: 'Rooibos' },
+            { item: 'Turmeric' },
+            { item: 'Masala Chai' },
+          ],
+        },
+        {
+          section: 'MILK',
+          items: [
+            { item: 'Oat Milk', description: 'No charge' },
+            { item: 'Macadamia Nut Milk', price: '+$0.75' },
+          ],
+        },
+      ],
+    },
+  ],
+
   'Base Salon + Supply': [
     {
       label: 'SERVICES',
