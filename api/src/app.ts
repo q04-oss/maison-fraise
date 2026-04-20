@@ -276,6 +276,14 @@ app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.use(express.static(path.join(__dirname, '../public')));
 
+app.get('/shop', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/shop.html'));
+});
+
+app.get('/paper', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/paper.html'));
+});
+
 app.get('/operator', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/operator.html'));
 });

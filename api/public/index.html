@@ -3,899 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Box Fraise</title>
-  <meta name="description" content="Chocolate-dipped strawberries, made to order. Picked up at Marché Atwater, Montréal." />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <title>box fraise</title>
+  <meta name="description" content="A platform for local commerce, cooperative ownership, and decentralised infrastructure." />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:      #0C0C0E;
-      --bg2:     #0A0A0C;
-      --card:    rgba(28,28,30,0.88);
-      --amber:   #C9973A;
-      --text:    #F2F2F7;
-      --muted:   rgba(242,242,247,0.42);
-      --border:  rgba(255,255,255,0.08);
-      --border2: rgba(255,255,255,0.13);
+      --bg:     #FFFFFF;
+      --text:   #111111;
+      --muted:  #666666;
+      --border: #DDDDDD;
     }
 
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    html {
       background: var(--bg);
       color: var(--text);
-      overflow-x: hidden;
+      font-family: 'Lora', 'Times New Roman', Georgia, serif;
+      font-size: 17px;
+      line-height: 1.75;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ── NAV ──────────────────────────────────────────── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 18px 40px;
-      background: rgba(10,10,12,0.82);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-logo {
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-      font-size: 20px;
-      color: var(--text);
-      text-decoration: none;
-      letter-spacing: 0.3px;
-    }
-
-    .nav-links { display: flex; gap: 32px; align-items: center; }
-    .nav-links a {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1.8px;
-      text-transform: uppercase;
-      color: var(--muted);
-      text-decoration: none;
-      transition: color 0.2s;
-    }
-    .nav-links a:hover { color: var(--text); }
-
-    .nav-cta {
-      background: var(--amber) !important;
-      color: #0C0C0E !important;
-      padding: 9px 20px;
-      border-radius: 20px;
-      font-family: 'DM Mono', monospace !important;
-      font-size: 10px !important;
-      letter-spacing: 1.5px !important;
-    }
-
-    /* ── HERO ─────────────────────────────────────────── */
-    .hero {
-      min-height: 100vh;
-      background: var(--bg2);
+    body {
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
-      justify-content: flex-end;
-      padding: 120px 40px 80px;
-      position: relative;
-      overflow: hidden;
     }
 
-    /* Amber glow — evokes a map marker */
-    .hero-bg {
-      position: absolute;
-      inset: 0;
-      background:
-        radial-gradient(ellipse at 72% 28%, rgba(201,151,58,0.13) 0%, transparent 55%),
-        radial-gradient(ellipse at 20% 80%, rgba(201,151,58,0.05) 0%, transparent 50%);
-    }
-
-    /* Subtle grid — evokes a map */
-    .hero-grid {
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
-      background-size: 80px 80px;
-      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
-      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
-    }
-
-    .hero-eyebrow {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--amber);
-      margin-bottom: 20px;
-      position: relative;
-    }
-
-    .hero-title {
-      font-family: 'Playfair Display', serif;
-      font-size: clamp(48px, 8vw, 96px);
-      color: var(--text);
-      line-height: 1.05;
-      max-width: 800px;
-      margin-bottom: 28px;
-      position: relative;
-    }
-
-    .hero-title em {
-      font-style: italic;
-      color: rgba(242,242,247,0.38);
-    }
-
-    .hero-sub {
-      font-size: 16px;
-      color: var(--muted);
-      max-width: 480px;
-      line-height: 1.8;
-      margin-bottom: 48px;
-      position: relative;
-    }
-
-    .hero-actions {
+    main {
+      flex: 1;
       display: flex;
-      gap: 20px;
-      flex-wrap: wrap;
-      align-items: center;
-      position: relative;
+      flex-direction: column;
+      justify-content: center;
+      width: 100%;
+      max-width: 680px;
+      margin-inline: auto;
+      padding-inline: clamp(2rem, 6vw, 5rem);
+      padding-block: clamp(3rem, 8vw, 6rem);
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2.5rem;
+    }
+
+    h1 {
+      font-size: clamp(1.4rem, 3vw, 1.75rem);
+      font-weight: 400;
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 42ch;
+    }
+
+    nav {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      display: inline-block;
+      font-family: 'Lora', serif;
+      font-size: 0.8125rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 0.6rem 1.25rem;
+      align-self: flex-start;
     }
 
     .btn-primary {
-      background: var(--amber);
-      color: #0C0C0E;
-      padding: 16px 32px;
-      border-radius: 30px;
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 1.8px;
-      text-transform: uppercase;
-      text-decoration: none;
-      transition: opacity 0.2s;
-    }
-    .btn-primary:hover { opacity: 0.85; }
-
-    .btn-ghost {
-      color: var(--muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: color 0.2s;
-    }
-    .btn-ghost:hover { color: var(--text); }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 40px;
-      right: 40px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      color: rgba(242,242,247,0.18);
-      font-family: 'DM Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-    }
-
-    .scroll-line {
-      width: 1px;
-      height: 40px;
-      background: linear-gradient(to bottom, rgba(201,151,58,0.45), transparent);
-    }
-
-    /* ── TODAY ────────────────────────────────────────── */
-    .section { padding: 100px 40px; }
-
-    .section-eyebrow {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--amber);
-      margin-bottom: 16px;
-    }
-
-    .section-title {
-      font-family: 'Playfair Display', serif;
-      font-size: clamp(32px, 5vw, 52px);
+      border: 1px solid var(--text);
       color: var(--text);
-      line-height: 1.15;
-      margin-bottom: 16px;
     }
 
-    .section-sub {
-      font-size: 15px;
-      color: var(--muted);
-      max-width: 520px;
-      line-height: 1.8;
-      margin-bottom: 60px;
-    }
-
-    .varieties-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-    }
-
-    .variety-card {
-      background: var(--card);
+    .btn-secondary {
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .variety-card:hover {
-      border-color: rgba(201,151,58,0.32);
-      transform: translateY(-2px);
-    }
-
-    .variety-card.greenhouse {
-      border-color: rgba(201,151,58,0.22);
-      background: rgba(201,151,58,0.06);
-    }
-
-    .variety-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: var(--amber);
-      width: fit-content;
-    }
-    .variety-tag::before {
-      content: '';
-      display: inline-block;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--amber);
-    }
-
-    .variety-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      color: var(--text);
-    }
-
-    .variety-farm {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.4px;
-    }
-
-    .variety-desc {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      color: rgba(242,242,247,0.5);
-      line-height: 1.7;
-      font-style: italic;
-    }
-
-    .variety-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 8px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-
-    .variety-price {
-      font-family: 'DM Mono', monospace;
-      font-size: 16px;
-      color: var(--text);
-      letter-spacing: 0.5px;
-    }
-
-    .variety-stock {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-    }
-    .variety-stock.low { color: #E05A5A; }
-
-    .varieties-loading {
-      text-align: center;
-      color: var(--muted);
-      font-style: italic;
-      padding: 40px 0;
-      font-size: 15px;
-    }
-
-    /* ── PHILOSOPHY ───────────────────────────────────── */
-    .philosophy {
-      background: var(--bg2);
-      padding: 120px 40px;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .philosophy-inner {
-      max-width: 960px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 80px;
-      align-items: start;
-    }
-
-    .philosophy-left { display: flex; flex-direction: column; gap: 24px; }
-
-    .philosophy-eyebrow {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
       color: var(--muted);
     }
 
-    .philosophy-title {
-      font-family: 'Playfair Display', serif;
-      font-size: clamp(30px, 4vw, 46px);
-      color: var(--text);
-      line-height: 1.2;
-    }
-
-    .philosophy-title em {
-      font-style: italic;
-      color: rgba(242,242,247,0.3);
-    }
-
-    .philosophy-body {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      padding-top: 12px;
-    }
-
-    .philosophy-body p {
-      font-size: 15px;
-      color: rgba(242,242,247,0.52);
-      line-height: 1.9;
-    }
-
-    .philosophy-body p strong {
-      color: rgba(242,242,247,0.85);
-      font-weight: 500;
-    }
-
-    .philosophy-pull {
-      font-family: 'Playfair Display', serif;
-      font-size: 20px;
-      font-style: italic;
-      color: rgba(242,242,247,0.28);
-      line-height: 1.6;
-      border-left: 2px solid rgba(201,151,58,0.5);
-      padding-left: 24px;
-      margin: 8px 0;
-    }
-
-    /* ── PLATFORM ─────────────────────────────────────── */
-    .platform { padding: 100px 40px; }
-    .platform-inner { max-width: 960px; margin: 0 auto; }
-
-    .platform-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 16px;
-      margin-top: 60px;
-    }
-
-    .platform-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .platform-card.live {
-      border-color: rgba(201,151,58,0.28);
-    }
-
-    .platform-glyph {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      color: var(--amber);
-      letter-spacing: 1px;
-      margin-bottom: 4px;
-    }
-
-    .platform-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 20px;
-      color: var(--text);
-    }
-
-    .platform-desc {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.7;
-    }
-
-    .platform-status {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: rgba(201,151,58,0.45);
-      margin-top: auto;
-    }
-
-    .platform-status.live-status {
-      color: rgba(201,151,58,0.8);
-    }
-
-    /* ── COMING ───────────────────────────────────────── */
-    .coming { padding: 100px 40px; }
-    .coming-inner { max-width: 960px; margin: 0 auto; }
-
-    .coming-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 16px;
-      margin-top: 60px;
-    }
-
-    .coming-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .coming-icon {
-      font-size: 22px;
-      width: 44px;
-      height: 44px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(201,151,58,0.1);
-      border-radius: 12px;
-    }
-
-    .coming-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 20px;
-      color: var(--text);
-    }
-
-    .coming-desc {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.7;
-    }
-
-    .coming-soon {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      color: rgba(201,151,58,0.45);
-      margin-top: auto;
-    }
-
-    /* ── WHERE ────────────────────────────────────────── */
-    .where {
-      padding: 100px 40px;
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
-    }
-
-    .where-inner {
-      max-width: 960px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 80px;
-      align-items: center;
-    }
-
-    .where-details { display: flex; flex-direction: column; gap: 28px; }
-
-    .where-location {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .where-name {
-      font-family: 'Playfair Display', serif;
-      font-size: 22px;
-      color: var(--text);
-    }
-
-    .where-address {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.3px;
-    }
-
-    .where-hours {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      color: var(--amber);
-      font-weight: 500;
-      margin-top: 4px;
-    }
-
-    /* Map placeholder with grid + amber marker */
-    .where-map {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      height: 320px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .where-map::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image:
-        linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-    }
-
-    .where-map-label {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .where-map-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--amber);
-      box-shadow: 0 0 0 4px rgba(201,151,58,0.2), 0 0 24px rgba(201,151,58,0.5);
-    }
-
-    /* ── FOOTER ───────────────────────────────────────── */
     footer {
-      background: var(--bg2);
-      border-top: 1px solid var(--border);
-      padding: 60px 40px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 24px;
+      padding-top: 3rem;
     }
 
-    .footer-logo {
-      font-family: 'Playfair Display', serif;
-      font-style: italic;
-      font-size: 22px;
-      color: var(--text);
-    }
-
-    .footer-sub {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
+    footer a {
+      font-size: 0.8125rem;
       color: var(--muted);
-      margin-top: 6px;
-      letter-spacing: 1.2px;
-    }
-
-    .footer-right {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 13px;
-      color: var(--muted);
-      text-align: right;
-      line-height: 1.75;
-    }
-
-    .footer-links { display: flex; gap: 24px; margin-top: 10px; justify-content: flex-end; }
-    .footer-links a {
-      font-family: 'DM Mono', monospace;
-      font-size: 10px;
-      color: rgba(242,242,247,0.22);
+      letter-spacing: 0.03em;
       text-decoration: none;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      transition: color 0.2s;
     }
-    .footer-links a:hover { color: var(--amber); }
 
-    /* ── RESPONSIVE ───────────────────────────────────── */
-    @media (max-width: 768px) {
-      nav { padding: 16px 20px; }
-      .nav-links { display: none; }
-      .hero { padding: 100px 24px 60px; }
-      .section { padding: 72px 24px; }
-      .philosophy { padding: 72px 24px; }
-      .philosophy-inner { grid-template-columns: 1fr; gap: 48px; }
-      .coming { padding: 72px 24px; }
-      .where { padding: 72px 24px; }
-      .where-inner { grid-template-columns: 1fr; gap: 40px; }
-      footer { padding: 40px 24px; flex-direction: column; align-items: flex-start; }
-      .footer-right { text-align: left; }
-      .footer-links { justify-content: flex-start; }
-      .hero-scroll { display: none; }
+    footer a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
+  <main>
+    <div class="content">
+      <header>
+        <h1>box fraise</h1>
+        <p class="subtitle">A platform for local commerce, cooperative ownership, and decentralised infrastructure.</p>
+      </header>
 
-<!-- NAV -->
-<nav>
-  <a href="/" class="nav-logo">Box Fraise</a>
-  <div class="nav-links">
-    <a href="#today">Today</a>
-    <a href="#philosophy">The Greenhouse</a>
-    <a href="#where">Where</a>
-    <a href="https://testflight.apple.com/join/zJG1Wc5Y" class="nav-cta" target="_blank" rel="noopener">Download Beta</a>
-  </div>
-</nav>
-
-<!-- HERO -->
-<section class="hero">
-  <div class="hero-bg"></div>
-  <div class="hero-grid"></div>
-  <p class="hero-eyebrow">Montréal · Marché Atwater</p>
-  <h1 class="hero-title">The strawberry,<br /><em>taken seriously.</em></h1>
-  <p class="hero-sub">
-    Chocolate-dipped to order. Each strawberry selected by variety, each chocolate chosen by you.
-    Collected at the market, same morning.
-  </p>
-  <div class="hero-actions">
-    <a href="#today" class="btn-primary">See Today's Varieties</a>
-    <a href="#philosophy" class="btn-ghost">Our obsession →</a>
-  </div>
-  <div class="hero-scroll">
-    <div class="scroll-line"></div>
-    <span>Scroll</span>
-  </div>
-</section>
-
-<!-- TODAY'S VARIETIES -->
-<section class="section" id="today">
-  <p class="section-eyebrow">Available Now</p>
-  <h2 class="section-title">What is ready today.</h2>
-  <p class="section-sub">
-    Stock changes daily. Each variety is sourced from a single farm and sold until it runs out.
-  </p>
-  <div id="varieties-container">
-    <div class="varieties-loading">Loading today's varieties…</div>
-  </div>
-</section>
-
-<!-- PHILOSOPHY -->
-<section class="philosophy" id="philosophy">
-  <div class="philosophy-inner">
-    <div class="philosophy-left">
-      <p class="philosophy-eyebrow">The Greenhouse</p>
-      <h2 class="philosophy-title">A life's work.<br /><em>Just begun.</em></h2>
+      <nav>
+        <a href="https://testflight.apple.com/join/zJG1Wc5Y" class="btn btn-primary">Download beta</a>
+        <a href="/shop" class="btn btn-secondary">Shop</a>
+      </nav>
     </div>
-    <div class="philosophy-body">
-      <p>
-        There is a tradition in Japan — the <strong>takumi</strong> — of spending an entire life devoted to a single craft,
-        and still considering oneself a beginner. Not as false modesty,
-        but as a philosophy. The work is never finished. The pursuit is the point.
-      </p>
-      <p class="philosophy-pull">
-        "To spend a life on one thing, and still find more in it — that is a beautiful way to live."
-      </p>
-      <p>
-        We think about strawberries the way a Japanese fruit grower thinks about a single melon —
-        with obsessive care, with patience, with reverence for the ingredient itself.
-        <strong>Our greenhouse is where that obsession lives.</strong>
-        It is small. It is serious. And it is, in our eyes, permanently unfinished.
-      </p>
-      <p>
-        The gold leaf on the Or Fin finish is not decoration. It is a reminder —
-        that the most ordinary things, treated with enough care, become extraordinary.
-        A strawberry. A flower. A morning at the market.
-        <strong>A life structured around beauty rather than accumulation.</strong>
-      </p>
-      <p>
-        We are working toward growing the finest greenhouse strawberry in the world.
-        We do not know how long it will take.
-        We think that is exactly the right answer.
-      </p>
-    </div>
-  </div>
-</section>
 
-<!-- PLATFORM -->
-<section class="platform" id="platform">
-  <div class="platform-inner">
-    <p class="section-eyebrow">The Platform</p>
-    <h2 class="section-title">An economy around<br /><em>one ingredient.</em></h2>
-    <p class="section-sub">
-      box fraise is not a shop. It is a membership, a social layer, a token, and a market —
-      built around the strawberry as a cultural object.
-    </p>
-    <div class="platform-grid">
-      <div class="platform-card live">
-        <div class="platform-glyph">01 / Ordering</div>
-        <div class="platform-name">The Board</div>
-        <div class="platform-desc">
-          Chocolate-dipped strawberries, made to order. Select variety, chocolate, and finish.
-          Collected at Marché Atwater, same morning.
-        </div>
-        <div class="platform-status live-status">Live now</div>
-      </div>
-      <div class="platform-card live">
-        <div class="platform-glyph">02 / Membership</div>
-        <div class="platform-name">Seven Tiers</div>
-        <div class="platform-desc">
-          Annual membership from Découverte to Or Absolu. Each tier unlocks deeper access —
-          to the platform, the social layer, and the harvest itself.
-        </div>
-        <div class="platform-status live-status">Live now</div>
-      </div>
-      <div class="platform-card live">
-        <div class="platform-glyph">03 / Social</div>
-        <div class="platform-name">NFC Time Bank</div>
-        <div class="platform-desc">
-          Each box tap credits platform time. Your tier is determined by how much time remains —
-          not by what you paid, but by how recently you bought.
-        </div>
-        <div class="platform-status live-status">Live now</div>
-      </div>
-      <div class="platform-card live">
-        <div class="platform-glyph">04 / Currency</div>
-        <div class="platform-name">Fraise (FRS)</div>
-        <div class="platform-desc">
-          A gold-backed digital currency. One Fraise equals one London Good Delivery bar —
-          400 troy ounces, held in allocated Swiss vault storage.
-        </div>
-        <div class="platform-status live-status">Live now</div>
-      </div>
-      <div class="platform-card">
-        <div class="platform-glyph">05 / Tokens</div>
-        <div class="platform-name">Strawberry Tokens</div>
-        <div class="platform-desc">
-          Generative SVGs tied to each variety. Numbered, tradeable, with provenance.
-          One token per box, permanently linked to the harvest it came from.
-        </div>
-        <div class="platform-status">In development</div>
-      </div>
-      <div class="platform-card">
-        <div class="platform-glyph">06 / Agriculture</div>
-        <div class="platform-name">Greenhouse Reserve</div>
-        <div class="platform-desc">
-          Our own variety. Grown in-house. Not sold anywhere else.
-          The long-term project at the centre of everything we do.
-        </div>
-        <div class="platform-status">In development</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- WHERE -->
-<section class="where" id="where">
-  <div class="where-inner">
-    <div class="where-details">
-      <div>
-        <p class="section-eyebrow">Find Us</p>
-        <h2 class="section-title">At the market,<br />every morning.</h2>
-      </div>
-      <div class="where-location">
-        <div class="where-name">Marché Atwater</div>
-        <div class="where-address">138 Av. Atwater, Montréal, QC H4C 2H5</div>
-        <div class="where-hours">Open daily · Order on the app for pickup</div>
-      </div>
-      <p style="font-size:14px;color:var(--muted);line-height:1.8;font-family:'DM Sans',sans-serif;">
-        Orders are placed through the app and collected in person.
-        We dip each strawberry after your order is confirmed —
-        the chocolate is always warm when you arrive.
-      </p>
-    </div>
-    <div class="where-map">
-      <div class="where-map-label">
-        <div class="where-map-dot"></div>
-        <span>Marché Atwater</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- FOOTER -->
-<footer>
-  <div>
-    <div class="footer-logo">Box Fraise</div>
-    <div class="footer-sub">Montréal · Est. 2026</div>
-  </div>
-  <div class="footer-right">
-    Chocolate-dipped strawberries.<br />
-    Made to order. Collected at the market.
-    <div class="footer-links">
-      <a href="/privacy">Privacy</a>
-      <a href="/support">Support</a>
-    </div>
-  </div>
-</footer>
-
-<script>
-  async function loadVarieties() {
-    const container = document.getElementById('varieties-container');
-    try {
-      const res = await fetch('/api/varieties');
-      if (!res.ok) throw new Error();
-      const varieties = await res.json();
-
-      if (!varieties.length) {
-        container.innerHTML = '<div class="varieties-loading">Nothing available today. Check back tomorrow.</div>';
-        return;
-      }
-
-      container.innerHTML = `<div class="varieties-grid">${varieties.map(v => {
-        const price = (v.price_cents / 100).toFixed(2);
-        const isGreenhouse = v.tag === 'GREENHOUSE';
-        const low = v.stock_remaining <= 5;
-        const farm = [v.source_farm, v.source_location].filter(Boolean).join(', ');
-        return `
-          <div class="variety-card ${isGreenhouse ? 'greenhouse' : ''}">
-            ${isGreenhouse ? '<span class="variety-tag">Greenhouse</span>' : ''}
-            <div class="variety-name">${v.name}</div>
-            ${farm ? `<div class="variety-farm">${farm}</div>` : ''}
-            ${v.description ? `<div class="variety-desc">${v.description}</div>` : ''}
-            <div class="variety-footer">
-              <div class="variety-price">CA$${price}</div>
-              <div class="variety-stock ${low ? 'low' : ''}">${v.stock_remaining} remaining</div>
-            </div>
-          </div>
-        `;
-      }).join('')}</div>`;
-    } catch (_) {
-      container.innerHTML = '<div class="varieties-loading">Could not load varieties right now.</div>';
-    }
-  }
-
-  loadVarieties();
-</script>
-
+    <footer>
+      <a href="/paper">Working Paper No. 1 →</a>
+    </footer>
+  </main>
 </body>
 </html>
