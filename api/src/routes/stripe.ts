@@ -873,26 +873,41 @@ router.post('/webhook', async (req: Request, res: Response) => {
         if (!isNaN(giftId)) {
           const [gift] = await db.select().from(gifts).where(eq(gifts.id, giftId)).limit(1);
           if (gift && gift.status === 'pending') {
-            await db.update(gifts).set({ status: 'paid', payment_intent_id: pi.id }).where(eq(gifts.id, giftId));
-            // Look up sender name
+            // Look up sender
             const [sender] = await db.select({ email: users.email, display_name: users.display_name }).from(users).where(eq(users.id, gift.sender_user_id)).limit(1);
             const senderName = sender?.display_name ?? sender?.email?.split('@')[0] ?? 'Someone';
-            // Look up business name if this is a business sticker
-            let businessName: string | undefined;
-            if (gift.sticker_business_id) {
-              const [biz] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, gift.sticker_business_id)).limit(1);
-              businessName = biz?.name;
+
+            // Self-send: auto-claim immediately, skip email
+            const isSelf = gift.recipient_email && sender?.email &&
+              gift.recipient_email.toLowerCase() === sender.email.toLowerCase();
+
+            if (isSelf) {
+              await db.update(gifts).set({
+                status: 'claimed',
+                payment_intent_id: pi.id,
+                claimed_by_user_id: gift.sender_user_id,
+                claimed_at: new Date(),
+              }).where(eq(gifts.id, giftId));
+              logger.info(`Gift ${giftId} self-purchased — auto-claimed for user ${gift.sender_user_id}`);
+            } else {
+              await db.update(gifts).set({ status: 'paid', payment_intent_id: pi.id }).where(eq(gifts.id, giftId));
+              // Look up business name if this is a business sticker
+              let businessName: string | undefined;
+              if (gift.sticker_business_id) {
+                const [biz] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, gift.sticker_business_id)).limit(1);
+                businessName = biz?.name;
+              }
+              if (gift.recipient_email) {
+                sendGiftNotification({
+                  to: gift.recipient_email,
+                  senderName,
+                  giftType: gift.gift_type as 'digital' | 'physical' | 'bundle',
+                  claimToken: gift.claim_token,
+                  businessName,
+                }).catch((err) => logger.error('Failed to send gift email:', err));
+              }
+              logger.info(`Gift ${giftId} paid, notification sent to ${gift.recipient_email}`);
             }
-            if (gift.recipient_email) {
-              sendGiftNotification({
-                to: gift.recipient_email,
-                senderName,
-                giftType: gift.gift_type as 'digital' | 'physical' | 'bundle',
-                claimToken: gift.claim_token,
-                businessName,
-              }).catch((err) => logger.error('Failed to send gift email:', err));
-            }
-            logger.info(`Gift ${giftId} paid, notification sent to ${gift.recipient_email}`);
           }
         }
       } else if (type === 'personal_toilet_visit') {
