@@ -10,9 +10,8 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "box fraise — Working Paper",
-  description:
-    "A working paper on domestic labour, cooperative governance, decentralised infrastructure, and the fraise protocol.",
+  title: "box fraise",
+  description: "A platform for local commerce, cooperative ownership, and decentralised infrastructure.",
 };
 
 export const viewport: Viewport = {
