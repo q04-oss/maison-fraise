@@ -173,6 +173,78 @@ export interface PartnerMenu {
   sections: MenuSection[];
 }
 
+const ACE_COFFEE_MENU: PartnerMenu[] = [
+  {
+    label: 'MENU',
+    sections: [
+      {
+        section: 'COFFEE',
+        items: [
+          { item: 'Espresso', price: '$3.75' },
+          { item: 'Americano', price: '$4.50' },
+          { item: 'Macchiato', price: '$4.50' },
+          { item: 'Cortado', price: '$5.50' },
+          { item: 'Cappuccino', price: '$5.75' },
+          { item: 'Flat White', price: '$5.75' },
+          { item: 'Latte', price: '$6.50' },
+          { item: 'Drip', description: '10oz / 16oz', price: '$3.50 / $4.00' },
+        ],
+      },
+      {
+        section: 'TEA',
+        items: [
+          { item: 'Chai Latte', price: '$6.50' },
+          { item: 'London Fog', price: '$6.50' },
+          { item: 'Tea', price: '$4.00' },
+        ],
+      },
+      {
+        section: 'ADD-ONS',
+        note: 'Select drinks only',
+        items: [
+          { item: 'Alternative Milk', price: '+$1.00' },
+          { item: 'Vanilla / Chocolate', price: '+$0.75' },
+        ],
+      },
+      {
+        section: 'EGGERS',
+        note: '8am – 2pm',
+        items: [
+          { item: 'Maple Infused Ham Egger', price: '$9.20' },
+          { item: 'Bacon Egger', price: '$10.00' },
+          { item: 'Veggie Egger', price: '$9.20' },
+        ],
+      },
+      {
+        section: 'LUNCH SANDWICHES',
+        note: '11am – 2pm',
+        items: [
+          { item: 'Mortadella', price: '$8.50' },
+          { item: 'Prosciutto Crudo & Bocconcini', price: '$8.50' },
+          { item: 'Roast Turkey', price: '$9.00' },
+        ],
+      },
+      {
+        section: 'BAGELS',
+        note: '8am – 2pm',
+        items: [
+          { item: 'Herb & Cream Cheese', price: '$8.50' },
+          { item: 'Gravlax', price: '$16.25' },
+          { item: 'Tomato & Avocado', price: '$12.25' },
+          { item: 'Add Avocado', price: '+$2.00' },
+        ],
+      },
+      {
+        section: 'DONUTS',
+        items: [
+          { item: 'Donut Ring', price: '$3.75' },
+          { item: 'Bomboloni', price: '$4.75' },
+        ],
+      },
+    ],
+  },
+];
+
 const FARROW_MENU: PartnerMenu[] = [
   {
     label: 'MENU',
@@ -1298,77 +1370,12 @@ export const PARTNER_MENUS: Record<string, PartnerMenu[]> = {
     },
   ],
 
-  'Ace coffee': [
-    {
-      label: 'MENU',
-      sections: [
-        {
-          section: 'COFFEE',
-          items: [
-            { item: 'Espresso', price: '$3.75' },
-            { item: 'Americano', price: '$4.50' },
-            { item: 'Macchiato', price: '$4.50' },
-            { item: 'Cortado', price: '$5.50' },
-            { item: 'Cappuccino', price: '$5.75' },
-            { item: 'Flat White', price: '$5.75' },
-            { item: 'Latte', price: '$6.50' },
-            { item: 'Drip', description: '10oz / 16oz', price: '$3.50 / $4.00' },
-          ],
-        },
-        {
-          section: 'TEA',
-          items: [
-            { item: 'Chai Latte', price: '$6.50' },
-            { item: 'London Fog', price: '$6.50' },
-            { item: 'Tea', price: '$4.00' },
-          ],
-        },
-        {
-          section: 'ADD-ONS',
-          note: 'Select drinks only',
-          items: [
-            { item: 'Alternative Milk', price: '+$1.00' },
-            { item: 'Vanilla / Chocolate', price: '+$0.75' },
-          ],
-        },
-        {
-          section: 'EGGERS',
-          note: '8am – 2pm',
-          items: [
-            { item: 'Maple Infused Ham Egger', price: '$9.20' },
-            { item: 'Bacon Egger', price: '$10.00' },
-            { item: 'Veggie Egger', price: '$9.20' },
-          ],
-        },
-        {
-          section: 'LUNCH SANDWICHES',
-          note: '11am – 2pm',
-          items: [
-            { item: 'Mortadella', price: '$8.50' },
-            { item: 'Prosciutto Crudo & Bocconcini', price: '$8.50' },
-            { item: 'Roast Turkey', price: '$9.00' },
-          ],
-        },
-        {
-          section: 'BAGELS',
-          note: '8am – 2pm',
-          items: [
-            { item: 'Herb & Cream Cheese', price: '$8.50' },
-            { item: 'Gravlax', price: '$16.25' },
-            { item: 'Tomato & Avocado', price: '$12.25' },
-            { item: 'Add Avocado', price: '+$2.00' },
-          ],
-        },
-        {
-          section: 'DONUTS',
-          items: [
-            { item: 'Donut Ring', price: '$3.75' },
-            { item: 'Bomboloni', price: '$4.75' },
-          ],
-        },
-      ],
-    },
-  ],
+  'Ace coffee': ACE_COFFEE_MENU,
+  'Ace Coffee': ACE_COFFEE_MENU,
+  'Ace Coffee — 97 Street': ACE_COFFEE_MENU,
+  'Ace Coffee — 101 Street': ACE_COFFEE_MENU,
+  'Ace Coffee — 80 Avenue': ACE_COFFEE_MENU,
+  'Ace Coffee — Garneau': ACE_COFFEE_MENU,
 
   'Farrow — Garneau': FARROW_MENU,
   'Farrow — Ritchie': FARROW_MENU,

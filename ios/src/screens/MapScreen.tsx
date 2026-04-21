@@ -550,6 +550,10 @@ export default function MapScreen() {
             key={`biz-${b.id}`}
             coordinate={{ latitude: b.lat, longitude: b.lng }}
             tracksViewChanges={isHighlighted}
+            onPress={() => {
+              showPanel('partner-detail', { partnerBusiness: b });
+              TrueSheet.resize(SHEET_NAME, 1);
+            }}
           >
             {isHighlighted
               ? <HighlightedPartnerPin color={c.markerBg} />
@@ -574,26 +578,9 @@ export default function MapScreen() {
                 {!!formatDistance(b.lat, b.lng) && (
                   <Text style={[styles.calloutDistance, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
                 )}
-                <View style={[styles.calloutActions, { borderTopColor: c.border }]}>
-                  <CalloutSubview
-                    onPress={() => handleStickerFromPin(b)}
-                    style={[styles.calloutAction, { borderRightColor: c.border, opacity: (b.contact && b.contact.includes('@') && !b.contact.startsWith('@')) ? 1 : 0.3 }]}
-                  >
-                    <Text style={styles.calloutActionEmoji}>🍓</Text>
-                  </CalloutSubview>
-                  <CalloutSubview
-                    onPress={() => handleSupportFromPin(b)}
-                    style={[styles.calloutAction, { borderRightColor: c.border }]}
-                  >
-                    <Text style={[styles.calloutActionText, { color: c.accent }]}>Support</Text>
-                  </CalloutSubview>
-                  <CalloutSubview
-                    onPress={() => handleDirections(b)}
-                    style={styles.calloutAction}
-                  >
-                    <Text style={[styles.calloutActionText, { color: c.text }]}>Directions</Text>
-                  </CalloutSubview>
-                </View>
+                <CalloutSubview onPress={() => handleDirections(b)}>
+                  <Text style={[styles.calloutDirections, { color: c.accent }]}>get directions →</Text>
+                </CalloutSubview>
               </View>
             </Callout>
           </Marker>
@@ -678,7 +665,7 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-fabPill: {
+  fabPill: {
     position: 'absolute',
     right: 16,
     borderRadius: 22,
@@ -768,8 +755,8 @@ fabPill: {
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
-    minWidth: 140,
-    maxWidth: 220,
+    minWidth: 180,
+    maxWidth: 280,
     shadowColor: '#000',
     shadowOpacity: 0.18,
     shadowRadius: 8,
@@ -781,21 +768,5 @@ fabPill: {
   calloutAddress: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
   calloutHours: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
   calloutDistance: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
-  calloutActions: {
-    flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    marginTop: 6,
-    marginHorizontal: -12,
-    marginBottom: -9,
-  },
-  calloutAction: {
-    flex: 1,
-    paddingTop: 8,
-    paddingBottom: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: StyleSheet.hairlineWidth,
-  },
-  calloutActionEmoji: { fontSize: 14 },
-  calloutActionText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.4 },
+  calloutDirections: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 6, paddingBottom: 2 },
 });

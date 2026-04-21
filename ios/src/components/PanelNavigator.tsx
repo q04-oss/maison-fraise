@@ -81,7 +81,7 @@ export default function PanelNavigator() {
       timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 0), 0);
     } else if (FULL_HEIGHT_PANELS.has(currentPanel) && lastNavType.current === 'show') {
       timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 2), 350);
-    } else if (currentPanel === 'home' && mountedRef.current) {
+    } else if ((currentPanel === 'home' || currentPanel === 'partner-detail') && mountedRef.current) {
       timerRef.current = setTimeout(() => TrueSheet.resize('main-sheet', 1), 350);
     }
     mountedRef.current = true;

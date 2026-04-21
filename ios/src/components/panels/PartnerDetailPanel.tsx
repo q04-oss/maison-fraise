@@ -3,7 +3,6 @@ import {
   View, Text, TouchableOpacity, ScrollView,
   StyleSheet, Linking, Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { PARTNER_MENUS, PartnerMenu, MenuSection, MenuItem } from '../../data/seed';
@@ -71,12 +70,15 @@ function MenuSectionBlock({ section, c }: { section: MenuSection; c: any }) {
 export default function PartnerDetailPanel() {
   const { goBack, panelData, showPanel } = usePanel();
   const c = useColors();
-  const insets = useSafeAreaInsets();
 
   const biz = panelData?.partnerBusiness;
   if (!biz) return null;
 
-  const menuKey = Object.keys(PARTNER_MENUS).find(k => k.toLowerCase() === biz.name?.toLowerCase()) ?? biz.name;
+  const bizNameLower = biz.name?.toLowerCase() ?? '';
+  const baseBizName = bizNameLower.replace(/\s*[\u2014\u2013-]\s*.*$/, '').trim();
+  const menuKey = Object.keys(PARTNER_MENUS).find(k => k.toLowerCase() === bizNameLower)
+    ?? Object.keys(PARTNER_MENUS).find(k => k.toLowerCase() === baseBizName)
+    ?? biz.name;
   const menus: PartnerMenu[] = PARTNER_MENUS[menuKey] ?? [];
   const hasMenu = menus.length > 0;
   const [activeTab, setActiveTab] = useState(0);
@@ -118,8 +120,35 @@ export default function PartnerDetailPanel() {
         <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{biz.name}</Text>
+        <Text
+          style={[styles.title, { color: c.text }]}
+          numberOfLines={1}
+          onLongPress={handleSupport}
+          suppressHighlighting
+        >{biz.name}</Text>
         <View style={styles.headerSpacer} />
+      </View>
+
+      {/* Action strip */}
+      <View style={[styles.actionStrip, { borderBottomColor: c.border }]}>
+        <TouchableOpacity
+          style={[styles.actionStripBtn, { borderRightColor: c.border, opacity: contactEmail ? 1 : 0.3 }]}
+          onPress={handleSendSticker}
+          disabled={!contactEmail}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionStripEmoji}>🍓</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionStripBtn, { opacity: contactInfo ? 1 : 0.3 }]}
+          onPress={handleContactPress}
+          disabled={!contactInfo}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.actionStripText, { color: c.text }]}>
+            {contactInfo?.url.startsWith('mailto') ? 'Email' : 'Call'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Menu tabs */}
@@ -190,29 +219,6 @@ export default function PartnerDetailPanel() {
         <View style={{ height: 24 }} />
       </ScrollView>
 
-      <View style={[styles.actionBar, { borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, SPACING.md) }]}>
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: c.accent }]}
-            onPress={handleOpenMaps}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.actionBtnText, { color: '#fff' }]}>Directions</Text>
-          </TouchableOpacity>
-
-          {contactInfo && (
-            <TouchableOpacity
-              style={[styles.actionBtn, { borderWidth: StyleSheet.hairlineWidth, borderColor: c.border }]}
-              onPress={handleContactPress}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.actionBtnText, { color: c.text }]}>
-                {contactInfo.url.startsWith('mailto') ? 'Email' : 'Call'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
 
     </View>
   );
@@ -315,17 +321,17 @@ const styles = StyleSheet.create({
   addOnItem: { fontSize: 11, fontFamily: fonts.dmSans, fontStyle: 'italic' },
   addOnPrice: { fontSize: 11, fontFamily: fonts.dmMono },
 
-  actionRow: { flexDirection: 'row', gap: 10 },
-  actionBar: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
+  actionStrip: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  actionBtn: {
+  actionStripBtn: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 14,
+    paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: StyleSheet.hairlineWidth,
   },
-  actionBtnText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '600' },
+  actionStripEmoji: { fontSize: 14 },
+  actionStripText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 });
