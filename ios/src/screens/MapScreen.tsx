@@ -7,7 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../context/PanelContext';
-import PanelNavigator from '../components/PanelNavigator';
+import PanelNavigator, { detentIndexForPanel } from '../components/PanelNavigator';
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
 import BeaconNudge from '../components/BeaconNudge';
@@ -118,7 +118,11 @@ export default function MapScreen() {
     const fullFrac = (SCREEN_HEIGHT - TAB_BAR_HEIGHT - insets.bottom) / SCREEN_HEIGHT;
     return [0.001, 0.55, fullFrac];
   }, [SCREEN_HEIGHT, insets.bottom]);
-  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack, activeRootTab, setActiveRootTab } = usePanel();
+  const detentAbsoluteHeights = useMemo<[number, number, number]>(
+    () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
+    [DETENTS, SCREEN_HEIGHT],
+  );
+  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack, activeRootTab } = usePanel();
   const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
@@ -166,17 +170,17 @@ export default function MapScreen() {
     if (pendingScreen === 'order-history') {
       clearPendingScreen();
       showPanel('order-history');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, detentIndexForPanel('order-history')), 350);
     }
     if (pendingScreen === 'profile') {
       clearPendingScreen();
       showPanel('my-profile');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, detentIndexForPanel('my-profile')), 350);
     }
     if (pendingScreen === 'NFCVerify') {
       clearPendingScreen();
       showPanel('verifyNFC');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, detentIndexForPanel('verifyNFC')), 350);
     }
   }, [pendingScreen, businesses]);
 
@@ -403,16 +407,6 @@ export default function MapScreen() {
     return { label: open ? 'open now' : 'closed', open };
   };
 
-  useEffect(() => {
-    if (currentPanel === 'order-history') {
-      setActiveRootTab('order');
-    } else if (currentPanel === 'my-profile') {
-      setActiveRootTab('me');
-    } else {
-      setActiveRootTab('discover');
-    }
-  }, [currentPanel]);
-
   const locateBtnBottom = insets.bottom + TAB_BAR_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
@@ -420,13 +414,13 @@ export default function MapScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (tab === 'discover') {
       goHome();
-      TrueSheet.resize(SHEET_NAME, 1);
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('home'));
     } else if (tab === 'order') {
       jumpToPanel('order-history');
-      TrueSheet.resize(SHEET_NAME, 2);
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('order-history'));
     } else if (tab === 'me') {
       jumpToPanel('my-profile');
-      TrueSheet.resize(SHEET_NAME, 2);
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('my-profile'));
     }
   };
 
@@ -548,7 +542,7 @@ export default function MapScreen() {
         onPositionChange={onPositionChange}
         onDidPresent={(e: any) => {
           const idx = e.nativeEvent.index;
-          const h = [0, Math.round(SCREEN_HEIGHT * 0.55), SCREEN_HEIGHT][idx] ?? 0;
+          const h = detentAbsoluteHeights[idx] ?? 0;
           setSheetHeight(h);
           setContentHeight(h);
           if (idx === 0 && currentPanel === 'partner-detail' && !suppressCollapseBack.current) {
@@ -581,13 +575,19 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      <View style={[styles.tabBar, { bottom: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom, borderTopColor: c.border, backgroundColor: c.sheetBg }]}>
+      <View
+        accessibilityRole="tablist"
+        style={[styles.tabBar, { bottom: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom, borderTopColor: c.border, backgroundColor: c.sheetBg }]}
+      >
         {(['discover', 'order', 'me'] as const).map(tab => (
           <TouchableOpacity
             key={tab}
             style={styles.tabItem}
             onPress={() => handleTabPress(tab)}
             activeOpacity={0.6}
+            accessibilityRole="tab"
+            accessibilityLabel={tab}
+            accessibilityState={{ selected: activeRootTab === tab }}
           >
             <Text style={[styles.tabLabel, { color: activeRootTab === tab ? c.text : c.muted }]}>{tab}</Text>
           </TouchableOpacity>

@@ -55,6 +55,13 @@ const FULL_HEIGHT_PANELS = new Set([
 // Panels that collapse the sheet so native system UI (NFC prompt) appears unobstructed
 const COLLAPSED_PANELS = new Set<string>();
 
+/** Single source of truth for which sheet detent a panel should open at. */
+export function detentIndexForPanel(panelId: string): 0 | 1 | 2 {
+  if (COLLAPSED_PANELS.has(panelId)) return 0;
+  if (FULL_HEIGHT_PANELS.has(panelId)) return 2;
+  return 1;
+}
+
 export default function PanelNavigator() {
   const { currentPanel, slideAnim, lastNavType } = usePanel();
   const { width: SCREEN_WIDTH } = useWindowDimensions();

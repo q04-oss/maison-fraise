@@ -150,7 +150,6 @@ interface PanelContextValue {
   setHighlightedBizId: (id: number | null) => void;
   suppressCollapseBack: React.MutableRefObject<boolean>;
   activeRootTab: RootTab;
-  setActiveRootTab: (tab: RootTab) => void;
 }
 
 const PanelContext = createContext<PanelContextValue | null>(null);
@@ -167,7 +166,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const [sheetHeight, setSheetHeight] = useState(0);
   const [panelData, setPanelData] = useState<Record<string, any> | null>(null);
   const [highlightedBizId, setHighlightedBizId] = useState<number | null>(null);
-  const [activeRootTab, setActiveRootTab] = useState<RootTab>('discover');
+  const activeRootTab: RootTab = currentPanel === 'order-history' ? 'order' : currentPanel === 'my-profile' ? 'me' : 'discover';
   const slideAnim = useRef(new Animated.Value(0)).current;
   const animSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNavType = useRef<'show' | 'jump'>('show');
@@ -250,7 +249,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       sheetHeight, setSheetHeight,
       highlightedBizId, setHighlightedBizId,
       suppressCollapseBack,
-      activeRootTab, setActiveRootTab,
+      activeRootTab,
     }}>
       {children}
     </PanelContext.Provider>
