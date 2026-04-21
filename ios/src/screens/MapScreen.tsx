@@ -113,11 +113,12 @@ function LivePopupPin({ color }: { color: string }) {
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
-  const TAB_BAR_HEIGHT = 44;
+  const TAB_PILL_HEIGHT = 44;
+  const TAB_PILL_BOTTOM = insets.bottom + 12;
   const DETENTS = useMemo<[number, number, number]>(() => {
-    const fullFrac = (SCREEN_HEIGHT - TAB_BAR_HEIGHT - insets.bottom) / SCREEN_HEIGHT;
+    const fullFrac = (SCREEN_HEIGHT - TAB_PILL_HEIGHT - TAB_PILL_BOTTOM - 8) / SCREEN_HEIGHT;
     return [0.001, 0.55, fullFrac];
-  }, [SCREEN_HEIGHT, insets.bottom]);
+  }, [SCREEN_HEIGHT, TAB_PILL_BOTTOM]);
   const detentAbsoluteHeights = useMemo<[number, number, number]>(
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
@@ -407,7 +408,7 @@ export default function MapScreen() {
     return { label: open ? 'open now' : 'closed', open };
   };
 
-  const locateBtnBottom = insets.bottom + TAB_BAR_HEIGHT + 12;
+  const locateBtnBottom = TAB_PILL_BOTTOM + TAB_PILL_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
   const handleTabPress = (tab: 'discover' | 'order' | 'me') => {
@@ -577,7 +578,7 @@ export default function MapScreen() {
 
       <View
         accessibilityRole="tablist"
-        style={[styles.tabBar, { bottom: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom, borderTopColor: c.border, backgroundColor: c.sheetBg }]}
+        style={[styles.tabBar, { bottom: TAB_PILL_BOTTOM, backgroundColor: c.card }]}
       >
         {(['discover', 'order', 'me'] as const).map(tab => (
           <TouchableOpacity
@@ -612,14 +613,20 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   tabBar: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    alignSelf: 'center',
     flexDirection: 'row',
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderRadius: 100,
+    height: 44,
+    paddingHorizontal: 4,
     zIndex: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 8,
   },
   tabItem: {
-    flex: 1,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
