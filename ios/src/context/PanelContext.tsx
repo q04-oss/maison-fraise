@@ -3,17 +3,13 @@ import { Animated, Dimensions } from 'react-native';
 
 export type PanelId =
   | 'home'
-  | 'terminal'
   | 'location'
   | 'verified'
   | 'batch-preference'
   | 'partner-detail'
   | 'order-history'
-  | 'search'
-  | 'receipt'
   | 'verifyNFC'
   | 'my-profile'
-  | 'notifications'
   | 'staff-orders'
   | 'walk-in'
   | 'walk-in-write'
@@ -21,8 +17,7 @@ export type PanelId =
   | 'nfc-write'
   | 'nfc-reveal'
   | 'merch'
-  | 'gift'
-  | 'claim-gift';
+  | 'gift';
 
 export interface OrderState {
   variety_id: number | null;

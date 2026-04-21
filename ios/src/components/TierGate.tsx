@@ -24,9 +24,8 @@ export function tierMeets(tier: SocialTier, required: SocialTier): boolean {
 // 'estate'   = estate box only
 
 export const PANEL_TIER_REQUIREMENTS: Partial<Record<PanelId, SocialTier>> = {
-  'my-profile':    'standard',
-  'notifications': 'standard',
-  'staff-orders':  'estate',
+  'my-profile':   'standard',
+  'staff-orders': 'estate',
 };
 
 // ─── TierGate component ───────────────────────────────────────────────────────

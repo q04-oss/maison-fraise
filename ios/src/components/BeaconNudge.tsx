@@ -66,12 +66,6 @@ export default function BeaconNudge() {
   const handleTap = () => {
     if (!nudge || adCampaign) return;
     dismiss();
-    showPanel('messageThread', {
-      userId: nudge.shopUserId,
-      displayName: nudge.shopName,
-      isShop: true,
-      businessId: nudge.businessId,
-    });
   };
 
   const handleAdRespond = async (accepted: boolean) => {
