@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  RefreshControl, StyleSheet, ActivityIndicator, FlatList, Alert,
+  RefreshControl, StyleSheet, ActivityIndicator, FlatList, TextInput, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -36,7 +36,6 @@ export default function HomePanel() {
     order, setOrder, userCoords,
     panelData, setPanelData,
     setHighlightedBizId,
-    searchQuery,
   } = usePanel();
   const { pushToken } = useApp();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -189,6 +188,8 @@ export default function HomePanel() {
 
   // ── Discover / search ──
   const [initials, setInitials] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<TextInput>(null);
 
   function nameToInitials(name: string) {
     const parts = name.trim().split(/\s+/);
@@ -350,6 +351,35 @@ export default function HomePanel() {
 
   return (
     <View style={styles.container}>
+
+      {/* Search bar — always visible when no active location */}
+      {!isOrderableLocation && (
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBox, { backgroundColor: c.cardDark, borderColor: c.border }]}>
+            <TextInput
+              ref={searchRef}
+              style={[styles.searchInput, { color: c.text }]}
+              placeholder="Search businesses…"
+              placeholderTextColor={c.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.avatar, { backgroundColor: c.cardDark }]}
+            onPress={() => {
+              showPanel('my-profile');
+              setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.avatarInitials, { color: c.text }]}>{initials || '❋'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Location strip */}
       {isOrderableLocation && (

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState, Linking } from 'react-native';
 import MapView, { Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -123,7 +123,7 @@ export default function MapScreen() {
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
   );
-  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack, searchQuery, setSearchQuery } = usePanel();
+  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack, activeRootTab } = usePanel();
   const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
@@ -134,15 +134,13 @@ export default function MapScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isVerified, setIsVerified] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userInitial, setUserInitial] = useState<string | null>(null);
   const hasAnimatedToUser = useRef(false);
 
 
   const syncVerifiedState = useCallback(() => {
-    AsyncStorage.multiGet(['verified', 'user_db_id', 'display_name']).then(([v, u, n]) => {
+    AsyncStorage.multiGet(['verified', 'user_db_id']).then(([v, u]) => {
       if (v[1] === 'true') setIsVerified(true);
       setIsLoggedIn(!!u[1]);
-      if (n[1]) setUserInitial(n[1].trim()[0]?.toUpperCase() ?? null);
     });
   }, []);
 
@@ -410,6 +408,20 @@ export default function MapScreen() {
     return { label: open ? 'open now' : 'closed', open };
   };
 
+  const handleTabPress = (tab: 'discover' | 'order' | 'me') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (tab === 'discover') {
+      goHome();
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('home'));
+    } else if (tab === 'order') {
+      jumpToPanel('order-history');
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('order-history'));
+    } else if (tab === 'me') {
+      jumpToPanel('my-profile');
+      TrueSheet.resize(SHEET_NAME, detentIndexForPanel('my-profile'));
+    }
+  };
+
   const locateBtnBottom = TAB_AREA_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
@@ -547,29 +559,23 @@ export default function MapScreen() {
             </PanelErrorBoundary>
           </View>
           <View style={[styles.tabBarArea, { paddingBottom: insets.bottom, backgroundColor: c.sheetBg }]}>
-            <View style={[styles.searchPill, { backgroundColor: c.sheetBg }]}>
-              <TextInput
-                style={[styles.searchPillInput, { color: c.text }]}
-                value={searchQuery}
-                onChangeText={(text: string) => { setSearchQuery(text); if (currentPanel !== 'home') goHome(); TrueSheet.resize(SHEET_NAME, 1); }}
-                onFocus={() => { if (currentPanel !== 'home') goHome(); TrueSheet.resize(SHEET_NAME, 1); }}
-                placeholder="for better taste"
-                placeholderTextColor={c.muted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="search"
-                accessibilityLabel="Search"
-              />
-              <TouchableOpacity
-                style={[styles.profileBtn, { backgroundColor: c.cardDark }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); jumpToPanel('my-profile'); TrueSheet.resize(SHEET_NAME, 2); }}
-                activeOpacity={0.7}
-                accessibilityLabel="Profile"
-              >
-                <Text style={[styles.profileBtnText, { color: c.text }]}>
-                  {userInitial ?? '·'}
-                </Text>
-              </TouchableOpacity>
+            <View
+              accessibilityRole="tablist"
+              style={[styles.tabPill, { backgroundColor: c.sheetBg }]}
+            >
+              {(['discover', 'order', 'me'] as const).map(tab => (
+                <TouchableOpacity
+                  key={tab}
+                  style={styles.tabItem}
+                  onPress={() => handleTabPress(tab)}
+                  activeOpacity={0.6}
+                  accessibilityRole="tab"
+                  accessibilityLabel={tab}
+                  accessibilityState={{ selected: activeRootTab === tab }}
+                >
+                  <Text style={[styles.tabLabel, { color: activeRootTab === tab ? c.text : c.muted }]}>{tab}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </View>
@@ -613,36 +619,26 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     justifyContent: 'center',
   },
-  searchPill: {
+  tabPill: {
     flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: 100,
     height: 44,
-    paddingLeft: 20,
-    paddingRight: 6,
+    paddingHorizontal: 4,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
+    elevation: 3,
   },
-  searchPillInput: {
+  tabItem: {
     flex: 1,
-    fontSize: 13,
-    fontFamily: fonts.dmMono,
-    letterSpacing: 0.5,
-    paddingVertical: 0,
-  },
-  profileBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profileBtnText: {
-    fontSize: 12,
+  tabLabel: {
+    fontSize: 11,
     fontFamily: fonts.dmMono,
+    letterSpacing: 1.5,
   },
   locateBtn: {
     position: 'absolute',
