@@ -1,6 +1,6 @@
 export const metadata = {
   title: 'box fraise',
-  description: 'A platform for local commerce.',
+  description: 'Better taste.',
 };
 
 export default function Home() {
@@ -23,7 +23,7 @@ export default function Home() {
             box fraise
           </h1>
           <p style={{ color: 'var(--muted)', fontSize: '1rem', lineHeight: 1.6, maxWidth: '42ch' }}>
-            A platform for local commerce, cooperative ownership, and decentralised infrastructure.
+            Better taste.
           </p>
         </header>
 
@@ -80,7 +80,10 @@ export default function Home() {
 
       </div>
 
-      <footer style={{ paddingTop: '3rem' }}>
+      <footer style={{ paddingTop: '3rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <p style={{ fontSize: '0.8125rem', color: 'var(--muted)', letterSpacing: '0.03em', fontStyle: 'italic' }}>
+          We have better taste. They have a bitter taste.
+        </p>
         <a
           href="/paper"
           style={{ fontSize: '0.8125rem', color: 'var(--muted)', letterSpacing: '0.03em' }}
