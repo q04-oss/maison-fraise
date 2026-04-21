@@ -18,19 +18,19 @@ router.get('/', async (req: Request, res: Response) => {
 
   try {
     const [usersResult, popupsResult, varietiesResult] = await Promise.all([
-      // Verified users by display_name or email
+      // Users by display_name (public search — no email exposure)
       db
         .select({
           id: users.id,
           display_name: users.display_name,
-          is_dj: users.is_dj,
+          portrait_url: users.portrait_url,
           verified: users.verified,
         })
         .from(users)
         .where(
-          sql`${users.verified} = true AND (${users.display_name} ILIKE ${pattern} OR ${users.email} ILIKE ${pattern})`
+          sql`${users.display_name} ILIKE ${pattern} AND ${users.banned} = false`
         )
-        .limit(5),
+        .limit(8),
 
       // Future popups matching name or neighbourhood
       db
