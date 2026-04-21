@@ -80,7 +80,7 @@ export default function HomePanel() {
       setPanelData(null);
       setInlineOrder(p => ({ ...p, variety_id: v.id, variety_name: v.name, price_cents: v.price_cents }));
       setOrderStep('chocolate');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 200);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 200);
     }
   }, [panelData]);
 
@@ -229,6 +229,17 @@ export default function HomePanel() {
     }
   };
 
+  // ── Nearest collection point ──
+  const nearestCollection = useMemo(() => {
+    if (!userCoords) return null;
+    const candidates = businesses.filter((b: any) => b.lat && b.lng && b.type === 'collection');
+    if (candidates.length === 0) return null;
+    return candidates.reduce((best: any, b: any) => {
+      const d = haversineKm(userCoords.latitude, userCoords.longitude, b.lat, b.lng);
+      return d < best.dist ? { biz: b, dist: d } : best;
+    }, { biz: candidates[0], dist: Infinity }).biz as Business;
+  }, [businesses, userCoords]);
+
   // ── Other locations switcher ──
   const otherLocations = businesses.filter((b: any) => {
     if (b.id === activeLocation?.id) return false;
@@ -361,7 +372,7 @@ export default function HomePanel() {
             style={[styles.avatar, { backgroundColor: c.cardDark }]}
             onPress={() => {
               showPanel('my-profile');
-              setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+              setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
             }}
             activeOpacity={0.7}
           >
@@ -394,6 +405,17 @@ export default function HomePanel() {
             <Text style={[styles.ambientStat, { color: c.muted }]}>
               {businesses.filter(b => b.type === 'partner').length} locations · edmonton
             </Text>
+            {nearestCollection && (
+              <TouchableOpacity
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleLocationSelect(nearestCollection); }}
+                activeOpacity={0.7}
+                style={{ marginTop: 12 }}
+              >
+                <Text style={[styles.nearestHint, { color: c.text }]}>
+                  {nearestCollection.name.toLowerCase()}{formatDist(nearestCollection) ? `  ·  ${formatDist(nearestCollection)}` : ''}  →
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {searchQuery.trim() !== '' ? (
@@ -556,7 +578,7 @@ export default function HomePanel() {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             setInlineOrder(p => ({ ...p, variety_id: v.id, variety_name: v.name, price_cents: v.price_cents }));
                             setOrderStep('chocolate');
-                            setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 200);
+                            setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 200);
                             scrollToBottom();
                           }}
                           activeOpacity={0.8}
@@ -748,6 +770,7 @@ const styles = StyleSheet.create({
   ambientDate: { fontSize: 32, fontFamily: fonts.playfair },
   ambientSeason: { fontSize: 13, fontFamily: fonts.playfair, fontStyle: 'italic' },
   ambientStat: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1, marginTop: 6 },
+  nearestHint: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 
   // Discover
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 18, paddingBottom: SPACING.sm, gap: 10 },

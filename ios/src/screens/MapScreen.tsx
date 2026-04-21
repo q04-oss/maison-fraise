@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState, Linking } from 'react-native';
-import MapView, { Callout, CalloutSubview, Marker, UserLocationChangeEvent } from 'react-native-maps';
+import MapView, { Marker, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,6 @@ import ARBoxModule from '../lib/NativeARBoxModule';
 import { haversineKm, formatDistanceKm } from '../lib/geo';
 
 const SHEET_NAME = 'main-sheet';
-const COLLAPSED_HEIGHT = 80;
 
 const AUDITION_COLOR = '#B8860B';
 
@@ -49,9 +48,9 @@ function AuditionPopupPin({ live }: { live: boolean }) {
 
   const ringStyle = (anim: Animated.Value) => ({
     position: 'absolute' as const,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: AUDITION_COLOR,
     opacity: anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0] }),
@@ -59,13 +58,11 @@ function AuditionPopupPin({ live }: { live: boolean }) {
   });
 
   return (
-    <View style={styles.pinPopup}>
+    <View style={styles.pinCircleWrap}>
       {live && <Animated.View style={ringStyle(anim0)} />}
       {live && <Animated.View style={ringStyle(anim1)} />}
       {live && <Animated.View style={ringStyle(anim2)} />}
-      {/* Diamond shape: rotated square */}
-      <View style={[styles.pinAuditionRing, { borderColor: AUDITION_COLOR }]} />
-      <View style={[styles.pinAuditionDot, { backgroundColor: AUDITION_COLOR }]} />
+      <View style={[styles.pinCircle, { backgroundColor: AUDITION_COLOR }]} />
     </View>
   );
 }
@@ -93,9 +90,9 @@ function LivePopupPin({ color }: { color: string }) {
 
   const ringStyle = (anim: Animated.Value) => ({
     position: 'absolute' as const,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: color,
     opacity: anim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, 0.45, 0] }),
@@ -103,60 +100,21 @@ function LivePopupPin({ color }: { color: string }) {
   });
 
   return (
-    <View style={styles.pinPopup}>
+    <View style={styles.pinCircleWrap}>
       <Animated.View style={ringStyle(anim0)} />
       <Animated.View style={ringStyle(anim1)} />
       <Animated.View style={ringStyle(anim2)} />
-      <View style={[styles.pinPopupRing, { borderColor: color }]} />
-      <View style={[styles.pinPopupDot, { backgroundColor: color }]} />
+      <View style={[styles.pinCircle, { backgroundColor: color }]} />
     </View>
   );
 }
 
-function HighlightedPartnerPin({ color }: { color: string }) {
-  const anim0 = useRef(new Animated.Value(0)).current;
-  const anim1 = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const pulse = (anim: Animated.Value, delay: number) => {
-      setTimeout(() => {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(anim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-            Animated.timing(anim, { toValue: 0, duration: 0, useNativeDriver: true }),
-          ])
-        ).start();
-      }, delay);
-    };
-    pulse(anim0, 0);
-    pulse(anim1, 500);
-  }, []);
-
-  const ringStyle = (anim: Animated.Value) => ({
-    position: 'absolute' as const,
-    width: 24, height: 24, borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: color,
-    opacity: anim.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0, 0.5, 0] }),
-    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [1, 3] }) }],
-  });
-
-  return (
-    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={ringStyle(anim0)} />
-      <Animated.View style={ringStyle(anim1)} />
-      <View style={[styles.pinPartner, { borderColor: color, width: 20, height: 20, borderRadius: 10 }]}>
-        <View style={[styles.pinPartnerDot, { backgroundColor: color }]} />
-      </View>
-    </View>
-  );
-}
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
-  const DETENTS = useMemo<[number, number, number]>(() => [COLLAPSED_HEIGHT / SCREEN_HEIGHT, 0.5, 1], [SCREEN_HEIGHT]);
-  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId } = usePanel();
+  const DETENTS = useMemo<[number, number, number]>(() => [0.001, 0.55, 1], []);
+  const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack } = usePanel();
   const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
@@ -197,24 +155,24 @@ export default function MapScreen() {
   }, [SCREEN_HEIGHT, setSheetHeight]);
 
   useEffect(() => {
-    setSheetHeight(Math.round(SCREEN_HEIGHT * 0.5));
+    setSheetHeight(0);
   }, []);
 
   useEffect(() => {
     if (pendingScreen === 'order-history') {
       clearPendingScreen();
       showPanel('order-history');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     }
     if (pendingScreen === 'profile') {
       clearPendingScreen();
       showPanel('my-profile');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     }
     if (pendingScreen === 'NFCVerify') {
       clearPendingScreen();
       showPanel('verifyNFC');
-      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
     }
   }, [pendingScreen, businesses]);
 
@@ -363,7 +321,7 @@ export default function MapScreen() {
         edgePadding: {
           top: insets.top + 60,
           right: 60,
-          bottom: SCREEN_HEIGHT * 0.5 + 60,
+          bottom: (sheetHeight > 50 ? sheetHeight : SCREEN_HEIGHT * 0.4) + 60,
           left: 60,
         },
         animated: true,
@@ -384,26 +342,6 @@ export default function MapScreen() {
         Alert.alert('Could not open maps', 'No maps app found on this device.');
       }
     }
-  };
-
-  const handleStrawberryPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-    const coords = userCoords.current;
-    const candidates = validBusinesses.filter(b => b.lat !== 0 && b.lng !== 0 && (b.type === 'collection' || b.type === 'popup'));
-
-    if (!coords || candidates.length === 0) {
-      // No user location or no valid businesses — fall back to showing all
-      handleShowAll();
-      return;
-    }
-
-    const nearest = candidates.reduce((best, b) => {
-      const d = haversineKm(coords.latitude, coords.longitude, b.lat, b.lng);
-      return d < best.dist ? { biz: b, dist: d } : best;
-    }, { biz: candidates[0], dist: Infinity }).biz;
-
-    doMarkerNav(nearest);
   };
 
   const isLive = (b: any): boolean => {
@@ -461,8 +399,24 @@ export default function MapScreen() {
     return { label: open ? 'open now' : 'closed', open };
   };
 
-  const fabBottom = sheetHeight + 16;
-  const fabsVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
+  const locateBtnBottom = insets.bottom + 28;
+  const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
+
+  const indicatorText = (() => {
+    if (order.order_status && order.order_status !== 'cancelled' && order.delivery_date) {
+      const date = new Date(order.delivery_date);
+      const day = date.toLocaleDateString('en', { weekday: 'short' }).toLowerCase();
+      const loc = order.location_name?.toLowerCase() ?? '';
+      return loc ? `${loc}  ·  ${day}` : `confirmed  ·  ${day}`;
+    }
+    if (activeLocation) {
+      const status = getOpenStatus(activeLocation.hours);
+      const name = activeLocation.name.toLowerCase();
+      if (status) return `${name}  ·  ${status.label}`;
+      return name;
+    }
+    return 'box fraise';
+  })();
 
   return (
     <View style={styles.container}>
@@ -511,26 +465,7 @@ export default function MapScreen() {
             coordinate={{ latitude: b.lat, longitude: b.lng }}
             onPress={() => handleMarkerPress(b)}
           >
-            <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]}>
-              <View style={styles.pinCollectionDot} />
-            </View>
-            <Callout tooltip>
-              <View style={[styles.callout, { backgroundColor: c.card }]}>
-                <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
-                {!!b.address && (
-                  <Text style={[styles.calloutAddress, { color: c.muted }]}>{b.address}</Text>
-                )}
-                {!!b.hours && (
-                  <Text style={[styles.calloutHours, { color: c.muted }]}>{b.hours}</Text>
-                )}
-                {!!formatDistance(b.lat, b.lng) && (
-                  <Text style={[styles.calloutDistance, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
-                )}
-                <CalloutSubview onPress={() => handleDirections(b)}>
-                  <Text style={[styles.calloutDirections, { color: c.accent }]}>get directions →</Text>
-                </CalloutSubview>
-              </View>
-            </Callout>
+            <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]} />
           </Marker>
         ))}
 
@@ -545,12 +480,7 @@ export default function MapScreen() {
             >
               {live
                 ? <LivePopupPin color="#C0392B" />
-                : (
-                  <View style={styles.pinPopup}>
-                    <View style={[styles.pinPopupRing, { borderColor: '#C0392B' }]} />
-                    <View style={[styles.pinPopupDot, { backgroundColor: '#C0392B' }]} />
-                  </View>
-                )
+                : <View style={[styles.pinCircle, { backgroundColor: '#C0392B' }]} />
               }
             </Marker>
           );
@@ -582,17 +512,11 @@ export default function MapScreen() {
               TrueSheet.resize(SHEET_NAME, 1);
             }}
           >
-            {isHighlighted
-              ? <HighlightedPartnerPin color={c.markerBg} />
-              : (
-                <View style={[styles.pinPartner, { borderColor: c.markerBg }]}>
-                  <View style={[styles.pinPartnerDot, { backgroundColor: c.markerBg }]} />
-                  {b.placed_user_name && (
-                    <View style={styles.pinPlacedDot} />
-                  )}
-                </View>
-              )
-            }
+            <View style={[
+              styles.pinPartner,
+              { borderColor: c.markerBg },
+              isHighlighted && { backgroundColor: c.markerBg, width: 14, height: 14, borderRadius: 7 },
+            ]} />
           </Marker>
           );
         })}
@@ -602,8 +526,8 @@ export default function MapScreen() {
       <TrueSheet
         name={SHEET_NAME}
         detents={DETENTS}
-        initialDetentIndex={1}
-        cornerRadius={20}
+        initialDetentIndex={0}
+        cornerRadius={4}
         style={{ backgroundColor: c.sheetBg }}
         dismissible={false}
         dimmed={false}
@@ -612,9 +536,12 @@ export default function MapScreen() {
         onPositionChange={onPositionChange}
         onDidPresent={(e: any) => {
           const idx = e.nativeEvent.index;
-          const h = [COLLAPSED_HEIGHT, Math.round(SCREEN_HEIGHT * 0.5), SCREEN_HEIGHT][idx] ?? COLLAPSED_HEIGHT;
+          const h = [0, Math.round(SCREEN_HEIGHT * 0.55), SCREEN_HEIGHT][idx] ?? 0;
           setSheetHeight(h);
           setContentHeight(h);
+          if (idx === 0 && currentPanel === 'partner-detail' && !suppressCollapseBack.current) {
+            goBack();
+          }
         }}
         scrollable
       >
@@ -642,31 +569,28 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-{fabsVisible && (
-        <View style={[styles.fabPill, { bottom: fabBottom, backgroundColor: c.card }]} pointerEvents="box-none">
-          <TouchableOpacity
-            style={styles.fabPillBtn}
-            onPress={handleStrawberryPress}
-            onLongPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              jumpToPanel('merch');
-              setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
-            }}
-            delayLongPress={400}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.fabIcon}>🍓</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.fabPillBtn}
-            onPress={() => { setActiveLocation(null); setHighlightedBizId(null); goHome(); setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350); }}
-            onLongPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); handleLocateMe(); }}
-            delayLongPress={500}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.fabIcon}>↑</Text>
-          </TouchableOpacity>
-        </View>
+      {sheetHeight < 50 && (
+        <TouchableOpacity
+          style={[styles.floatingIndicator, { bottom: insets.bottom + 28 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            showPanel('home');
+            TrueSheet.resize(SHEET_NAME, 1);
+          }}
+          activeOpacity={0.6}
+        >
+          <Text style={[styles.floatingLabel, { color: c.text }]}>{indicatorText}</Text>
+        </TouchableOpacity>
+      )}
+
+      {locateBtnVisible && (
+        <TouchableOpacity
+          style={[styles.locateBtn, { bottom: locateBtnBottom }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleLocateMe(); }}
+          activeOpacity={0.5}
+        >
+          <Text style={[styles.locateBtnText, { color: c.muted }]}>↑</Text>
+        </TouchableOpacity>
       )}
 
     </View>
@@ -675,25 +599,29 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  fabPill: {
+  floatingIndicator: {
     position: 'absolute',
-    right: 16,
-    borderRadius: 22,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 6,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     zIndex: 10,
   },
-  fabPillBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  floatingLabel: {
+    fontSize: 12,
+    fontFamily: fonts.dmMono,
+    letterSpacing: 1.5,
+    textAlign: 'center',
   },
-  fabIcon: { fontSize: 22 },
+  locateBtn: {
+    position: 'absolute',
+    right: 20,
+    padding: 10,
+    zIndex: 10,
+  },
+  locateBtnText: {
+    fontSize: 18,
+    fontFamily: fonts.dmMono,
+  },
   arDemoBtn: {
     position: 'absolute',
     left: 16,
@@ -710,46 +638,25 @@ const styles = StyleSheet.create({
   },
   arDemoBtnText: { fontSize: 13, letterSpacing: 2 },
   pinCollection: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4,
+    width: 16, height: 16, borderRadius: 2,
+    shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
   },
-  pinCollectionDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#fff' },
-  pinPopup: {
-    width: 32, height: 32,
+  pinCircleWrap: {
+    width: 24, height: 24,
     alignItems: 'center', justifyContent: 'center',
   },
-  pinPopupRing: {
-    position: 'absolute',
-    width: 32, height: 32, borderRadius: 16,
-    borderWidth: 2,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  pinPopupDot: { width: 10, height: 10, borderRadius: 5 },
-  pinAuditionRing: {
-    position: 'absolute',
-    width: 26, height: 26,
-    borderRadius: 4,
-    borderWidth: 2,
-    transform: [{ rotate: '45deg' }],
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  pinAuditionDot: { width: 8, height: 8, borderRadius: 2, transform: [{ rotate: '45deg' }] },
-  pinPartner: {
-    width: 16, height: 16, borderRadius: 8,
-    backgroundColor: '#fff', borderWidth: 2,
-    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2,
+  pinCircle: {
+    width: 10, height: 10, borderRadius: 5,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 3,
     shadowOffset: { width: 0, height: 1 },
   },
-  pinPartnerDot: { width: 6, height: 6, borderRadius: 3 },
-  pinPlacedDot: {
-    position: 'absolute', top: -3, right: -3,
-    width: 7, height: 7, borderRadius: 4,
-    backgroundColor: '#1C1C1E',
-    borderWidth: 1.5, borderColor: '#fff',
+  pinPartner: {
+    width: 10, height: 10, borderRadius: 5,
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+    shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2,
+    shadowOffset: { width: 0, height: 1 },
   },
   bizLoadingIndicator: { position: 'absolute', alignSelf: 'center' },
   bizErrorBanner: {
@@ -760,24 +667,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  bizErrorText: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
-  callout: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    minWidth: 180,
-    maxWidth: 280,
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-    gap: 3,
-  },
-  calloutName: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  calloutAddress: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
-  calloutHours: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
-  calloutStatus: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  calloutDistance: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
-  calloutDirections: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 6, paddingBottom: 2 },
+  bizErrorText: { fontSize: 13, fontFamily: fonts.dmMono },
 });

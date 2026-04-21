@@ -146,6 +146,7 @@ interface PanelContextValue {
   setSheetHeight: (h: number) => void;
   highlightedBizId: number | null;
   setHighlightedBizId: (id: number | null) => void;
+  suppressCollapseBack: React.MutableRefObject<boolean>;
 }
 
 const PanelContext = createContext<PanelContextValue | null>(null);
@@ -165,6 +166,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const animSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNavType = useRef<'show' | 'jump'>('show');
+  const suppressCollapseBack = useRef(false);
 
   const clearAnimSafety = () => {
     if (animSafetyRef.current) { clearTimeout(animSafetyRef.current); animSafetyRef.current = null; }
@@ -242,6 +244,7 @@ export function PanelProvider({ children }: { children: ReactNode }) {
       showPanel, jumpToPanel, goBack, goHome, lastNavType,
       sheetHeight, setSheetHeight,
       highlightedBizId, setHighlightedBizId,
+      suppressCollapseBack,
     }}>
       {children}
     </PanelContext.Provider>

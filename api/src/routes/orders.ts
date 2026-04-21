@@ -32,7 +32,7 @@ router.post('/', async (req: Request, res: Response) => {
     gift_note,
   } = req.body;
 
-  if (!variety_id || !location_id || !chocolate || !finish || !quantity || !customer_email) {
+  if (!variety_id || !location_id || !quantity || !customer_email) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
@@ -192,7 +192,7 @@ router.post('/payment-intent', async (req: Request, res: Response) => {
     customer_email,
   } = req.body;
 
-  if (!variety_id || !quantity || !location_id || !chocolate || !finish || !customer_email) {
+  if (!variety_id || !quantity || !location_id || !customer_email) {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
@@ -276,7 +276,7 @@ router.post('/pay-with-balance', requireUser, async (req: Request, res: Response
     chocolate, finish, quantity, is_gift, gift_note, push_token,
   } = req.body;
 
-  if (!variety_id || !location_id || !chocolate || !finish || !quantity) {
+  if (!variety_id || !location_id || !quantity) {
     res.status(400).json({ error: 'Missing required fields' }); return;
   }
 

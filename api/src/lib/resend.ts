@@ -93,8 +93,8 @@ function baseTemplate(content: string, heading: string): string {
 export async function sendOrderConfirmation(params: {
   to: string;
   varietyName: string;
-  chocolate: string;
-  finish: string;
+  chocolate: string | null;
+  finish: string | null;
   quantity: number;
   isGift: boolean;
   totalCents: number;
@@ -109,8 +109,8 @@ export async function sendOrderConfirmation(params: {
   const content = `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
       ${row('Strawberry', varietyName)}
-      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
-      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${chocolate ? row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate) : ''}
+      ${finish ? row('Finish', FINISH_LABELS[finish] ?? finish) : ''}
       ${row('Quantity', String(quantity))}
       ${isGift ? row('Gift', 'Handwritten note included') : ''}
       ${slot ? row('Collection', slot) : ''}
@@ -194,8 +194,8 @@ export async function sendOrderReady(params: {
 export async function sendOrderQueued(params: {
   to: string;
   varietyName: string;
-  chocolate: string;
-  finish: string;
+  chocolate: string | null;
+  finish: string | null;
   quantity: number;
   totalCents: number;
 }) {
@@ -208,8 +208,8 @@ export async function sendOrderQueued(params: {
     </p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
       ${row('Strawberry', varietyName)}
-      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
-      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${chocolate ? row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate) : ''}
+      ${finish ? row('Finish', FINISH_LABELS[finish] ?? finish) : ''}
       ${row('Quantity', String(quantity))}
       ${row('Amount held', `CA$${total}`)}
     </table>
@@ -227,8 +227,8 @@ export async function sendOrderQueued(params: {
 export async function sendBatchTriggered(params: {
   to: string;
   varietyName: string;
-  chocolate: string;
-  finish: string;
+  chocolate: string | null;
+  finish: string | null;
   quantity: number;
   totalCents: number;
   deliveryDate: string;
@@ -247,8 +247,8 @@ export async function sendBatchTriggered(params: {
     </p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
       ${row('Strawberry', varietyName)}
-      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
-      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${chocolate ? row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate) : ''}
+      ${finish ? row('Finish', FINISH_LABELS[finish] ?? finish) : ''}
       ${row('Quantity', String(quantity))}
       ${row('Collection', `${dateStr} · ${locationName}`)}
     </table>
@@ -278,8 +278,8 @@ export async function sendBatchTriggered(params: {
 export async function sendBatchReady(params: {
   to: string;
   varietyName: string;
-  chocolate: string;
-  finish: string;
+  chocolate: string | null;
+  finish: string | null;
   quantity: number;
   deliveryDate: string;
   locationName: string;
@@ -296,8 +296,8 @@ export async function sendBatchReady(params: {
     </p>
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
       ${row('Strawberry', varietyName)}
-      ${row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate)}
-      ${row('Finish', FINISH_LABELS[finish] ?? finish)}
+      ${chocolate ? row('Chocolate', CHOCOLATE_LABELS[chocolate] ?? chocolate) : ''}
+      ${finish ? row('Finish', FINISH_LABELS[finish] ?? finish) : ''}
       ${row('Quantity', String(quantity))}
       ${row('Location', locationName)}
       ${row('Ready date', dateStr)}
