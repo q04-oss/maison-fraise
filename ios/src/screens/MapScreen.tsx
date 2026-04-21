@@ -618,8 +618,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     minHeight: 44,
     zIndex: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.1)',
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
   },
   tabItem: {
     flex: 1,
