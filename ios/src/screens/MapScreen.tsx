@@ -115,10 +115,12 @@ export default function MapScreen() {
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const TAB_HEIGHT = 44;
   const TAB_BOTTOM = insets.bottom + 8;
+  // Bar extends from screen bottom; full detent must stop at bar top edge
+  const TAB_BAR_TOTAL = TAB_HEIGHT + TAB_BOTTOM;
   const DETENTS = useMemo<[number, number, number]>(() => {
-    const fullFrac = (SCREEN_HEIGHT - TAB_HEIGHT - TAB_BOTTOM) / SCREEN_HEIGHT;
+    const fullFrac = (SCREEN_HEIGHT - TAB_BAR_TOTAL) / SCREEN_HEIGHT;
     return [0.001, 0.55, fullFrac];
-  }, [SCREEN_HEIGHT, TAB_BOTTOM]);
+  }, [SCREEN_HEIGHT, TAB_BAR_TOTAL]);
   const detentAbsoluteHeights = useMemo<[number, number, number]>(
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
@@ -586,7 +588,7 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      <View style={[styles.tabBarOuter, { bottom: insets.bottom + 8 }]}>
+      <View style={[styles.tabBarOuter, { paddingBottom: insets.bottom + 8, backgroundColor: c.sheetBg }]}>
         <View
           accessibilityRole="tablist"
           style={[styles.tabPill, { backgroundColor: c.sheetBg }]}
@@ -617,6 +619,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
+    bottom: 0,
     alignItems: 'center',
     zIndex: 20,
   },
