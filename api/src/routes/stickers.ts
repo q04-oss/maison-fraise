@@ -1,5 +1,4 @@
 import { Router, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
 import { fal } from '@fal-ai/client';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
@@ -8,7 +7,6 @@ import { requireUser } from '../lib/auth';
 import { logger } from '../lib/logger';
 
 const router = Router();
-const anthropic = new Anthropic();
 
 fal.config({ credentials: process.env.FAL_KEY });
 
@@ -43,37 +41,13 @@ router.post('/generate/:business_id', requireUser, async (req: any, res: Respons
     const [biz] = await db.select().from(businesses).where(eq(businesses.id, bizId)).limit(1);
     if (!biz) { res.status(404).json({ error: 'not_found' }); return; }
 
-    const context = [
-      `Name: ${biz.name}`,
-      biz.type ? `Type: ${biz.type}` : null,
-      biz.neighbourhood ? `Neighbourhood: ${biz.neighbourhood}` : null,
-      biz.description ? `About: ${biz.description}` : null,
-    ].filter(Boolean).join('\n');
+    const parts = [
+      biz.name,
+      biz.neighbourhood ?? null,
+      biz.description ?? null,
+    ].filter(Boolean).join(', ');
 
-    // Step 1 — concept + emoji via Claude Haiku
-    const conceptPrompt = `You are designing a small, collectible die-cut vinyl sticker for a location.
-
-${context}
-
-Respond with exactly two lines:
-Line 1: A single emoji that best represents this location (one character only).
-Line 2: A vivid 1-sentence image generation prompt for a die-cut sticker — specific, bold, graphic art style. Reference the location's identity. Max 20 words.
-
-No labels, no punctuation after the emoji, nothing else.`;
-
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 80,
-      messages: [{ role: 'user', content: conceptPrompt }],
-    });
-
-    const raw = (message.content[0] as any)?.text?.trim() ?? '';
-    const lines = raw.split('\n').map((l: string) => l.trim()).filter(Boolean);
-    const emoji = lines[0] ?? '🍓';
-    const concept = lines[1] ?? `A die-cut sticker celebrating ${biz.name}.`;
-
-    // Step 2 — image generation via fal.ai Flux Schnell
-    const imagePrompt = `Die-cut vinyl sticker: ${concept} White background, bold graphic illustration, clean thick white border, collectible sticker style, no text.`;
+    const imagePrompt = `Die-cut vinyl sticker of ${parts}. White background, bold graphic illustration, clean thick white border, collectible sticker style, no text.`;
 
     const result = await fal.subscribe('fal-ai/flux/schnell', {
       input: {
@@ -87,11 +61,11 @@ No labels, no punctuation after the emoji, nothing else.`;
     const imageUrl: string | null = result?.data?.images?.[0]?.url ?? null;
 
     await db.update(businesses)
-      .set({ sticker_emoji: emoji, sticker_concept: concept, sticker_image_url: imageUrl })
+      .set({ sticker_image_url: imageUrl })
       .where(eq(businesses.id, bizId));
 
-    logger.info(`Sticker generated for business ${bizId}: ${emoji} — image: ${imageUrl ? 'ok' : 'failed'}`);
-    res.json({ id: bizId, sticker_emoji: emoji, sticker_concept: concept, sticker_image_url: imageUrl });
+    logger.info(`Sticker generated for business ${bizId}: image ${imageUrl ? 'ok' : 'failed'}`);
+    res.json({ id: bizId, sticker_image_url: imageUrl });
   } catch (err) {
     logger.error('Failed to generate sticker:', err);
     res.status(500).json({ error: 'server_error' });
