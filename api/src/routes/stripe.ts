@@ -6,7 +6,7 @@ import { stripe } from '../lib/stripe';
 import { db } from '../db';
 import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
-import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification, sendOutreachNotification } from '../lib/resend';
+import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification, sendOutreachNotification, sendBusinessDonationNotification } from '../lib/resend';
 import { sendStickerSMS } from '../lib/twilio';
 import { logger } from '../lib/logger';
 import { TIER_LABELS } from '../lib/membership';
@@ -927,6 +927,26 @@ router.post('/webhook', async (req: Request, res: Response) => {
               logger.info(`Gift ${giftId} paid, outreach=${gift.is_outreach}, notified via ${gift.recipient_phone ? 'SMS' : 'email'}`);
             }
           }
+        }
+      } else if (type === 'business_donation') {
+        const bizId = parseInt(pi.metadata?.business_id ?? '', 10);
+        const businessName = pi.metadata?.business_name ?? 'your business';
+        const businessCents = parseInt(pi.metadata?.business_cents ?? '0', 10);
+        if (!isNaN(bizId) && businessCents > 0) {
+          const [biz] = await db.select({ contact: businesses.contact })
+            .from(businesses).where(eq(businesses.id, bizId)).limit(1);
+          const contact = biz?.contact;
+          const isEmail = contact && contact.includes('@') && !contact.startsWith('@');
+          if (isEmail) {
+            const amountDollars = (businessCents / 100).toFixed(2);
+            sendBusinessDonationNotification({
+              to: contact,
+              businessName,
+              amountDollars,
+              yourEmail: process.env.PAYOUT_EMAIL ?? 'hello@fraise.chat',
+            }).catch(err => logger.error('Failed to send business donation email:', err));
+          }
+          logger.info(`Business donation: ${businessCents} cents for business ${bizId} (${businessName}), email ${isEmail ? 'sent' : 'skipped — no email on file'}`);
         }
       } else if (type === 'personal_toilet_visit') {
         const visitId = parseInt(pi.metadata?.visit_id ?? '', 10);

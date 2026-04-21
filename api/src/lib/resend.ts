@@ -639,3 +639,39 @@ export async function sendOutreachNotification(params: {
 }
 
 // @final-audit
+
+export async function sendBusinessDonationNotification(params: {
+  to: string;
+  businessName: string;
+  amountDollars: string;
+  yourEmail: string;
+}) {
+  const { to, businessName, amountDollars, yourEmail } = params;
+
+  const content = `
+    <p style="margin:0 0 24px;font-size:16px;color:rgba(242,242,247,0.65);line-height:1.75;font-family:Georgia,'Times New Roman',serif;">
+      Someone on Box Fraise sent <strong style="color:#F2F2F7;">${businessName}</strong> a donation of <strong style="color:#F2F2F7;">CA$${amountDollars}</strong>.
+    </p>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background:#C9973A;border-radius:12px;padding:20px 24px;">
+          <p style="margin:0 0 6px;font-size:10px;color:rgba(12,12,14,0.55);letter-spacing:2px;text-transform:uppercase;font-family:'Courier New',Courier,monospace;">To collect your funds</p>
+          <p style="margin:0;font-size:16px;color:#0C0C0E;font-family:'Courier New',Courier,monospace;line-height:1.6;">Send an Interac e-transfer request to<br><strong>${yourEmail}</strong></p>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:0;font-size:13px;color:rgba(242,242,247,0.4);line-height:1.75;font-family:'Courier New',Courier,monospace;letter-spacing:0.2px;">
+      Funds are held by Box Fraise and released upon request. If you have questions, reply to this email.
+    </p>
+  `;
+
+  await resend.emails.send({
+    from: FROM,
+    to,
+    replyTo: REPLY_TO,
+    subject: `CA$${amountDollars} waiting for ${businessName}`,
+    html: baseTemplate(content, 'Someone supports you.'),
+  });
+}
