@@ -114,10 +114,11 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const TAB_HEIGHT = 44;
+  const TAB_BOTTOM = insets.bottom + 8;
   const DETENTS = useMemo<[number, number, number]>(() => {
-    const fullFrac = (SCREEN_HEIGHT - TAB_HEIGHT - insets.bottom) / SCREEN_HEIGHT;
+    const fullFrac = (SCREEN_HEIGHT - TAB_HEIGHT - TAB_BOTTOM) / SCREEN_HEIGHT;
     return [0.001, 0.55, fullFrac];
-  }, [SCREEN_HEIGHT, insets.bottom]);
+  }, [SCREEN_HEIGHT, TAB_BOTTOM]);
   const detentAbsoluteHeights = useMemo<[number, number, number]>(
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
@@ -421,7 +422,7 @@ export default function MapScreen() {
     }
   };
 
-  const locateBtnBottom = insets.bottom + TAB_HEIGHT + 12;
+  const locateBtnBottom = TAB_BOTTOM + TAB_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
   return (
@@ -585,7 +586,7 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      <View style={[styles.tabBarOuter, { height: TAB_HEIGHT + insets.bottom, paddingBottom: insets.bottom }]}>
+      <View style={[styles.tabBarOuter, { bottom: insets.bottom + 8 }]}>
         <View
           accessibilityRole="tablist"
           style={[styles.tabPill, { backgroundColor: c.sheetBg }]}
@@ -614,11 +615,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   tabBarOuter: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
     alignItems: 'center',
-    justifyContent: 'center',
     zIndex: 20,
   },
   tabPill: {
@@ -633,7 +632,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   tabItem: {
-    flex: 1,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
