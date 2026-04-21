@@ -113,12 +113,11 @@ function LivePopupPin({ color }: { color: string }) {
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
-  const TAB_HEIGHT = 44;
-  const TAB_OFFSET = insets.bottom + 12;
+  const TAB_BAR_HEIGHT = 44;
   const DETENTS = useMemo<[number, number, number]>(() => {
-    const fullFrac = (SCREEN_HEIGHT - TAB_HEIGHT - TAB_OFFSET) / SCREEN_HEIGHT;
+    const fullFrac = (SCREEN_HEIGHT - TAB_BAR_HEIGHT - insets.bottom) / SCREEN_HEIGHT;
     return [0.001, 0.55, fullFrac];
-  }, [SCREEN_HEIGHT, TAB_OFFSET]);
+  }, [SCREEN_HEIGHT, insets.bottom]);
   const detentAbsoluteHeights = useMemo<[number, number, number]>(
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
@@ -408,6 +407,9 @@ export default function MapScreen() {
     return { label: open ? 'open now' : 'closed', open };
   };
 
+  const locateBtnBottom = insets.bottom + TAB_BAR_HEIGHT + 12;
+  const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
+
   const handleTabPress = (tab: 'discover' | 'order' | 'me') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (tab === 'discover') {
@@ -421,9 +423,6 @@ export default function MapScreen() {
       TrueSheet.resize(SHEET_NAME, detentIndexForPanel('my-profile'));
     }
   };
-
-  const locateBtnBottom = TAB_OFFSET + TAB_HEIGHT + 12;
-  const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
   return (
     <View style={styles.container}>
@@ -576,19 +575,9 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
-      {locateBtnVisible && (
-        <TouchableOpacity
-          style={[styles.locateBtn, { bottom: locateBtnBottom }]}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleLocateMe(); }}
-          activeOpacity={0.5}
-        >
-          <Text style={[styles.locateBtnText, { color: c.muted }]}>↑</Text>
-        </TouchableOpacity>
-      )}
-
       <View
         accessibilityRole="tablist"
-        style={[styles.tabBar, { bottom: TAB_OFFSET, backgroundColor: c.sheetBg }]}
+        style={[styles.tabBar, { bottom: 0, height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom, borderTopColor: c.border, backgroundColor: c.sheetBg }]}
       >
         {(['discover', 'order', 'me'] as const).map(tab => (
           <TouchableOpacity
@@ -605,6 +594,16 @@ export default function MapScreen() {
         ))}
       </View>
 
+      {locateBtnVisible && (
+        <TouchableOpacity
+          style={[styles.locateBtn, { bottom: locateBtnBottom }]}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleLocateMe(); }}
+          activeOpacity={0.5}
+        >
+          <Text style={[styles.locateBtnText, { color: c.muted }]}>↑</Text>
+        </TouchableOpacity>
+      )}
+
     </View>
   );
 }
@@ -615,13 +614,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 44,
     flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
     zIndex: 20,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: -4 },
   },
   tabItem: {
     flex: 1,
