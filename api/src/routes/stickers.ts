@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
+import { fal } from '@fal-ai/client';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { businesses } from '../db/schema';
@@ -9,8 +10,9 @@ import { logger } from '../lib/logger';
 const router = Router();
 const anthropic = new Anthropic();
 
+fal.config({ credentials: process.env.FAL_KEY });
+
 // GET /api/stickers
-// Returns all businesses with their sticker concept (and those without, for generation).
 router.get('/', async (_req, res: Response) => {
   try {
     const rows = await db.select({
@@ -21,6 +23,7 @@ router.get('/', async (_req, res: Response) => {
       description: businesses.description,
       sticker_concept: businesses.sticker_concept,
       sticker_emoji: businesses.sticker_emoji,
+      sticker_image_url: businesses.sticker_image_url,
     }).from(businesses).where(eq(businesses.type, 'collection'));
     res.json(rows);
   } catch (err) {
@@ -30,7 +33,8 @@ router.get('/', async (_req, res: Response) => {
 });
 
 // POST /api/stickers/generate/:business_id
-// Generates and stores a sticker concept for the given business using Claude Haiku.
+// Step 1: Claude Haiku writes the concept + emoji
+// Step 2: fal.ai Flux generates the sticker image from the concept
 router.post('/generate/:business_id', requireUser, async (req: any, res: Response) => {
   const bizId = parseInt(req.params.business_id, 10);
   if (isNaN(bizId)) { res.status(400).json({ error: 'invalid_id' }); return; }
@@ -46,20 +50,21 @@ router.post('/generate/:business_id', requireUser, async (req: any, res: Respons
       biz.description ? `About: ${biz.description}` : null,
     ].filter(Boolean).join('\n');
 
-    const prompt = `You are designing a small, collectible die-cut vinyl sticker for a local business.
+    // Step 1 — concept + emoji via Claude Haiku
+    const conceptPrompt = `You are designing a small, collectible die-cut vinyl sticker for a location.
 
 ${context}
 
 Respond with exactly two lines:
-Line 1: A single emoji that best represents this business (one character only).
-Line 2: A vivid 1-sentence concept for what the sticker looks like — be specific, visual, and creative. Reference the business's identity. Max 20 words.
+Line 1: A single emoji that best represents this location (one character only).
+Line 2: A vivid 1-sentence image generation prompt for a die-cut sticker — specific, bold, graphic art style. Reference the location's identity. Max 20 words.
 
 No labels, no punctuation after the emoji, nothing else.`;
 
     const message = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 80,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{ role: 'user', content: conceptPrompt }],
     });
 
     const raw = (message.content[0] as any)?.text?.trim() ?? '';
@@ -67,37 +72,50 @@ No labels, no punctuation after the emoji, nothing else.`;
     const emoji = lines[0] ?? '🍓';
     const concept = lines[1] ?? `A die-cut sticker celebrating ${biz.name}.`;
 
+    // Step 2 — image generation via fal.ai Flux Schnell
+    const imagePrompt = `Die-cut vinyl sticker: ${concept} White background, bold graphic illustration, clean thick white border, collectible sticker style, no text.`;
+
+    const result = await fal.subscribe('fal-ai/flux/schnell', {
+      input: {
+        prompt: imagePrompt,
+        image_size: 'square_hd',
+        num_images: 1,
+        num_inference_steps: 4,
+      },
+    }) as any;
+
+    const imageUrl: string | null = result?.data?.images?.[0]?.url ?? null;
+
     await db.update(businesses)
-      .set({ sticker_emoji: emoji, sticker_concept: concept })
+      .set({ sticker_emoji: emoji, sticker_concept: concept, sticker_image_url: imageUrl })
       .where(eq(businesses.id, bizId));
 
-    logger.info(`Sticker concept generated for business ${bizId}: ${emoji} ${concept}`);
-    res.json({ id: bizId, sticker_emoji: emoji, sticker_concept: concept });
+    logger.info(`Sticker generated for business ${bizId}: ${emoji} — image: ${imageUrl ? 'ok' : 'failed'}`);
+    res.json({ id: bizId, sticker_emoji: emoji, sticker_concept: concept, sticker_image_url: imageUrl });
   } catch (err) {
-    logger.error('Failed to generate sticker concept:', err);
+    logger.error('Failed to generate sticker:', err);
     res.status(500).json({ error: 'server_error' });
   }
 });
 
 // POST /api/stickers/generate-all
-// Bulk-generates concepts for every business that doesn't have one yet. Admin use.
+// Bulk-generates for all collection businesses. Admin use.
 router.post('/generate-all', requireUser, async (req: any, res: Response) => {
   try {
-    const rows = await db.select({ id: businesses.id }).from(businesses)
-      .where(eq(businesses.sticker_concept, businesses.sticker_concept)); // all rows
+    const rows = await db.select({ id: businesses.id })
+      .from(businesses)
+      .where(eq(businesses.type, 'collection'));
 
-    const pending = rows; // generate for all — already-set ones will just overwrite
-    res.json({ queued: pending.length, message: 'Generation started in background.' });
+    res.json({ queued: rows.length, message: 'Generation started in background.' });
 
-    // Fire-and-forget per business with a small delay to avoid rate limits
     (async () => {
-      for (const { id } of pending) {
+      for (const { id } of rows) {
         try {
           await fetch(`http://localhost:${process.env.PORT ?? 3000}/api/stickers/generate/${id}`, {
             method: 'POST',
             headers: { Authorization: req.headers.authorization ?? '' },
           });
-          await new Promise(r => setTimeout(r, 300));
+          await new Promise(r => setTimeout(r, 500));
         } catch (e) {
           logger.error(`generate-all: failed for business ${id}`, e);
         }

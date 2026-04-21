@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Image,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { usePanel } from '../../context/PanelContext';
@@ -14,6 +14,7 @@ interface StickerBusiness {
   neighbourhood: string | null;
   sticker_concept: string | null;
   sticker_emoji: string | null;
+  sticker_image_url: string | null;
 }
 
 export default function MerchPanel() {
@@ -61,7 +62,11 @@ export default function MerchPanel() {
               activeOpacity={0.8}
             >
               <View style={styles.cardLeft}>
-                <Text style={styles.cardEmoji}>{biz.sticker_emoji ?? '🍓'}</Text>
+                {biz.sticker_image_url ? (
+                  <Image source={{ uri: biz.sticker_image_url }} style={styles.stickerImg} />
+                ) : (
+                  <Text style={styles.cardEmoji}>{biz.sticker_emoji ?? '🍓'}</Text>
+                )}
               </View>
               <View style={styles.cardBody}>
                 <Text style={[styles.bizName, { color: c.text }]}>{biz.name}</Text>
@@ -100,8 +105,9 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderWidth: StyleSheet.hairlineWidth,
     padding: SPACING.md, flexDirection: 'row', alignItems: 'center', gap: 12,
   },
-  cardLeft: { width: 40, alignItems: 'center' },
+  cardLeft: { width: 56, alignItems: 'center' },
   cardEmoji: { fontSize: 28 },
+  stickerImg: { width: 52, height: 52, borderRadius: 6 },
   cardBody: { flex: 1, gap: 3 },
   bizName: { fontFamily: fonts.playfair, fontSize: 17 },
   neighbourhood: { fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 0.5 },

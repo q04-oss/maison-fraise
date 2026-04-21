@@ -167,6 +167,7 @@ router.get('/received', requireUser, async (req: any, res: Response) => {
       gift_type: gifts.gift_type,
       claimed_at: gifts.claimed_at,
       sticker_emoji: businesses.sticker_emoji,
+      sticker_image_url: businesses.sticker_image_url,
       business_name: businesses.name,
     })
       .from(gifts)

@@ -230,6 +230,7 @@ export const businesses = pgTable('businesses', {
   // Sticker store
   sticker_concept: text('sticker_concept'),
   sticker_emoji: text('sticker_emoji'),
+  sticker_image_url: text('sticker_image_url'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, TextInput, Alert,
+  ActivityIndicator, TextInput, Alert, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -23,7 +23,7 @@ export default function MyProfilePanel() {
 
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  const [receivedGifts, setReceivedGifts] = useState<{ id: number; gift_type: string; claimed_at: string; sticker_emoji: string | null; business_name: string | null }[]>([]);
+  const [receivedGifts, setReceivedGifts] = useState<{ id: number; gift_type: string; claimed_at: string; sticker_emoji: string | null; sticker_image_url: string | null; business_name: string | null }[]>([]);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -190,7 +190,11 @@ export default function MyProfilePanel() {
               <View style={styles.stickerRow}>
                 {receivedGifts.map(g => (
                   <View key={g.id} style={styles.stickerItem}>
-                    <Text style={styles.stickerEmoji}>{g.sticker_emoji ?? '🍓'}</Text>
+                    {g.sticker_image_url ? (
+                      <Image source={{ uri: g.sticker_image_url }} style={styles.stickerImg} />
+                    ) : (
+                      <Text style={styles.stickerEmoji}>{g.sticker_emoji ?? '🍓'}</Text>
+                    )}
                     {g.business_name ? (
                       <Text style={[styles.stickerLabel, { color: c.muted }]} numberOfLines={1}>{g.business_name}</Text>
                     ) : null}
@@ -262,6 +266,7 @@ const styles = StyleSheet.create({
   stickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 },
   stickerItem: { alignItems: 'center', gap: 4, width: 56 },
   stickerEmoji: { fontSize: 28 },
+  stickerImg: { width: 52, height: 52, borderRadius: 6 },
   stickerLabel: { fontFamily: fonts.dmMono, fontSize: 8, letterSpacing: 0.3, textAlign: 'center' },
   navRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

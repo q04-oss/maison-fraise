@@ -2593,13 +2593,13 @@ export async function fetchMyStats(): Promise<any> {
   return r.json();
 }
 
-export async function fetchStickers(): Promise<{ id: number; name: string; type: string; neighbourhood: string | null; sticker_concept: string | null; sticker_emoji: string | null }[]> {
+export async function fetchStickers(): Promise<{ id: number; name: string; type: string; neighbourhood: string | null; sticker_concept: string | null; sticker_emoji: string | null; sticker_image_url: string | null }[]> {
   const r = await fetch(`${BASE_URL}/api/stickers`);
   if (!r.ok) return [];
   return r.json();
 }
 
-export async function fetchReceivedGifts(): Promise<{ id: number; gift_type: string; claimed_at: string; sticker_emoji: string | null; business_name: string | null }[]> {
+export async function fetchReceivedGifts(): Promise<{ id: number; gift_type: string; claimed_at: string; sticker_emoji: string | null; sticker_image_url: string | null; business_name: string | null }[]> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/gifts/received`, { headers: auth });
   if (!r.ok) return [];
