@@ -114,11 +114,11 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const TAB_HEIGHT = 44;
-  const TAB_AREA_HEIGHT = TAB_HEIGHT + insets.bottom;
+  const TAB_BOTTOM = insets.bottom + 12;
   const DETENTS = useMemo<[number, number, number]>(() => {
-    const collapsedFrac = TAB_AREA_HEIGHT / SCREEN_HEIGHT;
-    return [collapsedFrac, 0.55, 1];
-  }, [SCREEN_HEIGHT, TAB_AREA_HEIGHT]);
+    const fullFrac = (SCREEN_HEIGHT - TAB_HEIGHT - TAB_BOTTOM - 8) / SCREEN_HEIGHT;
+    return [0.001, 0.55, fullFrac];
+  }, [SCREEN_HEIGHT, TAB_BOTTOM]);
   const detentAbsoluteHeights = useMemo<[number, number, number]>(
     () => DETENTS.map(d => Math.round(d * SCREEN_HEIGHT)) as [number, number, number],
     [DETENTS, SCREEN_HEIGHT],
@@ -422,7 +422,7 @@ export default function MapScreen() {
     }
   };
 
-  const locateBtnBottom = TAB_AREA_HEIGHT + 12;
+  const locateBtnBottom = TAB_BOTTOM + TAB_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
   return (
@@ -553,31 +553,9 @@ export default function MapScreen() {
         scrollable
       >
         <View style={{ height: contentHeight, backgroundColor: c.sheetBg }} onLayout={onSheetLayout}>
-          <View style={{ flex: 1 }}>
-            <PanelErrorBoundary onReset={() => goHome()}>
-              <PanelNavigator />
-            </PanelErrorBoundary>
-          </View>
-          <View style={[styles.tabBarArea, { paddingBottom: insets.bottom, backgroundColor: c.sheetBg }]}>
-            <View
-              accessibilityRole="tablist"
-              style={[styles.tabPill, { backgroundColor: c.sheetBg }]}
-            >
-              {(['discover', 'order', 'me'] as const).map(tab => (
-                <TouchableOpacity
-                  key={tab}
-                  style={styles.tabItem}
-                  onPress={() => handleTabPress(tab)}
-                  activeOpacity={0.6}
-                  accessibilityRole="tab"
-                  accessibilityLabel={tab}
-                  accessibilityState={{ selected: activeRootTab === tab }}
-                >
-                  <Text style={[styles.tabLabel, { color: activeRootTab === tab ? c.text : c.muted }]}>{tab}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          <PanelErrorBoundary onReset={() => goHome()}>
+            <PanelNavigator />
+          </PanelErrorBoundary>
         </View>
       </TrueSheet>
 
@@ -608,18 +586,34 @@ export default function MapScreen() {
         </TouchableOpacity>
       )}
 
+      <View
+        accessibilityRole="tablist"
+        style={[styles.tabPill, { bottom: TAB_BOTTOM, backgroundColor: c.sheetBg }]}
+      >
+        {(['discover', 'order', 'me'] as const).map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={styles.tabItem}
+            onPress={() => handleTabPress(tab)}
+            activeOpacity={0.6}
+            accessibilityRole="tab"
+            accessibilityLabel={tab}
+            accessibilityState={{ selected: activeRootTab === tab }}
+          >
+            <Text style={[styles.tabLabel, { color: activeRootTab === tab ? c.text : c.muted }]}>{tab}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  tabBarArea: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    justifyContent: 'center',
-  },
   tabPill: {
+    position: 'absolute',
+    alignSelf: 'center',
     flexDirection: 'row',
     borderRadius: 100,
     height: 44,
@@ -629,6 +623,7 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+    zIndex: 20,
   },
   tabItem: {
     flex: 1,
