@@ -4051,9 +4051,3 @@ export async function setFeedVisibility(visible: boolean) {
   return r.json();
 }
 
-export async function searchUsers(q: string) {
-  const r = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(q)}`);
-  if (!r.ok) throw new Error('failed');
-  const data = await r.json();
-  return (data.users ?? []) as { id: number; display_name: string; portrait_url: string | null; verified: boolean }[];
-}
