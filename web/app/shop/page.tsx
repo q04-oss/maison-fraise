@@ -1,19 +1,27 @@
 export const metadata = {
-  title: 'box fraise — shop',
+  title: 'box fraise — stickers',
+  description: 'Collectible city stickers. Digital and physical.',
 };
 
-const PRODUCTS = [
+const STICKERS = [
   {
-    id: 'sticker-pack',
-    title: 'Sticker Pack',
-    description: '5 die-cut vinyl strawberry stickers. Weatherproof, kiss-cut, ready to go anywhere.',
+    title: 'Digital Sticker',
+    description: 'Delivered instantly in-app. Collect locations, send them to friends.',
+    price: '3.00',
+  },
+  {
+    title: 'Physical Sticker Pack',
+    description: 'Die-cut vinyl. Weatherproof. Mailed to the recipient.',
     price: '14.00',
-    currency: 'CAD',
-    checkoutUrl: 'https://shop.fraise.box/cart/50900019970281:1',
+  },
+  {
+    title: 'Digital + Physical',
+    description: 'Both together.',
+    price: '16.00',
   },
 ];
 
-export default function ShopPage() {
+export default function StickersPage() {
   return (
     <main className="document">
       <header style={{ marginBottom: '3rem' }}>
@@ -22,37 +30,42 @@ export default function ShopPage() {
             ← box fraise
           </a>
         </nav>
-        <h1>shop</h1>
-        <p className="meta" style={{ marginTop: '0.75rem' }}>fraise.box — pre-order</p>
+        <h1>stickers</h1>
+        <p className="meta" style={{ marginTop: '0.75rem' }}>
+          Collectible city stickers. Send one to a friend — digital or physical.
+        </p>
       </header>
 
       <hr />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '3rem', marginTop: '2rem' }}>
-        {PRODUCTS.map(product => (
-          <div key={product.id} style={{ borderTop: '1px solid var(--border)', paddingTop: '2rem' }}>
-            <h2 style={{ marginTop: 0 }}>{product.title}</h2>
-            <p style={{ color: 'var(--muted)', fontStyle: 'italic' }}>{product.description}</p>
-            <p style={{ margin: '1rem 0', fontSize: '0.9375rem', letterSpacing: '0.02em' }}>
-              ${product.price} {product.currency}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0', marginTop: '2rem' }}>
+        {STICKERS.map((s, i) => (
+          <div key={i} style={{ borderTop: '1px solid var(--border)', paddingTop: '2rem', paddingBottom: '2rem' }}>
+            <h2 style={{ marginTop: 0, marginBottom: '0.5rem' }}>{s.title}</h2>
+            <p style={{ color: 'var(--muted)', fontStyle: 'italic', margin: '0 0 0.75rem' }}>{s.description}</p>
+            <p style={{ margin: 0, fontSize: '0.9375rem', letterSpacing: '0.02em' }}>
+              CA${s.price}
             </p>
-            <a
-              href={product.checkoutUrl}
-              style={{
-                display: 'inline-block',
-                fontSize: '0.8125rem',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                textDecoration: 'none',
-                border: '1px solid var(--text)',
-                padding: '0.6rem 1.25rem',
-                color: 'var(--text)',
-              }}
-            >
-              Pre-order
-            </a>
           </div>
         ))}
+      </div>
+
+      <div style={{ marginTop: '2rem' }}>
+        <a
+          href="https://testflight.apple.com/join/zJG1Wc5Y"
+          style={{
+            display: 'inline-block',
+            fontSize: '0.8125rem',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase',
+            textDecoration: 'none',
+            border: '1px solid var(--text)',
+            padding: '0.6rem 1.25rem',
+            color: 'var(--text)',
+          }}
+        >
+          Get the app →
+        </a>
       </div>
 
       <hr style={{ marginTop: '4rem' }} />

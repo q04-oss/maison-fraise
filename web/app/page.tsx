@@ -58,7 +58,23 @@ export default function Home() {
               alignSelf: 'flex-start',
             }}
           >
-            Shop
+            Stickers
+          </a>
+          <a
+            href="/support"
+            style={{
+              display: 'inline-block',
+              fontSize: '0.8125rem',
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              textDecoration: 'none',
+              border: '1px solid var(--border)',
+              padding: '0.6rem 1.25rem',
+              color: 'var(--muted)',
+              alignSelf: 'flex-start',
+            }}
+          >
+            Support
           </a>
         </nav>
 
