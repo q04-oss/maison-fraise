@@ -16,11 +16,15 @@ const SHEET_NAME = 'main-sheet';
 const PRESETS = [300, 500, 1000, 2500];
 
 export default function DonatePanel() {
-  const { goBack } = usePanel();
+  const { goBack, panelData } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const inputRef = useRef<TextInput>(null);
+
+  const businessId: number | null = panelData?.businessId ?? null;
+  const businessName: string | null = panelData?.businessName ?? null;
+  const isBusinessDonation = businessId !== null;
 
   const [selected, setSelected] = useState<number | null>(500);
   const [customInput, setCustomInput] = useState('');
@@ -41,7 +45,11 @@ export default function DonatePanel() {
     Keyboard.dismiss();
     setPaying(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/donate/payment-intent`, {
+      const endpoint = isBusinessDonation
+        ? `${API_BASE_URL}/api/donate/business/${businessId}`
+        : `${API_BASE_URL}/api/donate/payment-intent`;
+
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount_cents: activeCents }),
@@ -112,7 +120,9 @@ export default function DonatePanel() {
         <TouchableOpacity onPress={goBack} style={styles.backBtn} activeOpacity={0.7}>
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.title, { color: c.text }]}>Support Box Fraise</Text>
+        <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>
+          {isBusinessDonation ? `Support ${businessName ?? 'this business'}` : 'Support Box Fraise'}
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 

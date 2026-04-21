@@ -105,6 +105,10 @@ export default function PartnerDetailPanel() {
     showPanel('gift', { recipientEmail: contactEmail, businessName: biz.name, isOutreach: true });
   };
 
+  const handleSupport = () => {
+    showPanel('donate', { businessId: biz.id, businessName: biz.name });
+  };
+
   const activeMenu = menus[activeTab];
 
   return (
@@ -194,6 +198,14 @@ export default function PartnerDetailPanel() {
           activeOpacity={0.8}
         >
           <Text style={[styles.stickerBtnText, { color: c.accent }]}>Send them a sticker 🍓</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.stickerBtn, { borderColor: c.border }]}
+          onPress={handleSupport}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.stickerBtnText, { color: c.text }]}>Support this business</Text>
         </TouchableOpacity>
 
         <View style={styles.actionRow}>
