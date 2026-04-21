@@ -57,10 +57,9 @@ export default function HomePanel() {
   const [adBalanceCents, setAdBalanceCents] = useState(0);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['user_email', 'user_db_id', 'display_name']).then(([email, dbId, name]) => {
+    AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
       if (email[1]) setUserEmail(email[1]);
       if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
-      if (name[1]) setInitials(nameToInitials(name[1]));
     });
     fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
   }, []);
@@ -70,10 +69,9 @@ export default function HomePanel() {
     if (!panelData) return;
     if (panelData.signedIn) {
       setPanelData(null);
-      AsyncStorage.multiGet(['user_email', 'user_db_id', 'display_name']).then(([email, dbId, name]) => {
+      AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
         if (email[1]) setUserEmail(email[1]);
         if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
-        if (name[1]) setInitials(nameToInitials(name[1]));
       });
     } else if (panelData.preselectedVariety) {
       const v = panelData.preselectedVariety;
@@ -187,16 +185,7 @@ export default function HomePanel() {
   };
 
   // ── Discover / search ──
-  const [initials, setInitials] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const searchRef = useRef<TextInput>(null);
-
-  function nameToInitials(name: string) {
-    const parts = name.trim().split(/\s+/);
-    return parts.length >= 2
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase();
-  }
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -766,8 +755,6 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 18, paddingBottom: SPACING.sm, gap: 10 },
   searchBox: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   searchInput: { fontSize: 14, fontFamily: fonts.dmSans },
-  avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   locCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth },
   locCardBody: { flex: 1, gap: 3 },
   locCardName: { fontSize: 16, fontFamily: fonts.playfair },
