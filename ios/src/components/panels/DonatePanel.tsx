@@ -97,13 +97,6 @@ export default function DonatePanel() {
           <Text style={styles.thankEmoji}>🍓</Text>
           <Text style={[styles.thankHeading, { color: c.text }]}>Thank you.</Text>
           <Text style={[styles.thankSub, { color: c.muted }]}>It means a lot.</Text>
-          <TouchableOpacity
-            style={[styles.doneBtn, { backgroundColor: c.accent }]}
-            onPress={goBack}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.doneBtnText}>Done</Text>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -245,6 +238,4 @@ const styles = StyleSheet.create({
   thankEmoji: { fontSize: 48 },
   thankHeading: { fontFamily: fonts.playfair, fontSize: 32 },
   thankSub: { fontFamily: fonts.dmSans, fontSize: 14 },
-  doneBtn: { marginTop: 8, paddingVertical: 16, paddingHorizontal: 40, borderRadius: 14 },
-  doneBtnText: { fontFamily: fonts.dmSans, fontWeight: '600', fontSize: 14, color: '#fff' },
 });
