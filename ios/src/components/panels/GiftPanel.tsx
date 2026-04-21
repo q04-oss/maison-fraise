@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, Keyboard,
 } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -154,7 +154,7 @@ export default function GiftPanel() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
 
         {/* Type picker */}
         <Text style={[styles.sectionLabel, { color: c.muted }]}>CHOOSE A GIFT</Text>
@@ -206,6 +206,8 @@ export default function GiftPanel() {
               value={recipientPhone}
               onChangeText={setRecipientPhone}
               keyboardType="phone-pad"
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
               autoCapitalize="none"
               autoCorrect={false}
             />
