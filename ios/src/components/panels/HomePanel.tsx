@@ -359,7 +359,7 @@ export default function HomePanel() {
             <TextInput
               ref={searchRef}
               style={[styles.searchInput, { color: c.text }]}
-              placeholder="Search businesses…"
+              placeholder="for better taste"
               placeholderTextColor={c.muted}
               value={searchQuery}
               onChangeText={setSearchQuery}
