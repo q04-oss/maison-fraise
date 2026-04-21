@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  RefreshControl, StyleSheet, ActivityIndicator, FlatList, Alert,
+  RefreshControl, StyleSheet, ActivityIndicator, FlatList, TextInput, Alert,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -57,9 +57,10 @@ export default function HomePanel() {
   const [adBalanceCents, setAdBalanceCents] = useState(0);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
+    AsyncStorage.multiGet(['user_email', 'user_db_id', 'display_name']).then(([email, dbId, name]) => {
       if (email[1]) setUserEmail(email[1]);
       if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
+      if (name[1]) setInitials(nameToInitials(name[1]));
     });
     fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
   }, []);
@@ -69,9 +70,10 @@ export default function HomePanel() {
     if (!panelData) return;
     if (panelData.signedIn) {
       setPanelData(null);
-      AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
+      AsyncStorage.multiGet(['user_email', 'user_db_id', 'display_name']).then(([email, dbId, name]) => {
         if (email[1]) setUserEmail(email[1]);
         if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
+        if (name[1]) setInitials(nameToInitials(name[1]));
       });
     } else if (panelData.preselectedVariety) {
       const v = panelData.preselectedVariety;
@@ -185,7 +187,16 @@ export default function HomePanel() {
   };
 
   // ── Discover / search ──
+  const [initials, setInitials] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<TextInput>(null);
+
+  function nameToInitials(name: string) {
+    const parts = name.trim().split(/\s+/);
+    return parts.length >= 2
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+  }
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -340,6 +351,35 @@ export default function HomePanel() {
 
   return (
     <View style={styles.container}>
+
+      {/* Search bar — shown when no active orderable location */}
+      {!isOrderableLocation && (
+        <View style={styles.searchRow}>
+          <View style={[styles.searchBox, { backgroundColor: c.cardDark, borderColor: c.border }]}>
+            <TextInput
+              ref={searchRef}
+              style={[styles.searchInput, { color: c.text }]}
+              placeholder="Search businesses…"
+              placeholderTextColor={c.muted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.avatar, { backgroundColor: c.cardDark }]}
+            onPress={() => {
+              showPanel('my-profile');
+              setTimeout(() => TrueSheet.resize(SHEET_NAME, 1), 350);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.avatarInitials, { color: c.text }]}>{initials || '❋'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Location strip */}
       {isOrderableLocation && (
