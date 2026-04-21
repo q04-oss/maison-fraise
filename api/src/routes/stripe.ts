@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts, creditTransactions } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification, sendOutreachNotification, sendBusinessDonationNotification } from '../lib/resend';
 import { sendStickerSMS } from '../lib/twilio';
@@ -926,6 +926,43 @@ router.post('/webhook', async (req: Request, res: Response) => {
               }
               logger.info(`Gift ${giftId} paid, outreach=${gift.is_outreach}, notified via ${gift.recipient_phone ? 'SMS' : 'email'}`);
             }
+          }
+        }
+      } else if (type === 'credit_transfer') {
+        const fromUserId = parseInt(pi.metadata?.from_user_id ?? '', 10);
+        const toUserId = parseInt(pi.metadata?.to_user_id ?? '', 10);
+        const note = pi.metadata?.note ?? null;
+        const amountCents = pi.amount_received ?? pi.amount;
+        if (!isNaN(fromUserId) && !isNaN(toUserId) && amountCents > 0) {
+          // Idempotency: skip if already recorded
+          const existing = await db.select({ id: creditTransactions.id })
+            .from(creditTransactions)
+            .where(eq(creditTransactions.stripe_payment_intent_id, pi.id))
+            .limit(1);
+          if (existing.length === 0) {
+            await db.insert(creditTransactions).values({
+              from_user_id: fromUserId,
+              to_user_id: toUserId,
+              amount_cents: amountCents,
+              type: 'transfer',
+              stripe_payment_intent_id: pi.id,
+              note,
+            });
+            const [recipient] = await db.select({ platform_credit_cents: users.platform_credit_cents, push_token: users.push_token, display_name: users.display_name })
+              .from(users).where(eq(users.id, toUserId)).limit(1);
+            const [sender] = await db.select({ display_name: users.display_name })
+              .from(users).where(eq(users.id, fromUserId)).limit(1);
+            if (recipient) {
+              await db.update(users)
+                .set({ platform_credit_cents: (recipient.platform_credit_cents ?? 0) + amountCents })
+                .where(eq(users.id, toUserId));
+              if (recipient.push_token) {
+                const dollars = (amountCents / 100).toFixed(2);
+                const fromName = sender?.display_name ?? 'Someone';
+                sendPushNotification(recipient.push_token, `CA$${dollars} from ${fromName}`, note ?? 'Added to your platform credit.').catch(() => {});
+              }
+            }
+            logger.info(`Credit transfer: ${amountCents} cents from user ${fromUserId} to user ${toUserId}`);
           }
         }
       } else if (type === 'business_donation') {

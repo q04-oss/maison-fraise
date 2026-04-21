@@ -25,6 +25,7 @@ import MerchPanel from './panels/MerchPanel';
 import GiftPanel from './panels/GiftPanel';
 import ClaimGiftPanel from './panels/ClaimGiftPanel';
 import DonatePanel from './panels/DonatePanel';
+import SendCreditPanel from './panels/SendCreditPanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -50,6 +51,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'gift': GiftPanel,
   'claim-gift': ClaimGiftPanel,
   'donate': DonatePanel,
+  'send-credit': SendCreditPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([

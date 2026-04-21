@@ -10,7 +10,7 @@ import { useColors, fonts, SPACING } from '../../theme';
 import {
   fetchMyStats, updateDisplayName,
   deleteAuthToken, verifyAppleSignIn, setAuthToken,
-  fetchReceivedGifts,
+  fetchReceivedGifts, fetchCreditBalance,
 } from '../../lib/api';
 
 export default function MyProfilePanel() {
@@ -27,6 +27,7 @@ export default function MyProfilePanel() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [creditBalance, setCreditBalance] = useState(0);
 
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => {
@@ -42,6 +43,7 @@ export default function MyProfilePanel() {
       setStats(s);
     }).finally(() => setStatsLoading(false));
     fetchReceivedGifts().then(g => setReceivedGifts(g)).catch(() => {});
+    fetchCreditBalance().then(r => setCreditBalance(r.balance_cents)).catch(() => {});
   };
 
   const handleAppleSignIn = async () => {
@@ -204,8 +206,21 @@ export default function MyProfilePanel() {
             </View>
           )}
 
+          {/* Credit balance */}
+          {creditBalance > 0 && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>CREDIT</Text>
+              <Text style={[styles.balance, { color: c.text }]}>CA${(creditBalance / 100).toFixed(2)}</Text>
+              <Text style={[styles.subLine, { color: c.muted }]}>Applies automatically at checkout</Text>
+            </View>
+          )}
+
           {/* Nav */}
           <View>
+            <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('send-credit')} activeOpacity={0.7}>
+              <Text style={[styles.navLabel, { color: c.text }]}>Send Credit</Text>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('merch')} activeOpacity={0.7}>
               <Text style={[styles.navLabel, { color: c.text }]}>Shop</Text>
               <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>

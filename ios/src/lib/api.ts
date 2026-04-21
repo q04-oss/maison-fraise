@@ -3924,3 +3924,22 @@ export async function fetchMyWorkerAccess(locationId: number): Promise<{ status:
   if (!r.ok) throw new Error('fetch_failed');
   return r.json();
 }
+
+export async function fetchCreditBalance(): Promise<{ balance_cents: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/credits/balance`, { headers: auth });
+  if (!r.ok) return { balance_cents: 0 };
+  return r.json();
+}
+
+export async function createCreditTransferIntent(to_user_id: number, amount_cents: number, note?: string): Promise<{ client_secret: string }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/credits/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ to_user_id, amount_cents, note }),
+  });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+

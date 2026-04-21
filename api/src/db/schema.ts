@@ -175,6 +175,7 @@ export const users: any = pgTable('users', {
   stripe_connect_account_id: text('stripe_connect_account_id'),
   stripe_connect_onboarded: boolean('stripe_connect_onboarded').notNull().default(false),
   ad_balance_cents: integer('ad_balance_cents').notNull().default(0),
+  platform_credit_cents: integer('platform_credit_cents').notNull().default(0),
   social_time_bank_seconds: integer('social_time_bank_seconds').notNull().default(0),
   social_time_bank_updated_at: timestamp('social_time_bank_updated_at'),
   social_lifetime_credits_seconds: integer('social_lifetime_credits_seconds').notNull().default(0),
@@ -1580,5 +1581,18 @@ export const gifts = pgTable('gifts', {
   idx_recipient_email: index('gifts_recipient_email_idx').on(t.recipient_email),
   idx_sticker_biz: index('gifts_sticker_business_id_idx').on(t.sticker_business_id),
 }));
+
+// ─── Platform credit ──────────────────────────────────────────────────────────
+
+export const creditTransactions = pgTable('credit_transactions', {
+  id: serial('id').primaryKey(),
+  from_user_id: integer('from_user_id').references(() => users.id),   // null = platform grant
+  to_user_id: integer('to_user_id').notNull().references(() => users.id),
+  amount_cents: integer('amount_cents').notNull(),
+  type: text('type').notNull(),  // 'transfer' | 'applied'
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
+  note: text('note'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
 
 // @final-audit
