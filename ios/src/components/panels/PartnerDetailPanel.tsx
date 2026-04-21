@@ -119,24 +119,8 @@ export default function PartnerDetailPanel() {
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{biz.name}</Text>
-        <TouchableOpacity
-          style={[styles.stickerBtn, { opacity: contactEmail ? 1 : 0.25 }]}
-          onPress={handleSendSticker}
-          disabled={!contactEmail}
-          activeOpacity={0.6}
-        >
-          <Text style={styles.stickerEmoji}>🍓</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
-
-      {/* Support strip */}
-      <TouchableOpacity
-        style={[styles.supportStrip, { backgroundColor: `${c.accent}14`, borderBottomColor: `${c.accent}30` }]}
-        onPress={handleSupport}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.supportStripText, { color: c.accent }]}>Support this business →</Text>
-      </TouchableOpacity>
 
       {/* Menu tabs */}
       {hasMenu && menus.length > 1 && (
@@ -247,14 +231,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, paddingVertical: 4 },
   backBtnText: { fontSize: 28, lineHeight: 34 },
   title: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: fonts.playfair },
-  stickerBtn: { width: 40, alignItems: 'flex-end', justifyContent: 'center' },
-  stickerEmoji: { fontSize: 22 },
-  supportStrip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  supportStripText: { fontFamily: fonts.dmMono, fontSize: 11, letterSpacing: 0.5 },
+  headerSpacer: { width: 40 },
   body: { flex: 1 },
 
   tabBar: {
