@@ -4,13 +4,11 @@ import { logger } from '../lib/logger';
 
 const router = Router();
 
-const ALLOWED_AMOUNTS = [300, 500, 1000, 2500]; // $3, $5, $10, $25 CAD
-
 // POST /api/donate/payment-intent
 router.post('/payment-intent', async (req: any, res: Response) => {
   const { amount_cents } = req.body;
 
-  if (!ALLOWED_AMOUNTS.includes(amount_cents)) {
+  if (!Number.isInteger(amount_cents) || amount_cents < 100 || amount_cents > 1_000_000) {
     res.status(400).json({ error: 'invalid_amount' });
     return;
   }

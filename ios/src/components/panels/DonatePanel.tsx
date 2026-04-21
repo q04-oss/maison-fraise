@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Keyboard,
 } from 'react-native';
 import { useStripe } from '@stripe/stripe-react-native';
 import * as Haptics from 'expo-haptics';
@@ -25,17 +25,29 @@ export default function DonatePanel() {
   const insets = useSafeAreaInsets();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
-  const [selected, setSelected] = useState(500);
+  const [selected, setSelected] = useState<number | null>(500);
+  const [customInput, setCustomInput] = useState('');
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
 
+  const customCents = customInput ? Math.round(parseFloat(customInput) * 100) : 0;
+  const activeCents = customInput ? customCents : (selected ?? 0);
+  const displayAmount = customInput
+    ? (customCents >= 100 ? `$${parseFloat(customInput).toFixed(2)}` : '')
+    : AMOUNTS.find(a => a.cents === selected)?.label ?? '';
+
   const handleDonate = async () => {
+    if (activeCents < 100) {
+      alert('Minimum donation is $1.00.');
+      return;
+    }
+    Keyboard.dismiss();
     setPaying(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/donate/payment-intent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount_cents: selected }),
+        body: JSON.stringify({ amount_cents: activeCents }),
       });
       if (!res.ok) throw new Error('Failed to create payment');
       const { client_secret } = await res.json();
@@ -116,33 +128,50 @@ export default function DonatePanel() {
         </Text>
 
         <View style={[styles.amountRow, { paddingHorizontal: SPACING.md }]}>
-          {AMOUNTS.map(a => (
-            <TouchableOpacity
-              key={a.cents}
-              style={[
-                styles.amountBtn,
-                { borderColor: selected === a.cents ? c.accent : c.border },
-                selected === a.cents && { backgroundColor: c.accent },
-              ]}
-              onPress={() => { setSelected(a.cents); Haptics.selectionAsync(); }}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.amountLabel, { color: selected === a.cents ? '#fff' : c.text }]}>
-                {a.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {AMOUNTS.map(a => {
+            const active = !customInput && selected === a.cents;
+            return (
+              <TouchableOpacity
+                key={a.cents}
+                style={[
+                  styles.amountBtn,
+                  { borderColor: active ? c.accent : c.border },
+                  active && { backgroundColor: c.accent },
+                ]}
+                onPress={() => { setSelected(a.cents); setCustomInput(''); Haptics.selectionAsync(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.amountLabel, { color: active ? '#fff' : c.text }]}>
+                  {a.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={[styles.customWrapper, { borderColor: customInput ? c.accent : c.border, backgroundColor: c.card }]}>
+          <Text style={[styles.customPrefix, { color: c.muted }]}>$</Text>
+          <TextInput
+            style={[styles.customInput, { color: c.text }]}
+            placeholder="Custom amount"
+            placeholderTextColor={c.muted}
+            keyboardType="decimal-pad"
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+            value={customInput}
+            onChangeText={v => { setCustomInput(v); setSelected(null); }}
+          />
         </View>
 
         <TouchableOpacity
-          style={[styles.payBtn, { backgroundColor: c.accent, opacity: paying ? 0.7 : 1 }]}
+          style={[styles.payBtn, { backgroundColor: c.accent, opacity: (paying || activeCents < 100) ? 0.5 : 1 }]}
           onPress={handleDonate}
-          disabled={paying}
+          disabled={paying || activeCents < 100}
           activeOpacity={0.8}
         >
           {paying
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.payBtnText}>Donate {AMOUNTS.find(a => a.cents === selected)?.label} →</Text>
+            : <Text style={styles.payBtnText}>{displayAmount ? `Donate ${displayAmount} →` : 'Donate →'}</Text>
           }
         </TouchableOpacity>
       </View>
@@ -166,6 +195,13 @@ const styles = StyleSheet.create({
   sub: { fontFamily: fonts.dmSans, fontSize: 14, lineHeight: 22 },
 
   amountRow: { flexDirection: 'row', gap: 10 },
+  customWrapper: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: SPACING.md, borderWidth: 1, borderRadius: 12,
+    paddingHorizontal: SPACING.md, paddingVertical: 14,
+  },
+  customPrefix: { fontFamily: fonts.playfair, fontSize: 18, marginRight: 4 },
+  customInput: { flex: 1, fontFamily: fonts.playfair, fontSize: 18 },
   amountBtn: {
     flex: 1, paddingVertical: 14, borderRadius: 12,
     borderWidth: 1, alignItems: 'center',
