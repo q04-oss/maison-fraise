@@ -10,7 +10,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { PARTNER_MENUS, CHOCOLATES, FINISHES, PartnerMenu, MenuSection, MenuItem } from '../../data/seed';
-import { createOrder, confirmOrder, payOrderWithBalance, fetchAdBalance } from '../../lib/api';
+import { createOrder, confirmOrder, payOrderWithBalance, fetchAdBalance, fetchMyMaps, createMap, addToMap } from '../../lib/api';
 import { haversineKm } from '../../lib/geo';
 import { useApp } from '../../../App';
 
@@ -139,6 +139,45 @@ export default function PartnerDetailPanel() {
     });
     fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
   }, []);
+
+  const handleAddToMap = useCallback(async () => {
+    if (!biz?.id) return;
+    if (!userDbId) { Alert.alert('Sign in required', 'Sign in to save places to your maps.'); return; }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const maps = await fetchMyMaps();
+      if (maps.length === 0) {
+        Alert.prompt('Create a map', 'Name your first map', async (name) => {
+          if (!name?.trim()) return;
+          const created = await createMap(name.trim());
+          await addToMap(created.id, biz.id);
+          Alert.alert('Added', `Saved to "${created.name}".`);
+        });
+        return;
+      }
+      const options = maps.map((m: any) => ({
+        text: `${m.name} (${m.entry_count} places)`,
+        onPress: async () => {
+          await addToMap(m.id, biz.id);
+          Alert.alert('Added', `Saved to "${m.name}".`);
+        },
+      }));
+      Alert.alert('Add to map', biz.name, [
+        ...options,
+        { text: 'New map…', onPress: () => {
+          Alert.prompt('New map', 'Name your map', async (name) => {
+            if (!name?.trim()) return;
+            const created = await createMap(name.trim());
+            await addToMap(created.id, biz.id);
+            Alert.alert('Added', `Saved to "${created.name}".`);
+          });
+        }},
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    } catch {
+      Alert.alert('Something went wrong', 'Try again.');
+    }
+  }, [biz, userDbId]);
 
   // ── Menu tabs ──
   const [activeTab, setActiveTab] = useState(0);
@@ -481,6 +520,9 @@ export default function PartnerDetailPanel() {
                 <Text style={[styles.infoAction, { color: c.muted }]}>order</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity onPress={handleAddToMap} activeOpacity={0.6}>
+              <Text style={[styles.infoAction, { color: c.muted }]}>+ map</Text>
+            </TouchableOpacity>
           </View>
         </View>
 

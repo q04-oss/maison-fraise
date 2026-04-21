@@ -11,6 +11,7 @@ import {
   fetchMyStats, updateDisplayName,
   deleteAuthToken, verifyAppleSignIn, setAuthToken,
   fetchReceivedGifts, fetchCreditBalance,
+  fetchMyMaps, createMap, deleteMap,
 } from '../../lib/api';
 
 export default function MyProfilePanel() {
@@ -29,6 +30,11 @@ export default function MyProfilePanel() {
   const [savingName, setSavingName] = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
 
+  const [maps, setMaps] = useState<{ id: number; name: string; description: string | null; entry_count: number }[]>([]);
+  const [creatingMap, setCreatingMap] = useState(false);
+  const [newMapName, setNewMapName] = useState('');
+  const [savingMap, setSavingMap] = useState(false);
+
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => {
       const isIn = !!id;
@@ -44,6 +50,38 @@ export default function MyProfilePanel() {
     }).finally(() => setStatsLoading(false));
     fetchReceivedGifts().then(g => setReceivedGifts(g)).catch(() => {});
     fetchCreditBalance().then(r => setCreditBalance(r.balance_cents)).catch(() => {});
+    fetchMyMaps().then(m => setMaps(m)).catch(() => {});
+  };
+
+  const handleCreateMap = async () => {
+    if (!newMapName.trim()) return;
+    setSavingMap(true);
+    try {
+      const created = await createMap(newMapName.trim());
+      setMaps(prev => [created, ...prev]);
+      setNewMapName('');
+      setCreatingMap(false);
+    } catch {
+      Alert.alert('Error', 'Could not create map.');
+    } finally {
+      setSavingMap(false);
+    }
+  };
+
+  const handleDeleteMap = (mapId: number, mapName: string) => {
+    Alert.alert(`Delete "${mapName}"?`, 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await deleteMap(mapId);
+            setMaps(prev => prev.filter(m => m.id !== mapId));
+          } catch {
+            Alert.alert('Error', 'Could not delete map.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleAppleSignIn = async () => {
@@ -215,6 +253,47 @@ export default function MyProfilePanel() {
             </View>
           )}
 
+          {/* Maps */}
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
+            <View style={styles.mapsHeader}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>MAPS</Text>
+              <TouchableOpacity onPress={() => setCreatingMap(v => !v)} activeOpacity={0.7}>
+                <Text style={[styles.actionBtn, { color: c.accent }]}>{creatingMap ? 'CANCEL' : '+ NEW'}</Text>
+              </TouchableOpacity>
+            </View>
+            {creatingMap && (
+              <View style={styles.editRow}>
+                <TextInput
+                  style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontSize: 16 }]}
+                  value={newMapName}
+                  onChangeText={setNewMapName}
+                  placeholder="map name"
+                  placeholderTextColor={c.muted}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={handleCreateMap}
+                />
+                <TouchableOpacity onPress={handleCreateMap} disabled={savingMap || !newMapName.trim()} activeOpacity={0.7}>
+                  <Text style={[styles.actionBtn, { color: c.accent }]}>{savingMap ? '…' : 'SAVE'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {maps.length === 0 && !creatingMap && (
+              <Text style={[styles.subLine, { color: c.muted }]}>no maps yet</Text>
+            )}
+            {maps.map(m => (
+              <View key={m.id} style={[styles.mapRow, { borderTopColor: c.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.mapName, { color: c.text }]}>{m.name}</Text>
+                  <Text style={[styles.subLine, { color: c.muted }]}>{m.entry_count} {m.entry_count === 1 ? 'place' : 'places'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => handleDeleteMap(m.id, m.name)} activeOpacity={0.6}>
+                  <Text style={[styles.actionBtn, { color: c.muted }]}>×</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
           {/* Nav */}
           <View>
             <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('send-credit')} activeOpacity={0.7}>
@@ -283,6 +362,9 @@ const styles = StyleSheet.create({
   stickerEmoji: { fontSize: 28 },
   stickerImg: { width: 52, height: 52, borderRadius: 6 },
   stickerLabel: { fontFamily: fonts.dmMono, fontSize: 8, letterSpacing: 0.3, textAlign: 'center' },
+  mapsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  mapRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 6 },
+  mapName: { fontFamily: fonts.dmSans, fontSize: 15 },
   navRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: SPACING.md, paddingVertical: SPACING.md,
