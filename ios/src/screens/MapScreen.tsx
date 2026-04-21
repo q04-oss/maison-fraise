@@ -291,6 +291,19 @@ export default function MapScreen() {
     }, 400);
   };
 
+  const handleStickerFromPin = (biz: any) => {
+    const contactEmail = biz.contact && biz.contact.includes('@') && !biz.contact.startsWith('@')
+      ? biz.contact.trim() : null;
+    if (!contactEmail) return;
+    showPanel('gift', { recipientEmail: contactEmail, businessName: biz.name, isOutreach: true });
+    setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+  };
+
+  const handleSupportFromPin = (biz: any) => {
+    showPanel('donate', { businessId: biz.id, businessName: biz.name });
+    setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+  };
+
   const handlePopupPress = (biz: any) => {
     setActiveLocation(biz);
     showPanel('home');
@@ -552,21 +565,40 @@ export default function MapScreen() {
                 </View>
               )
             }
-            <Callout tooltip>
+            <Callout tooltip onPress={() => handlePartnerPress(b)}>
               <View style={[styles.callout, { backgroundColor: c.card }]}>
                 <Text style={[styles.calloutName, { color: c.text }]}>{b.name}</Text>
-                {!!b.address && (
-                  <Text style={[styles.calloutAddress, { color: c.muted }]}>{b.address}</Text>
+                {!!b.description && (
+                  <Text style={[styles.calloutDesc, { color: c.muted }]} numberOfLines={2}>{b.description}</Text>
                 )}
-                {!!b.hours && (
-                  <Text style={[styles.calloutHours, { color: c.muted }]}>{b.hours}</Text>
-                )}
-                {!!formatDistance(b.lat, b.lng) && (
-                  <Text style={[styles.calloutDistance, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
-                )}
-                <CalloutSubview onPress={() => handleDirections(b)}>
-                  <Text style={[styles.calloutDirections, { color: c.accent ?? '#c94f6d' }]}>get directions →</Text>
-                </CalloutSubview>
+                <View style={styles.calloutMeta}>
+                  {!!b.neighbourhood && (
+                    <Text style={[styles.calloutMetaText, { color: c.muted }]}>{b.neighbourhood}</Text>
+                  )}
+                  {!!formatDistance(b.lat, b.lng) && (
+                    <Text style={[styles.calloutMetaText, { color: c.muted }]}>{formatDistance(b.lat, b.lng)}</Text>
+                  )}
+                </View>
+                <View style={[styles.calloutActions, { borderTopColor: c.border }]}>
+                  <CalloutSubview
+                    onPress={() => handleStickerFromPin(b)}
+                    style={[styles.calloutAction, { borderRightColor: c.border, opacity: (b.contact && b.contact.includes('@') && !b.contact.startsWith('@')) ? 1 : 0.3 }]}
+                  >
+                    <Text style={styles.calloutActionEmoji}>🍓</Text>
+                  </CalloutSubview>
+                  <CalloutSubview
+                    onPress={() => handleSupportFromPin(b)}
+                    style={[styles.calloutAction, { borderRightColor: c.border }]}
+                  >
+                    <Text style={[styles.calloutActionText, { color: c.accent }]}>Support</Text>
+                  </CalloutSubview>
+                  <CalloutSubview
+                    onPress={() => handleDirections(b)}
+                    style={styles.calloutAction}
+                  >
+                    <Text style={[styles.calloutActionText, { color: c.text }]}>Directions</Text>
+                  </CalloutSubview>
+                </View>
               </View>
             </Callout>
           </Marker>
@@ -738,21 +770,31 @@ fabPill: {
   },
   bizErrorText: { fontSize: 13, fontFamily: 'DMSans_400Regular' },
   callout: {
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    minWidth: 140,
-    maxWidth: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+    minWidth: 220,
+    maxWidth: 260,
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
-    gap: 3,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
   },
-  calloutName: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
-  calloutAddress: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
-  calloutHours: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
-  calloutDistance: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
-  calloutDirections: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5, marginTop: 6 },
+  calloutName: { fontSize: 13, fontFamily: fonts.dmMono, letterSpacing: 0.5, paddingHorizontal: 12, paddingTop: 10 },
+  calloutDesc: { fontSize: 11, fontFamily: fonts.dmSans, fontStyle: 'italic', lineHeight: 16, paddingHorizontal: 12, marginTop: 4 },
+  calloutMeta: { flexDirection: 'row', gap: 8, paddingHorizontal: 12, paddingBottom: 10, marginTop: 4 },
+  calloutMetaText: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 0.3 },
+  calloutActions: {
+    flexDirection: 'row',
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  calloutAction: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
+  calloutActionEmoji: { fontSize: 16 },
+  calloutActionText: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.4 },
 });
