@@ -430,7 +430,7 @@ export default function HomePanel() {
                   <View style={[styles.fundFill, { backgroundColor: '#C0392B', width: `${Math.min(100, Math.round((communityFund.balance_cents / communityFund.threshold_cents) * 100))}%` as any }]} />
                 </View>
                 <Text style={[styles.fundCaption, { color: c.muted }]}>
-                  {`CA$${(communityFund.balance_cents / 100).toFixed(0)} of CA$${(communityFund.threshold_cents / 100).toFixed(0)} · next community popup`}
+                  {`CA$${(communityFund.balance_cents / 100).toFixed(0)} of CA$${(communityFund.threshold_cents / 100).toFixed(0)} · next community meal`}
                   {communityFund.popup_count > 0 ? `  ·  ${communityFund.popup_count} done` : ''}
                 </Text>
               </View>

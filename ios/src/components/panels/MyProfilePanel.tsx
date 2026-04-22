@@ -328,7 +328,7 @@ export default function MyProfilePanel() {
             <View style={[styles.section, { borderBottomColor: c.border }]}>
               <Text style={[styles.sectionLabel, { color: c.muted }]}>COMMUNITY FUND</Text>
               <Text style={[styles.balance, { color: c.text }]}>CA${(fundTotalCents / 100).toFixed(2)}</Text>
-              <Text style={[styles.subLine, { color: c.muted }]}>contributed toward free popups for the homeless</Text>
+              <Text style={[styles.subLine, { color: c.muted }]}>contributed to feeding people in the community</Text>
             </View>
           )}
 
