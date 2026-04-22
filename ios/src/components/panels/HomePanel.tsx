@@ -431,7 +431,9 @@ export default function HomePanel() {
                     >
                       <View style={styles.locCardBody}>
                         <Text style={[styles.locCardName, { color: c.text }]}>{u.display_name}</Text>
-                        {u.verified && <Text style={[styles.locCardMeta, { color: c.muted }]}>verified</Text>}
+                        <Text style={[styles.locCardMeta, { color: c.muted }]}>
+                          {[u.verified ? 'verified' : null, (u as any).save_count > 0 ? `${(u as any).save_count} saves` : null].filter(Boolean).join('  ·  ')}
+                        </Text>
                       </View>
                       <Text style={[styles.locCardArrow, { color: c.muted }]}>→</Text>
                     </TouchableOpacity>

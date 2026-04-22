@@ -23,6 +23,7 @@ export default function UserProfilePanel() {
   const displayName: string = panelData?.displayName ?? 'user';
 
   const [maps, setMaps] = useState<UserMap[]>([]);
+  const [saveCount, setSaveCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [savingInProgress, setSavingInProgress] = useState(false);
@@ -33,8 +34,9 @@ export default function UserProfilePanel() {
     Promise.all([
       fetchUserMaps(userId),
       checkUserSaved(userId),
-    ]).then(([mapsData, saveData]) => {
-      setMaps(mapsData);
+    ]).then(([profileData, saveData]) => {
+      setMaps(profileData.maps ?? profileData);
+      setSaveCount(profileData.save_count ?? 0);
       setSaved(saveData.saved);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [userId]);
@@ -88,7 +90,12 @@ export default function UserProfilePanel() {
       </View>
 
       <View style={styles.identity}>
-        <Text style={[styles.name, { color: c.text }]}>{displayName}</Text>
+        <View>
+          <Text style={[styles.name, { color: c.text }]}>{displayName}</Text>
+          {saveCount > 0 && (
+            <Text style={[styles.saveCount, { color: c.muted }]}>{saveCount} {saveCount === 1 ? 'save' : 'saves'}</Text>
+          )}
+        </View>
         <TouchableOpacity
           style={[styles.saveBtn, { borderColor: saved ? c.accent : c.border }]}
           onPress={handleSaveToggle}
@@ -142,6 +149,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 20 },
   identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: SPACING.md },
   name: { fontSize: 28, fontFamily: fonts.playfair },
+  saveCount: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1, marginTop: 4 },
   saveBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 },
   saveBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1 },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: SPACING.md, marginBottom: SPACING.md },

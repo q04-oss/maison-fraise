@@ -18,19 +18,17 @@ router.get('/', async (req: Request, res: Response) => {
 
   try {
     const [usersResult, popupsResult, varietiesResult] = await Promise.all([
-      // Users by display_name (public search — no email exposure)
-      db
-        .select({
-          id: users.id,
-          display_name: users.display_name,
-          portrait_url: users.portrait_url,
-          verified: users.verified,
-        })
-        .from(users)
-        .where(
-          sql`${users.display_name} ILIKE ${pattern} AND ${users.banned} = false`
-        )
-        .limit(8),
+      // Users by display_name with save count (public search — no email exposure)
+      db.execute(sql`
+        SELECT u.id, u.display_name, u.portrait_url, u.verified,
+               COUNT(s.id)::int AS save_count
+        FROM users u
+        LEFT JOIN user_saves s ON s.saved_user_id = u.id
+        WHERE u.display_name ILIKE ${pattern} AND u.banned = false
+        GROUP BY u.id
+        ORDER BY COUNT(s.id) DESC
+        LIMIT 8
+      `),
 
       // Future popups matching name or neighbourhood
       db
@@ -65,7 +63,7 @@ router.get('/', async (req: Request, res: Response) => {
     ]);
 
     res.json({
-      users: usersResult,
+      users: (usersResult as any).rows ?? usersResult,
       popups: popupsResult,
       varieties: varietiesResult,
     });
