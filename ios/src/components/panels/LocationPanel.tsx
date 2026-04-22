@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'react-native';
 import { usePanel, Variety } from '../../context/PanelContext';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
+import { fetchCommunityFund, CommunityFundState } from '../../lib/api';
 
 export default function LocationPanel() {
   const { goBack, showPanel, setOrder, setActiveLocation, activeLocation, varieties, businesses, order } = usePanel();
   const c = useColors();
+  const [communityFund, setCommunityFund] = useState<CommunityFundState | null>(null);
+
+  useEffect(() => {
+    fetchCommunityFund().then(f => setCommunityFund(f)).catch(() => {});
+  }, []);
 
   const doLocationSwitch = (biz: any) => {
     setActiveLocation(biz);
@@ -103,6 +109,18 @@ export default function LocationPanel() {
               </>
             )}
 
+            {communityFund && communityFund.threshold_cents > 0 && (
+              <View style={styles.fundBlock}>
+                <View style={[styles.fundTrack, { backgroundColor: c.border }]}>
+                  <View style={[styles.fundFill, { backgroundColor: '#C0392B', width: `${Math.min(100, Math.round((communityFund.balance_cents / communityFund.threshold_cents) * 100))}%` as any }]} />
+                </View>
+                <Text style={[styles.fundCaption, { color: c.muted }]}>
+                  {`CA$${(communityFund.balance_cents / 100).toFixed(0)} of CA$${(communityFund.threshold_cents / 100).toFixed(0)} · next community meal`}
+                  {communityFund.popup_count > 0 ? `  ·  ${communityFund.popup_count} done` : ''}
+                </Text>
+              </View>
+            )}
+
             <TouchableOpacity
               style={[styles.foodMenuBtn, { backgroundColor: '#C0392B' }]}
               onPress={() => showPanel('popup-food', { popupId: activeLocation.id, popupName: activeLocation.name })}
@@ -191,6 +209,10 @@ const styles = StyleSheet.create({
   popupStatusText: { fontSize: 12, fontFamily: fonts.dmMono },
   progressTrack: { height: 3, borderRadius: 2, overflow: 'hidden' },
   progressFill: { height: 3, borderRadius: 2 },
+  fundBlock: { gap: 5 },
+  fundTrack: { height: 2, borderRadius: 1, overflow: 'hidden' },
+  fundFill: { height: 2, borderRadius: 1 },
+  fundCaption: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   foodMenuBtn: {
     flexDirection: 'row',
     alignItems: 'center',

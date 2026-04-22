@@ -1681,6 +1681,20 @@ export const communityFundContributions = pgTable('community_fund_contributions'
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Community events (past meals) ───────────────────────────────────────────
+
+export const communityEvents = pgTable('community_events', {
+  id: serial('id').primaryKey(),
+  event_date: date('event_date').notNull(),
+  operator_names: text('operator_names').notNull(), // e.g. "Fraise Skin · cum.coffee"
+  people_fed: integer('people_fed').notNull().default(0),
+  location: text('location'),
+  description: text('description'),
+  photo_url: text('photo_url'),
+  fund_raised_cents: integer('fund_raised_cents').notNull().default(0),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 // ─── Community popup interest ─────────────────────────────────────────────────
 
 export const communityPopupInterest = pgTable('community_popup_interest', {
