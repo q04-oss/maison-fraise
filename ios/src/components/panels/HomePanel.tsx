@@ -442,7 +442,16 @@ export default function HomePanel() {
                 </>
               )}
               {searchResults.length === 0 && userResults.length === 0 ? (
-                <Text style={[styles.nothingText, { color: c.muted, paddingHorizontal: SPACING.md, paddingTop: SPACING.md }]}>nothing matched — try a neighbourhood or name</Text>
+                <View style={{ paddingHorizontal: SPACING.md, paddingTop: SPACING.md }}>
+                  <Text style={[styles.nothingText, { color: c.muted }]}>nothing matched — try a neighbourhood or name</Text>
+                  <TouchableOpacity
+                    style={[styles.proposeNudge, { borderColor: c.border }]}
+                    onPress={() => showPanel('propose-business')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.proposeNudgeText, { color: c.muted }]}>know a place that belongs here?  →</Text>
+                  </TouchableOpacity>
+                </View>
               ) : searchResults.map(b => {
                 const dist = formatDist(b);
                 const meta = [(b as any).neighbourhood ?? (b as any).city, b.hours].filter(Boolean).join('  ·  ');
@@ -857,4 +866,6 @@ const styles = StyleSheet.create({
   reviewBarBtnText: { fontSize: 20, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 
   nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
+  proposeNudge: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 10, marginTop: SPACING.md, alignSelf: 'flex-start' },
+  proposeNudgeText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 });

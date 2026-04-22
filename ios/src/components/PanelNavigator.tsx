@@ -22,6 +22,7 @@ import GiftPanel from './panels/GiftPanel';
 import DonatePanel from './panels/DonatePanel';
 import SendCreditPanel from './panels/SendCreditPanel';
 import UserProfilePanel from './panels/UserProfilePanel';
+import ProposeBusinessPanel from './panels/ProposeBusinessPanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -44,6 +45,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'donate': DonatePanel,
   'send-credit': SendCreditPanel,
   'user-profile': UserProfilePanel,
+  'propose-business': ProposeBusinessPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([

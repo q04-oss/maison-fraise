@@ -4051,3 +4051,32 @@ export async function setFeedVisibility(visible: boolean) {
   return r.json();
 }
 
+// ─── Business proposals ───────────────────────────────────────────────────────
+
+export interface ProposalPayload {
+  business_name: string;
+  business_address?: string;
+  business_type?: string;
+  business_email?: string;
+  instagram_handle?: string;
+  note?: string;
+}
+
+export async function submitProposal(payload: ProposalPayload): Promise<{ ok: boolean }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/proposals`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function fetchMyBusinessProposals(): Promise<any[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/proposals`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+

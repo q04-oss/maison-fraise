@@ -86,6 +86,7 @@ import notificationsRouter from './routes/notifications';
 import arVideosRouter from './routes/ar-videos';
 import socialRouter from './routes/social';
 import mapsRouter from './routes/maps';
+import proposalsRouter from './routes/proposals';
 import artRouter from './routes/art';
 import artAdminRouter from './routes/art-admin';
 import { logger } from './lib/logger';
@@ -260,6 +261,7 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/ar-videos', arVideosRouter);
 app.use('/api/social', socialRouter);
 app.use('/api/maps', mapsRouter);
+app.use('/api/proposals', proposalsRouter);
 app.use('/api/art', artRouter);
 app.use('/api/art-admin', artAdminRouter);
 app.use('/api/ar-poem', arPoemRouter);
@@ -442,6 +444,12 @@ app.get('/members/:username', async (req, res) => {
       ${pieces.length > 0 ? `<h2>Published pieces</h2><ul>${pieceItems}</ul>` : '<p style="color:#888;font-size:14px">No published pieces yet.</p>'}
     </div></body></html>`);
   } catch (e) { res.status(500).send('<h1>Error</h1>'); }
+});
+
+// Business proposal claim landing page — top-level (not under /api)
+app.get('/proposal/:token', (req, res, next) => {
+  req.url = `/claim/${req.params.token}`;
+  proposalsRouter(req, res, next);
 });
 
 // Sentry error handler — must be after all routes
