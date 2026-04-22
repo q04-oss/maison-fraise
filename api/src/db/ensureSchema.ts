@@ -279,12 +279,12 @@ export async function ensureSchema(): Promise<void> {
     id SERIAL PRIMARY KEY,
     balance_cents INTEGER NOT NULL DEFAULT 0,
     total_raised_cents INTEGER NOT NULL DEFAULT 0,
-    threshold_cents INTEGER NOT NULL DEFAULT 50000,
+    threshold_cents INTEGER NOT NULL DEFAULT 110000,
     popup_count INTEGER NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
   await run('community_fund_seed', sql`INSERT INTO community_fund (id, balance_cents, total_raised_cents, threshold_cents, popup_count)
-    VALUES (1, 0, 0, 50000, 0) ON CONFLICT (id) DO NOTHING`);
+    VALUES (1, 0, 0, 110000, 0) ON CONFLICT (id) DO NOTHING`);
 
   await run('community_fund_contributions', sql`CREATE TABLE IF NOT EXISTS community_fund_contributions (
     id SERIAL PRIMARY KEY,

@@ -1667,7 +1667,7 @@ export const communityFund = pgTable('community_fund', {
   id: serial('id').primaryKey(),
   balance_cents: integer('balance_cents').notNull().default(0),
   total_raised_cents: integer('total_raised_cents').notNull().default(0),
-  threshold_cents: integer('threshold_cents').notNull().default(50000),
+  threshold_cents: integer('threshold_cents').notNull().default(110000),
   popup_count: integer('popup_count').notNull().default(0),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
 });
