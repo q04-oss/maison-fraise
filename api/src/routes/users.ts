@@ -571,6 +571,8 @@ router.get('/me/orders', requireUser, async (req: Request, res: Response) => {
         quantity: orders.quantity,
         total_cents: orders.total_cents,
         status: orders.status,
+        nfc_token: orders.nfc_token,
+        rating: orders.rating,
         slot_date: timeSlots.date,
         slot_time: timeSlots.time,
         created_at: orders.created_at,

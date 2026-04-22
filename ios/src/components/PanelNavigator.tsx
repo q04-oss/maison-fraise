@@ -23,6 +23,9 @@ import DonatePanel from './panels/DonatePanel';
 import SendCreditPanel from './panels/SendCreditPanel';
 import UserProfilePanel from './panels/UserProfilePanel';
 import ProposeBusinessPanel from './panels/ProposeBusinessPanel';
+import MemoryPromptPanel from './panels/MemoryPromptPanel';
+import ConversationsPanel from './panels/ConversationsPanel';
+import ChatThreadPanel from './panels/ChatThreadPanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -46,6 +49,9 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'send-credit': SendCreditPanel,
   'user-profile': UserProfilePanel,
   'propose-business': ProposeBusinessPanel,
+  'memory-prompt': MemoryPromptPanel,
+  'conversations': ConversationsPanel,
+  'chat-thread': ChatThreadPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([

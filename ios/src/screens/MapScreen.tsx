@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions, LayoutChangeEvent, Alert, ActivityIndicator, Animated, AppState, Linking } from 'react-native';
-import MapView, { Marker, UserLocationChangeEvent } from 'react-native-maps';
+import MapView, { Marker, Callout, UserLocationChangeEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +11,7 @@ import PanelNavigator, { detentIndexForPanel } from '../components/PanelNavigato
 import OfflineBanner from '../components/OfflineBanner';
 import PanelErrorBoundary from '../components/PanelErrorBoundary';
 import BeaconNudge from '../components/BeaconNudge';
+import MessageBanner from '../components/MessageBanner';
 import { loadAndMonitorBeacons } from '../lib/beaconService';
 import { initBeaconRecommendations } from '../lib/BeaconRecommendationService';
 import { fetchBusinesses, fetchVarieties, updatePushToken, deleteAuthToken } from '../lib/api';
@@ -18,11 +19,70 @@ import { STRAWBERRIES } from '../data/seed';
 import { useColors, fonts, SPACING } from '../theme';
 import { useApp } from '../../App';
 import ARBoxModule from '../lib/NativeARBoxModule';
-import { haversineKm, formatDistanceKm } from '../lib/geo';
+import { haversineKm, formatDistanceKm, getOpenStatus, formatHours24 } from '../lib/geo';
 
 const SHEET_NAME = 'main-sheet';
 
 const AUDITION_COLOR = '#B8860B';
+
+// ─── Pin callout ──────────────────────────────────────────────────────────────
+
+interface PinCalloutProps {
+  name: string;
+  hours?: string | null;
+  hoursLabel?: string | null;
+  hoursOpen?: boolean | null;
+  subtitle?: string | null;
+  onPress: () => void;
+}
+
+function PinCallout({ name, hoursLabel, hoursOpen, hours, subtitle, onPress }: PinCalloutProps) {
+  const hours24 = hours ? formatHours24(hours) : null;
+  return (
+    <Callout onPress={onPress} tooltip>
+      <View style={calloutStyles.container}>
+        <Text style={calloutStyles.name} numberOfLines={1} ellipsizeMode="tail">{name}</Text>
+        {hoursLabel ? (
+          <View style={calloutStyles.row}>
+            <View style={[calloutStyles.dot, { backgroundColor: hoursOpen ? '#4CAF50' : '#9E9E9E' }]} />
+            <Text style={[calloutStyles.status, { color: hoursOpen ? '#4CAF50' : '#9E9E9E' }]} numberOfLines={1}>
+              {hoursLabel}
+            </Text>
+          </View>
+        ) : null}
+        {hours24 ? (
+          <Text style={calloutStyles.hoursStr} numberOfLines={1} ellipsizeMode="tail">{hours24}</Text>
+        ) : null}
+        {subtitle ? <Text style={calloutStyles.subtitle} numberOfLines={1} ellipsizeMode="tail">{subtitle}</Text> : null}
+        <Text style={calloutStyles.cta}>tap to open  →</Text>
+      </View>
+    </Callout>
+  );
+}
+
+const calloutStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#FDFCFA',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 160,
+    maxWidth: 220,
+    gap: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.14,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 6,
+  },
+  name: { fontSize: 14, fontWeight: '600', color: '#1A1A1A', letterSpacing: 0.1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  status: { fontSize: 11, fontWeight: '500' },
+  hoursStr: { fontSize: 10, color: '#9E9E9E', marginLeft: 4 },
+  subtitle: { fontSize: 10, color: '#9E9E9E', letterSpacing: 0.3 },
+  cta: { fontSize: 9, color: '#C9973A', marginTop: 2, letterSpacing: 0.5 },
+});
 
 function AuditionPopupPin({ live }: { live: boolean }) {
   const anim0 = useRef(new Animated.Value(0)).current;
@@ -123,7 +183,7 @@ export default function MapScreen() {
     [DETENTS, SCREEN_HEIGHT],
   );
   const { setBusinesses, setActiveLocation, activeLocation, setOrder, order, businesses, jumpToPanel, goHome, goBack, showPanel, sheetHeight, setSheetHeight, setPanelData, setVarieties, varieties, setUserCoords, highlightedBizId, setHighlightedBizId, currentPanel, suppressCollapseBack, activeRootTab, curatedMap, setCuratedMap } = usePanel();
-  const { pendingScreen, pendingData, clearPendingScreen, pushToken } = useApp();
+  const { pendingScreen, pendingData, clearPendingScreen, pushToken, incomingBanner, clearIncomingBanner } = useApp();
   const c = useColors();
   const [contentHeight, setContentHeight] = useState(SCREEN_HEIGHT * 0.55);
   const [bizError, setBizError] = useState(false);
@@ -181,6 +241,12 @@ export default function MapScreen() {
       clearPendingScreen();
       showPanel('verifyNFC');
       setTimeout(() => TrueSheet.resize(SHEET_NAME, detentIndexForPanel('verifyNFC')), 350);
+    }
+    if (pendingScreen === 'messages') {
+      clearPendingScreen();
+      const userId = pendingData?.user_id;
+      showPanel('conversations', userId ? { user_id: userId } : undefined);
+      setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
     }
   }, [pendingScreen, businesses]);
 
@@ -384,32 +450,6 @@ export default function MapScreen() {
     return formatDistanceKm(haversineKm(userLocation.latitude, userLocation.longitude, lat, lng));
   };
 
-  const getOpenStatus = (hours: string | null | undefined): { label: string; open: boolean } | null => {
-    if (!hours) return null;
-    // Expects e.g. "Mon–Fri 8am–6pm" or "8am–6pm" or "8:00–18:00"
-    const now = new Date();
-    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
-    const today = dayNames[now.getDay()];
-    const lc = hours.toLowerCase();
-    // If hours string mentions days and today isn't included, closed
-    const hasDays = /mon|tue|wed|thu|fri|sat|sun/.test(lc);
-    if (hasDays && !lc.includes(today)) return { label: 'closed today', open: false };
-    // Extract time range like 8am–6pm or 8:00–18:00
-    const timeMatch = lc.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*[–\-to]+\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
-    if (!timeMatch) return null;
-    const toMin = (h: string, m: string, meridiem: string) => {
-      let hour = parseInt(h);
-      if (meridiem === 'pm' && hour !== 12) hour += 12;
-      if (meridiem === 'am' && hour === 12) hour = 0;
-      return hour * 60 + (parseInt(m) || 0);
-    };
-    const openMin = toMin(timeMatch[1], timeMatch[2], timeMatch[3]);
-    const closeMin = toMin(timeMatch[4], timeMatch[5], timeMatch[6] || (openMin > toMin(timeMatch[4], timeMatch[5], 'am') ? 'pm' : 'am'));
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    const open = nowMin >= openMin && nowMin < closeMin;
-    return { label: open ? 'open now' : 'closed', open };
-  };
-
   const locateBtnBottom = insets.bottom + TAB_BAR_HEIGHT + 12;
   const locateBtnVisible = sheetHeight < SCREEN_HEIGHT - insets.top - 40;
 
@@ -431,6 +471,18 @@ export default function MapScreen() {
     <View style={styles.container}>
       <OfflineBanner />
       <BeaconNudge />
+      {incomingBanner && (
+        <MessageBanner
+          senderName={incomingBanner.senderName}
+          body={incomingBanner.body}
+          onTap={() => {
+            clearIncomingBanner();
+            showPanel('conversations', { user_id: incomingBanner.userId });
+            setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
+          }}
+          onDismiss={clearIncomingBanner}
+        />
+      )}
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
@@ -468,15 +520,26 @@ export default function MapScreen() {
           }
         }}
       >
-        {collectionPoints.map(b => (
-          <Marker
-            key={`col-${b.id}`}
-            coordinate={{ latitude: b.lat, longitude: b.lng }}
-            onPress={() => handleMarkerPress(b)}
-          >
-            <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]} />
-          </Marker>
-        ))}
+        {collectionPoints.map(b => {
+          const status = getOpenStatus((b as any).hours);
+          const dist = formatDistance(b.lat, b.lng);
+          return (
+            <Marker
+              key={`col-${b.id}`}
+              coordinate={{ latitude: b.lat, longitude: b.lng }}
+            >
+              <View style={[styles.pinCollection, { backgroundColor: c.markerBg }]} />
+              <PinCallout
+                name={b.name}
+                hours={(b as any).hours}
+                hoursLabel={status?.label ?? null}
+                hoursOpen={status?.open ?? null}
+                subtitle={dist ?? ((b as any).neighbourhood ?? (b as any).address ?? null)}
+                onPress={() => handleMarkerPress(b)}
+              />
+            </Marker>
+          );
+        })}
 
         {popups.map(b => {
           const live = isLive(b);
@@ -510,23 +573,33 @@ export default function MapScreen() {
 
         {partners.map(b => {
           const isHighlighted = highlightedBizId === b.id;
+          const status = getOpenStatus((b as any).hours);
+          const dist = formatDistance(b.lat, b.lng);
           return (
-          <Marker
-            key={`biz-${b.id}`}
-            coordinate={{ latitude: b.lat, longitude: b.lng }}
-            tracksViewChanges={isHighlighted}
-            onPress={() => {
-              setHighlightedBizId(b.id);
-              showPanel('partner-detail', { partnerBusiness: b });
-              TrueSheet.resize(SHEET_NAME, 1);
-            }}
-          >
-            <View style={[
-              styles.pinPartner,
-              { borderColor: c.markerBg },
-              isHighlighted && { backgroundColor: c.markerBg, width: 14, height: 14, borderRadius: 7 },
-            ]} />
-          </Marker>
+            <Marker
+              key={`biz-${b.id}`}
+              coordinate={{ latitude: b.lat, longitude: b.lng }}
+              tracksViewChanges={isHighlighted}
+              onPress={() => setHighlightedBizId(b.id)}
+            >
+              <View style={[
+                styles.pinPartner,
+                { borderColor: c.markerBg },
+                isHighlighted && { backgroundColor: c.markerBg, width: 14, height: 14, borderRadius: 7 },
+              ]} />
+              <PinCallout
+                name={b.name}
+                hours={(b as any).hours}
+                hoursLabel={status?.label ?? null}
+                hoursOpen={status?.open ?? null}
+                subtitle={dist ?? ((b as any).neighbourhood ?? (b as any).address ?? null)}
+                onPress={() => {
+                  setHighlightedBizId(b.id);
+                  showPanel('partner-detail', { partnerBusiness: b });
+                  TrueSheet.resize(SHEET_NAME, 1);
+                }}
+              />
+            </Marker>
           );
         })}
 

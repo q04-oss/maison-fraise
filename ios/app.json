@@ -35,7 +35,7 @@
         "NSUserNotificationUsageDescription": "We'll notify you when your order is ready for collection.",
         "NSLocationWhenInUseUsageDescription": "We use your location to show collection points near you.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you when you're near a collection point so you can tap your box.",
-        "NFCReaderUsageDescription": "Used to verify your identity at collection points.",
+        "NFCReaderUsageDescription": "Used to scan your box at pickup.",
         "NSBluetoothAlwaysUsageDescription": "Used to detect nearby Box Fraise collection points and notify you of available strawberries.",
         "NSBluetoothPeripheralUsageDescription": "Used to detect nearby Box Fraise collection points.",
         "NSLocationAlwaysUsageDescription": "We use your location in the background to detect nearby collection points via Bluetooth.",
@@ -69,7 +69,7 @@
       [
         "react-native-nfc-manager",
         {
-          "nfcPermission": "Used to verify your identity at collection points.",
+          "nfcPermission": "Used to scan your box at pickup.",
           "includeNdefEntitlement": false
         }
       ],

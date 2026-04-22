@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { eq, or, and, sql } from 'drizzle-orm';
+import { eq, or, and, sql, lt } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
 import { messages, users, nfcConnections, orders, varieties, timeSlots, eveningTokens, reservationOffers, reservationBookings, businesses } from '../db/schema';
@@ -9,8 +9,20 @@ import { stripe } from '../lib/stripe';
 
 const router = Router();
 
+// Boot migration: conversation archive table
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS conversation_archives (
+    id serial PRIMARY KEY,
+    user_id int NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    other_user_id int NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    archived_at timestamptz NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, other_user_id)
+  )
+`).catch(() => {});
+
 // Verify messaging permission:
 // - Shop accounts can always be messaged (no NFC connection required)
+// - Minted dinner date pairs can always message each other
 // - Peer-to-peer requires verified status + NFC connection
 async function canMessage(userA: number, userB: number): Promise<boolean> {
   const [sender, recipient] = await Promise.all([
@@ -21,6 +33,22 @@ async function canMessage(userA: number, userB: number): Promise<boolean> {
 
   // Either party is a shop account — always allowed
   if (sender.is_shop || recipient.is_shop) return true;
+
+  // Minted dinner date memory — always allowed
+  const [dinnerPair] = await db
+    .select({ id: eveningTokens.id })
+    .from(eveningTokens)
+    .where(
+      and(
+        sql`${eveningTokens.minted_at} IS NOT NULL`,
+        or(
+          and(eq(eveningTokens.user_a_id, userA), eq(eveningTokens.user_b_id, userB)),
+          and(eq(eveningTokens.user_a_id, userB), eq(eveningTokens.user_b_id, userA)),
+        ),
+      )
+    )
+    .limit(1);
+  if (dinnerPair) return true;
 
   // Peer-to-peer: both must be verified with an NFC connection
   if (!sender.verified || !recipient.verified) return false;
@@ -72,12 +100,33 @@ router.get('/conversations', requireUser, async (req: Request, res: Response) =>
         GROUP BY other_user_id
       ) t
       JOIN users u ON u.id = t.other_user_id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM conversation_archives ca
+        WHERE ca.user_id = ${userId} AND ca.other_user_id = t.other_user_id
+      )
       ORDER BY last_at DESC
     `);
     const result = (rows as any).rows ?? rows;
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/messages/conversations/:userId/archive — hide a conversation from inbox
+router.post('/conversations/:userId/archive', requireUser, async (req: Request, res: Response) => {
+  const myId = (req as any).userId as number;
+  const otherId = parseInt(req.params.userId, 10);
+  if (isNaN(otherId)) { res.status(400).json({ error: 'invalid id' }); return; }
+  try {
+    await db.execute(sql`
+      INSERT INTO conversation_archives (user_id, other_user_id)
+      VALUES (${myId}, ${otherId})
+      ON CONFLICT (user_id, other_user_id) DO NOTHING
+    `);
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal' });
   }
 });
 
@@ -413,23 +462,30 @@ router.post('/gift/:messageId/confirm', requireUser, async (req: Request, res: R
   }
 });
 
-// GET /api/messages/:userId — thread with a specific user
+// GET /api/messages/:userId — thread with a specific user; supports ?before=:id&limit=50 for pagination
 router.get('/:userId', requireUser, async (req: Request, res: Response) => {
   const currentUserId = (req as any).userId as number;
   const otherId = parseInt(req.params.userId);
   if (isNaN(otherId)) { res.status(400).json({ error: 'Invalid user id' }); return; }
 
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+  const beforeId = req.query.before ? parseInt(req.query.before as string) : null;
+
   try {
+    const baseWhere = or(
+      and(eq(messages.sender_id, currentUserId), eq(messages.recipient_id, otherId)),
+      and(eq(messages.sender_id, otherId), eq(messages.recipient_id, currentUserId)),
+    );
+    const whereClause = beforeId
+      ? and(baseWhere, lt(messages.id, beforeId))
+      : baseWhere;
+
     const thread = await db
       .select()
       .from(messages)
-      .where(
-        or(
-          and(eq(messages.sender_id, currentUserId), eq(messages.recipient_id, otherId)),
-          and(eq(messages.sender_id, otherId), eq(messages.recipient_id, currentUserId)),
-        )
-      )
-      .orderBy(messages.created_at);
+      .where(whereClause)
+      .orderBy(messages.created_at)
+      .limit(limit);
 
     // Mark received messages as read
     await db
@@ -460,6 +516,7 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
       return;
     }
 
+    const { nonce } = req.body;
     const [message] = await db
       .insert(messages)
       .values({
@@ -470,6 +527,7 @@ router.post('/', requireUser, async (req: Request, res: Response) => {
         ephemeral_key: ephemeral_key ?? null,
         sender_identity_key: sender_identity_key ?? null,
         one_time_pre_key_id: one_time_pre_key_id ?? null,
+        metadata: (encrypted && nonce) ? { nonce } : null,
       })
       .returning();
 

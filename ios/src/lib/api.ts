@@ -558,6 +558,8 @@ export async function fetchOrderHistory(userId: number, offset = 0, limit = 20) 
     quantity: number;
     total_cents: number;
     status: string;
+    nfc_token: string | null;
+    rating: number | null;
     slot_date: string;
     slot_time: string;
     created_at: string;
@@ -1284,19 +1286,67 @@ export async function fetchConversations(): Promise<any[]> {
   return r.json();
 }
 
-export async function fetchThread(userId: number): Promise<any[]> {
+export async function fetchThread(userId: number, before?: number): Promise<any[]> {
   const auth = await authHeader();
-  const r = await fetch(`${BASE_URL}/api/messages/${userId}`, { headers: auth });
+  const params = new URLSearchParams({ limit: '50' });
+  if (before) params.set('before', String(before));
+  const r = await fetch(`${BASE_URL}/api/messages/${userId}?${params}`, { headers: auth });
   if (!r.ok) return [];
   return r.json();
 }
 
-export async function sendMessage(recipientId: number, body: string): Promise<any> {
+export async function archiveConversation(userId: number): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/messages/conversations/${userId}/archive`, {
+    method: 'POST',
+    headers: auth,
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'archive_failed'); }
+}
+
+// ─── E2E keys ─────────────────────────────────────────────────────────────────
+
+export async function registerKeys(payload: {
+  identityKey: string;
+  signedPreKey: string;
+  signedPreKeySig: string;
+  oneTimePreKeys: { keyId: string; publicKey: string }[];
+}): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/keys/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'register_keys_failed'); }
+}
+
+export async function fetchKeyBundle(userId: number): Promise<{
+  identityKey: string;
+  signedPreKey: string;
+  signedPreKeySig: string;
+  oneTimePreKey?: { keyId: number; publicKey: string };
+} | null> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/keys/bundle/${userId}`, { headers: auth });
+  if (!r.ok) return null;
+  return r.json();
+}
+
+export async function sendMessage(
+  recipientId: number,
+  body: string,
+  e2e?: { encrypted: boolean; ephemeral_key: string; nonce: string },
+): Promise<any> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...auth },
-    body: JSON.stringify({ recipient_id: recipientId, body }),
+    body: JSON.stringify({
+      recipient_id: recipientId,
+      body,
+      ...(e2e ?? {}),
+    }),
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'send_failed'); }
   return r.json();
@@ -2927,6 +2977,27 @@ export async function staffFlagOrder(pin: string, id: number, note: string): Pro
   });
 }
 
+export async function selfCollectOrder(nfcToken: string): Promise<{ ok: boolean; order_id: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/orders/scan-collect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ nfc_token: nfcToken }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'collect_failed'); }
+  return r.json();
+}
+
+export async function staffMarkCollected(pin: string, id: number, nfcToken?: string): Promise<void> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/staff/orders/${id}/collect`, {
+    method: 'POST',
+    headers: { 'x-staff-pin': pin, 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(nfcToken ? { nfc_token: nfcToken } : {}),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'collect_failed'); }
+}
+
 // ─── Vendor onboarding API ────────────────────────────────────────────────────
 
 export async function fetchMyVendorProfile(): Promise<any | null> {
@@ -4160,6 +4231,38 @@ export async function fetchMyBusinessProposals(): Promise<any[]> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/proposals`, { headers: auth });
   if (!r.ok) return [];
+  return r.json();
+}
+
+
+// ─── Memory confirmation ──────────────────────────────────────────────────────
+
+export interface MemoryPrompt {
+  token_id: number;
+  booking_id: number;
+  offer_title: string;
+  reservation_date: string | null;
+  business_name: string;
+  partner_name: string;
+  user_a_id: number;
+  user_b_id: number;
+}
+
+export async function fetchMemoryPrompts(): Promise<MemoryPrompt[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/memory-prompts`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function confirmMemory(bookingId: number, confirmed: boolean): Promise<{ confirmed: boolean; minted: boolean; partner_id?: number }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/reservation-offers/evening-tokens/${bookingId}/confirm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ confirmed }),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
   return r.json();
 }
 

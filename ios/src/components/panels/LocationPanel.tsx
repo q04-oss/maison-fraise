@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'rea
 import { usePanel, Variety } from '../../context/PanelContext';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
+import { formatHours24 } from '../../lib/geo';
 
 export default function LocationPanel() {
   const { goBack, showPanel, setOrder, setActiveLocation, activeLocation, varieties, businesses, order } = usePanel();
@@ -34,7 +35,7 @@ export default function LocationPanel() {
 
   const isPopup = activeLocation?.type === 'popup';
   const popupDate = isPopup && activeLocation?.launched_at
-    ? (activeLocation.hours ?? new Date(activeLocation.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
+    ? (activeLocation.hours ? formatHours24(activeLocation.hours) : new Date(activeLocation.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
     : null;
 
   return (

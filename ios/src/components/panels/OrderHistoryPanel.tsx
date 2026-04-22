@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
-import { fetchOrderHistory, rateOrder } from '../../lib/api';
+import { fetchOrderHistory, rateOrder, selfCollectOrder } from '../../lib/api';
+import { readNfcToken, cancelNfc } from '../../lib/nfc';
 import { useColors, fonts, SPACING } from '../../theme';
 
 const CHOC: Record<string, string> = {
@@ -17,12 +18,26 @@ const FIN: Record<string, string> = {
   or_fin: 'or fin',
 };
 
+function parseHour24(t: string): string {
+  if (!t) return '';
+  const colon = t.match(/^(\d{1,2}):\d{2}/);
+  if (colon) return String(parseInt(colon[1]));
+  const mer = t.match(/^(\d{1,2})(?::\d{2})?\s*(am|pm)$/i);
+  if (mer) {
+    let h = parseInt(mer[1]);
+    if (mer[2].toLowerCase() === 'pm' && h !== 12) h += 12;
+    if (mer[2].toLowerCase() === 'am' && h === 12) h = 0;
+    return String(h);
+  }
+  return t;
+}
+
 function formatSlot(date: string, time: string): string {
-  if (!date) return time ?? '';
+  if (!date) return parseHour24(time ?? '');
   const d = new Date(date);
   const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
   const label = `${d.getDate()} ${months[d.getMonth()]}`;
-  return time ? `${label}  ·  ${time}` : label;
+  return time ? `${label}  ·  ${parseHour24(time)}` : label;
 }
 
 export default function OrderHistoryPanel() {
@@ -34,6 +49,7 @@ export default function OrderHistoryPanel() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [pendingRating, setPendingRating] = useState<Record<number, number>>({});
+  const [collectingId, setCollectingId] = useState<number | null>(null);
   const userDbIdRef = useRef<number | null>(null);
 
   const loadPage = (userId: number, pageOffset: number, append: boolean) => {
@@ -70,6 +86,27 @@ export default function OrderHistoryPanel() {
       await rateOrder(orderId, stars);
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, rating: stars } : o));
     } catch {}
+  };
+
+  const handleCollect = async (orderId: number) => {
+    setCollectingId(orderId);
+    try {
+      const scanned = await readNfcToken();
+      await selfCollectOrder(scanned);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'collected' } : o));
+    } catch (err: any) {
+      const msg = err?.message;
+      if (msg === 'already_claimed') {
+        Alert.alert('Already collected', 'This order has already been picked up.');
+      } else if (msg === 'forbidden') {
+        Alert.alert('Wrong order', 'This tag does not belong to your order.');
+      } else if (msg !== 'cancelled') {
+        Alert.alert('Could not collect', 'Make sure you are tapping the sticker on your bag.');
+      }
+    } finally {
+      cancelNfc().catch(() => {});
+      setCollectingId(null);
+    }
   };
 
   const sorted = [...orders].sort((a, b) => {
@@ -112,6 +149,27 @@ export default function OrderHistoryPanel() {
               {o.queued_boxes} of {o.min_quantity} boxes{o.queued_boxes < o.min_quantity ? ` · ${o.min_quantity - o.queued_boxes} more to fill` : ' · filling now'}
             </Text>
           </View>
+        )}
+
+        {isReady && o.nfc_token && (
+          collectingId === o.id ? (
+            <View style={[styles.collectCard, { backgroundColor: c.card, borderColor: c.accent }]}>
+              <ActivityIndicator color={c.accent} size="small" />
+              <Text style={[styles.collectScan, { color: c.muted }]}>hold phone to bag sticker…</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.collectCard, { backgroundColor: c.card, borderColor: c.accent }]}
+              onPress={() => handleCollect(o.id)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.collectIcon, { color: c.accent }]}>⬡</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.collectTitle, { color: c.text }]}>tap bag to collect</Text>
+                <Text style={[styles.collectSub, { color: c.muted }]}>hold your phone to the sticker on your box</Text>
+              </View>
+            </TouchableOpacity>
+          )
         )}
 
         {isCollected && (
@@ -204,4 +262,9 @@ const styles = StyleSheet.create({
   batchTrack: { height: 2, borderRadius: 1, overflow: 'hidden' },
   batchFill: { height: 2, borderRadius: 1 },
   batchLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  collectCard: { marginTop: 10, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  collectIcon: { fontSize: 22 },
+  collectTitle: { fontSize: 13, fontFamily: fonts.dmSans, fontWeight: '500' },
+  collectSub: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.3, marginTop: 2 },
+  collectScan: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 });

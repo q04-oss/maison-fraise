@@ -528,6 +528,70 @@ router.get('/:id/receipt', requireUser, async (req: Request, res: Response) => {
   }
 });
 
+// ── Customer self-collect via NFC scan ────────────────────────────────────────
+
+// POST /api/orders/scan-collect
+// Called by the customer's own phone after they tap the NFC sticker on their bag.
+// Auth: requireUser — verifies the order belongs to this user before marking collected.
+router.post('/scan-collect', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const { nfc_token } = req.body;
+
+  if (!nfc_token || typeof nfc_token !== 'string' || !/^[0-9a-fA-F-]{32,}$/.test(nfc_token)) {
+    res.status(400).json({ ok: false, error: 'invalid_token' });
+    return;
+  }
+
+  try {
+    const [currentUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!currentUser) { res.status(401).json({ ok: false, error: 'unauthorized' }); return; }
+
+    const [order] = await db
+      .select({ id: orders.id, status: orders.status, nfc_token_used: orders.nfc_token_used, customer_email: orders.customer_email, push_token: orders.push_token })
+      .from(orders)
+      .where(eq(orders.nfc_token, nfc_token))
+      .limit(1);
+
+    if (!order) {
+      res.status(404).json({ ok: false, error: 'not_found' });
+      return;
+    }
+
+    if (order.customer_email !== currentUser.email) {
+      res.status(403).json({ ok: false, error: 'forbidden' });
+      return;
+    }
+
+    if (order.nfc_token_used) {
+      res.status(409).json({ ok: false, error: 'already_claimed' });
+      return;
+    }
+
+    if (order.status !== 'paid' && order.status !== 'ready') {
+      res.status(409).json({ ok: false, error: 'not_collectable' });
+      return;
+    }
+
+    // Atomic update — guards against race conditions
+    const updated = await db
+      .update(orders)
+      .set({ status: 'collected', nfc_token_used: true, nfc_verified_at: new Date() })
+      .where(and(eq(orders.id, order.id), eq(orders.nfc_token_used, false), sql`${orders.status} IN ('paid', 'ready')`))
+      .returning({ id: orders.id });
+
+    if (updated.length === 0) {
+      res.status(409).json({ ok: false, error: 'already_claimed' });
+      return;
+    }
+
+    logger.info(`order ${order.id} self-collected by user ${userId}`);
+    res.json({ ok: true, order_id: order.id });
+  } catch (err) {
+    logger.error('scan-collect error', err);
+    res.status(500).json({ ok: false, error: 'internal' });
+  }
+});
+
 // ── Device collect endpoint ───────────────────────────────────────────────────
 
 // POST /api/orders/:nfc_token/collect

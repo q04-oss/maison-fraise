@@ -41,6 +41,9 @@ db.execute(sql`
   )
 `).catch(() => {});
 
+// Memory confirmation columns on evening_tokens
+db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS memory_asked_at timestamptz`).catch(() => {});
+
 const COMMISSION_RATE = 0.20;
 
 // ─── Booking routes (registered before /:id to prevent parameter capture) ─────
@@ -442,6 +445,154 @@ router.patch('/:id', requireUser, async (req: Request, res: Response) => {
     if (!updated) { res.status(404).json({ error: 'not found' }); return; }
     res.json(updated);
   } catch { res.status(500).json({ error: 'internal' }); }
+});
+
+// ─── Memory confirmation ──────────────────────────────────────────────────────
+
+// GET /api/reservation-offers/memory-prompts
+// Returns confirmed dinners where window_closes_at has passed and this user hasn't yet
+// confirmed or declined their memory. Marks memory_asked_at on first call so we only
+// send the prompt once per user per booking.
+router.get('/memory-prompts', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        et.id AS token_id,
+        et.booking_id,
+        et.user_a_id,
+        et.user_b_id,
+        et.user_a_confirmed,
+        et.user_b_confirmed,
+        et.minted_at,
+        et.window_closes_at,
+        et.memory_asked_at,
+        ro.title AS offer_title,
+        ro.reservation_date,
+        b.name AS business_name,
+        CASE WHEN et.user_a_id = ${userId} THEN u_b.display_name ELSE u_a.display_name END AS partner_name
+      FROM evening_tokens et
+      JOIN reservation_offers ro ON ro.id = et.offer_id
+      JOIN businesses b ON b.id = et.business_id
+      JOIN users u_a ON u_a.id = et.user_a_id
+      JOIN users u_b ON u_b.id = et.user_b_id
+      WHERE (et.user_a_id = ${userId} OR et.user_b_id = ${userId})
+        AND et.minted_at IS NULL
+        AND et.window_closes_at <= NOW()
+        AND (
+          (et.user_a_id = ${userId} AND et.user_a_confirmed = false)
+          OR
+          (et.user_b_id = ${userId} AND et.user_b_confirmed = false)
+        )
+      ORDER BY et.window_closes_at DESC
+    `);
+    const prompts = (rows as any).rows ?? rows;
+
+    // Mark memory_asked_at for any newly surfaced prompts (fire and forget)
+    for (const p of prompts as any[]) {
+      if (!p.memory_asked_at) {
+        db.execute(sql`
+          UPDATE evening_tokens SET memory_asked_at = NOW() WHERE id = ${p.token_id}
+        `).catch(() => {});
+      }
+    }
+
+    res.json(prompts);
+  } catch (err) {
+    logger.error(`Memory prompts error: ${String(err)}`);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// POST /api/reservation-offers/evening-tokens/:bookingId/confirm
+// User confirms (or declines) their memory of a dinner date.
+// When both users confirm → minted_at is set and a chat thread is opened.
+router.post('/evening-tokens/:bookingId/confirm', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const bookingId = parseInt(req.params.bookingId, 10);
+  if (isNaN(bookingId)) { res.status(400).json({ error: 'invalid id' }); return; }
+  const { confirmed } = req.body;
+  if (typeof confirmed !== 'boolean') { res.status(400).json({ error: 'confirmed (boolean) required' }); return; }
+
+  try {
+    const tokenRows = await db.execute(sql`
+      SELECT et.*, ro.title AS offer_title, b.name AS business_name
+      FROM evening_tokens et
+      JOIN reservation_offers ro ON ro.id = et.offer_id
+      JOIN businesses b ON b.id = et.business_id
+      WHERE et.booking_id = ${bookingId}
+      LIMIT 1
+    `);
+    const token = ((tokenRows as any).rows ?? tokenRows)[0] as any;
+    if (!token) { res.status(404).json({ error: 'not found' }); return; }
+
+    const isUserA = token.user_a_id === userId;
+    const isUserB = token.user_b_id === userId;
+    if (!isUserA && !isUserB) { res.status(403).json({ error: 'not your booking' }); return; }
+
+    const field = isUserA ? 'user_a_confirmed' : 'user_b_confirmed';
+
+    if (!confirmed) {
+      // Decline — just mark their side as declined (we use false = not confirmed, so this is a no-op in terms of minting)
+      res.json({ confirmed: false, minted: false });
+      return;
+    }
+
+    // Set this user's confirmation
+    await db.execute(sql`
+      UPDATE evening_tokens SET ${sql.raw(field)} = true WHERE booking_id = ${bookingId}
+    `);
+
+    // Re-fetch to check if both confirmed
+    const updatedRows = await db.execute(sql`
+      SELECT user_a_confirmed, user_b_confirmed, user_a_id, user_b_id, minted_at
+      FROM evening_tokens WHERE booking_id = ${bookingId}
+    `);
+    const updated = ((updatedRows as any).rows ?? updatedRows)[0] as any;
+
+    if (updated.user_a_confirmed && updated.user_b_confirmed && !updated.minted_at) {
+      // Both confirmed — mint the memory
+      await db.execute(sql`
+        UPDATE evening_tokens SET minted_at = NOW() WHERE booking_id = ${bookingId}
+      `);
+
+      const partnerId = isUserA ? token.user_b_id : token.user_a_id;
+
+      // Open a chat thread: insert a system message between the two users
+      await db.execute(sql`
+        INSERT INTO messages (sender_id, recipient_id, body, type, metadata)
+        VALUES (
+          ${userId}, ${partnerId},
+          ${'You shared a memory.'},
+          'memory_unlock',
+          ${JSON.stringify({ booking_id: bookingId, offer_title: token.offer_title, business_name: token.business_name })}::jsonb
+        )
+      `);
+
+      // Push both users
+      const userRows = await db.execute(sql`
+        SELECT id, push_token, display_name FROM users WHERE id IN (${token.user_a_id}, ${token.user_b_id})
+      `);
+      const userList = (userRows as any).rows ?? userRows;
+      for (const u of userList as any[]) {
+        if (u.push_token) {
+          sendPushNotification(u.push_token, {
+            title: 'A shared memory',
+            body: `You both remembered dinner at ${token.business_name}. A conversation has opened.`,
+            data: { screen: 'messages' },
+          }).catch(() => {});
+        }
+      }
+
+      res.json({ confirmed: true, minted: true, partner_id: partnerId });
+    } else {
+      // Waiting on the other person
+      res.json({ confirmed: true, minted: false });
+    }
+  } catch (err) {
+    logger.error(`Memory confirm error: ${String(err)}`);
+    res.status(500).json({ error: 'internal' });
+  }
 });
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────

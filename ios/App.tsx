@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { View, ActivityIndicator, Platform, StatusBar, AppState, Linking } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
@@ -24,6 +24,12 @@ Notifications.setNotificationHandler({
   }),
 });
 
+interface IncomingBanner {
+  senderName: string;
+  body: string;
+  userId: number;
+}
+
 interface AppContextType {
   pushToken: string | null;
   pendingScreen: string | null;
@@ -31,6 +37,10 @@ interface AppContextType {
   clearPendingScreen: () => void;
   connectReturn: boolean;
   clearConnectReturn: () => void;
+  unreadCount: number;
+  refreshUnreadCount: () => void;
+  incomingBanner: IncomingBanner | null;
+  clearIncomingBanner: () => void;
 }
 
 export const AppContext = createContext<AppContextType>({
@@ -40,6 +50,10 @@ export const AppContext = createContext<AppContextType>({
   clearPendingScreen: () => {},
   connectReturn: false,
   clearConnectReturn: () => {},
+  unreadCount: 0,
+  refreshUnreadCount: () => {},
+  incomingBanner: null,
+  clearIncomingBanner: () => {},
 });
 
 export const useApp = () => useContext(AppContext);
@@ -49,6 +63,8 @@ export default function App() {
   const [pendingScreen, setPendingScreen] = useState<string | null>(null);
   const [pendingData, setPendingData] = useState<Record<string, any> | null>(null);
   const [connectReturn, setConnectReturn] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [incomingBanner, setIncomingBanner] = useState<IncomingBanner | null>(null);
   const [fontsLoaded, fontError] = useFonts({
     PlayfairDisplay_400Regular_Italic,
     PlayfairDisplay_700Bold,
@@ -56,9 +72,45 @@ export default function App() {
     DMMono_400Regular,
   });
 
+  const refreshUnreadCount = useCallback(async () => {
+    const id = await AsyncStorage.getItem('user_db_id').catch(() => null);
+    if (!id) return;
+    try {
+      const { fetchConversations } = await import('./src/lib/api');
+      const convos = await fetchConversations();
+      const total = convos.reduce((n: number, c: any) => n + (c.unread_count ?? 0), 0);
+      setUnreadCount(total);
+    } catch { /* non-fatal */ }
+  }, []);
+
+  // Initialise E2E keys after session is available
+  useEffect(() => {
+    AsyncStorage.getItem('user_db_id').then(id => {
+      if (id) import('./src/lib/crypto').then(({ initKeys }) => initKeys()).catch(() => {});
+    });
+  }, []);
+
   useEffect(() => {
     registerForPushNotifications().then(token => {
       if (token) setPushToken(token);
+    });
+
+    // Poll unread count every 30s
+    refreshUnreadCount();
+    const pollInterval = setInterval(refreshUnreadCount, 30000);
+
+    // Foreground notification: show in-app banner for message pushes
+    const foregroundSub = Notifications.addNotificationReceivedListener(notification => {
+      const screen = notification.request.content.data?.screen;
+      if (screen === 'messages') {
+        const userId = notification.request.content.data?.user_id;
+        const senderName = notification.request.content.title ?? 'New message';
+        const body = notification.request.content.body ?? '';
+        if (userId) {
+          setIncomingBanner({ senderName, body, userId: Number(userId) });
+        }
+        refreshUnreadCount();
+      }
     });
 
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
@@ -89,7 +141,11 @@ export default function App() {
         setPendingData(tournamentId ? { tournament_id: tournamentId } : null);
       }
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      foregroundSub.remove();
+      clearInterval(pollInterval);
+    };
   }, []);
 
   useEffect(() => {
@@ -127,7 +183,7 @@ export default function App() {
   }
 
   return (
-    <AppContext.Provider value={{ pushToken, pendingScreen, pendingData, clearPendingScreen: () => { setPendingScreen(null); setPendingData(null); }, connectReturn, clearConnectReturn: () => setConnectReturn(false) }}>
+    <AppContext.Provider value={{ pushToken, pendingScreen, pendingData, clearPendingScreen: () => { setPendingScreen(null); setPendingData(null); }, connectReturn, clearConnectReturn: () => setConnectReturn(false), unreadCount, refreshUnreadCount, incomingBanner, clearIncomingBanner: () => setIncomingBanner(null) }}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
       <StripeProvider publishableKey={publishableKey} merchantIdentifier="merchant.com.boxfraise.app">
         <SafeAreaProvider>

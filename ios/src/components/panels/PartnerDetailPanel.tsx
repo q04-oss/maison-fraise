@@ -11,7 +11,7 @@ import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { PARTNER_MENUS, CHOCOLATES, FINISHES, PartnerMenu, MenuSection, MenuItem } from '../../data/seed';
 import { createOrder, confirmOrder, payOrderWithBalance, fetchAdBalance, fetchBusinessVisitCount, getOrCreateMyMap, addToMap } from '../../lib/api';
-import { haversineKm } from '../../lib/geo';
+import { haversineKm, formatHours24 } from '../../lib/geo';
 import { useApp } from '../../../App';
 
 const SHEET_NAME = 'main-sheet';
@@ -490,7 +490,7 @@ export default function PartnerDetailPanel() {
           <Text style={styles.metaLine}>
             <Text style={{ color: c.text }}>{biz.name.toLowerCase()}</Text>
             {[openStatus?.label, biz.neighbourhood, biz.hours].filter(Boolean).length > 0 && (
-              <Text style={{ color: c.muted }}>{'  ·  ' + [openStatus?.label, biz.neighbourhood, biz.hours].filter(Boolean).join('  ·  ')}</Text>
+              <Text style={{ color: c.muted }}>{'  ·  ' + [openStatus?.label, biz.neighbourhood, biz.hours ? formatHours24(biz.hours) : null].filter(Boolean).join('  ·  ')}</Text>
             )}
           </Text>
           {!!biz.description && <Text style={[styles.description, { color: c.muted }]}>{biz.description}</Text>}

@@ -10,6 +10,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Haptics from 'expo-haptics';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
+import { useApp } from '../../../App';
 import {
   fetchMyStats, updateDisplayName,
   deleteAuthToken, verifyAppleSignIn, setAuthToken,
@@ -21,17 +22,17 @@ import {
 } from '../../lib/api';
 
 function timeAgo(isoDate: string): string {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  const date = new Date(isoDate);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return String(date.getHours());
+  const days = Math.floor((now.getTime() - date.getTime()) / 86400000);
+  if (days < 7) return ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam'][date.getDay()];
+  return `${days}j`;
 }
 
 export default function MyProfilePanel() {
   const { goBack, showPanel, setOrder, setPanelData } = usePanel();
+  const { unreadCount } = useApp();
   const c = useColors();
 
   const [loggedIn, setLoggedIn] = useState(false);
@@ -520,6 +521,17 @@ export default function MyProfilePanel() {
 
           {/* Nav */}
           <View>
+            <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('conversations')} activeOpacity={0.7}>
+              <View style={styles.navLabelRow}>
+                <Text style={[styles.navLabel, { color: c.text }]}>Strawberry Chat</Text>
+                {unreadCount > 0 && (
+                  <View style={[styles.unreadBadge, { backgroundColor: c.text }]}>
+                    <Text style={[styles.unreadText, { color: c.sheetBg }]}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('send-credit')} activeOpacity={0.7}>
               <Text style={[styles.navLabel, { color: c.text }]}>Send Credit</Text>
               <Text style={[styles.navChevron, { color: c.accent }]}>→</Text>
@@ -595,6 +607,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   navLabel: { fontFamily: fonts.dmSans, fontSize: 15 },
+  navLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  unreadBadge: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  unreadText: { fontSize: 9, fontFamily: fonts.dmMono },
   navChevron: { fontSize: 18 },
 
   // Social / audience

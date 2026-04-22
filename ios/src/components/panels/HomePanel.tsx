@@ -17,7 +17,7 @@ import {
 } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES, CHOCOLATES, FINISHES } from '../../data/seed';
-import { haversineKm, formatDistanceKm } from '../../lib/geo';
+import { haversineKm, formatDistanceKm, getOpenStatus, formatHours24 } from '../../lib/geo';
 
 const SHEET_NAME = 'main-sheet';
 
@@ -192,6 +192,17 @@ export default function HomePanel() {
   useEffect(() => {
     import('../../lib/api').then(({ fetchMyVisitCounts }) => {
       fetchMyVisitCounts().then(counts => setVisitCounts(counts)).catch(() => {});
+    });
+  }, []);
+
+  // Memory prompt check — surfaces pending dinner date memory confirmations
+  useEffect(() => {
+    import('../../lib/api').then(({ fetchMemoryPrompts }) => {
+      fetchMemoryPrompts().then(prompts => {
+        if (prompts.length > 0) {
+          showPanel('memory-prompt', { prompt: prompts[0] });
+        }
+      }).catch(() => {});
     });
   }, []);
 
@@ -377,6 +388,13 @@ export default function HomePanel() {
               returnKeyType="search"
             />
           </View>
+          <TouchableOpacity
+            onPress={() => showPanel('conversations')}
+            activeOpacity={0.7}
+            style={[styles.msgBtn, { backgroundColor: c.cardDark, borderColor: c.border }]}
+          >
+            <Text style={[styles.msgBtnText, { color: c.muted }]}>🍓</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -461,7 +479,10 @@ export default function HomePanel() {
                 </View>
               ) : searchResults.map(b => {
                 const dist = formatDist(b);
-                const meta = [(b as any).neighbourhood ?? (b as any).city, b.hours].filter(Boolean).join('  ·  ');
+                const neighbourhood = (b as any).neighbourhood ?? (b as any).city ?? null;
+                const openStatus = getOpenStatus((b as any).hours);
+                const metaParts = [neighbourhood, (b as any).hours ? formatHours24((b as any).hours) : null].filter(Boolean);
+                const meta = metaParts.join('  ·  ');
                 const visits = visitCounts[b.id] ?? 0;
                 const visitLabel = visits >= 4 ? '✓' : visits > 0 ? `${visits}/4` : null;
                 return (
@@ -472,7 +493,17 @@ export default function HomePanel() {
                     activeOpacity={0.75}
                   >
                     <View style={styles.locCardBody}>
-                      <Text style={[styles.locCardName, { color: c.text }]}>{b.name}</Text>
+                      <View style={styles.locCardNameRow}>
+                        <Text style={[styles.locCardName, { color: c.text }]}>{b.name}</Text>
+                        {openStatus && (
+                          <View style={[styles.openBadge, { backgroundColor: openStatus.open ? '#E8F5E9' : '#F5F5F5' }]}>
+                            <View style={[styles.openDot, { backgroundColor: openStatus.open ? '#4CAF50' : '#9E9E9E' }]} />
+                            <Text style={[styles.openLabel, { color: openStatus.open ? '#388E3C' : '#757575' }]}>
+                              {openStatus.label}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       {!!meta && <Text style={[styles.locCardMeta, { color: c.muted }]}>{meta}</Text>}
                       {!!dist && <Text style={[styles.locCardDist, { color: c.muted }]}>{dist}</Text>}
                     </View>
@@ -519,7 +550,7 @@ export default function HomePanel() {
                   activeLocation!.type === 'popup' ? 'popup' : null,
                   activeLocation!.address ?? (activeLocation as any).neighbourhood ?? null,
                   activeLocation!.type === 'popup' && activeLocation!.launched_at
-                    ? ((activeLocation as any).hours ?? new Date(activeLocation!.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
+                    ? ((activeLocation as any).hours ? formatHours24((activeLocation as any).hours) : new Date(activeLocation!.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
                     : new Date().toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }),
                 ].filter(Boolean).join('  ·  ')}
               </Text>
@@ -815,13 +846,19 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingTop: 18, paddingBottom: SPACING.sm, gap: 10 },
   searchBox: { flex: 1, borderWidth: StyleSheet.hairlineWidth, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10 },
   searchInput: { fontSize: 14, fontFamily: fonts.dmSans },
+  msgBtn: { width: 42, height: 42, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', justifyContent: 'center' },
+  msgBtnText: { fontSize: 17 },
   searchSectionLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 1.5, paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 4 },
   locCard: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.md, paddingVertical: SPACING.md, borderBottomWidth: StyleSheet.hairlineWidth },
   locCardBody: { flex: 1, gap: 3 },
+  locCardNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   locCardName: { fontSize: 16, fontFamily: fonts.playfair },
   locCardMeta: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.4 },
   locCardDist: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.4 },
   locCardArrow: { fontSize: 16, fontFamily: fonts.dmSans, paddingLeft: SPACING.sm },
+  openBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  openDot: { width: 5, height: 5, borderRadius: 3 },
+  openLabel: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 
   // Location view
   locationMeta: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md, paddingBottom: 4, gap: 4 },

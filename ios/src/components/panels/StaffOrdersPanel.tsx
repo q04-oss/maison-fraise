@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { fetchStaffOrders, staffMarkPrepare, staffMarkReady, staffFlagOrder } from '../../lib/api';
+import { fetchStaffOrders, staffMarkPrepare, staffMarkReady, staffFlagOrder, staffMarkCollected } from '../../lib/api';
+import { formatHours24 } from '../../lib/geo';
 
 const STATUS_FILTERS = ['ALL', 'PAID', 'PREPARING', 'READY', 'COLLECTED'] as const;
 
@@ -89,6 +90,29 @@ export default function StaffOrdersPanel() {
       setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prev } : o));
       Alert.alert('Failed to update order');
     }
+  };
+
+  const markCollected = async (id: number, nfcToken?: string) => {
+    Alert.alert(
+      'Mark as collected?',
+      nfcToken ? `Token: ${nfcToken}` : 'No token — confirm pickup manually.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Collect',
+          onPress: async () => {
+            const prev = orders.find(o => o.id === id)?.status;
+            setOrders(prev => prev.map(o => o.id === id ? { ...o, status: 'collected' } : o));
+            try {
+              await staffMarkCollected(pin, id, nfcToken);
+            } catch (e: any) {
+              setOrders(prev => prev.map(o => o.id === id ? { ...o, status: prev } : o));
+              Alert.alert('Failed', e?.message === 'token_mismatch' ? 'Token does not match order.' : 'Could not mark as collected.');
+            }
+          },
+        },
+      ],
+    );
   };
 
   const markReady = async (id: number) => {
@@ -237,7 +261,7 @@ export default function StaffOrdersPanel() {
                 slotKeys.map(slot => (
                   <View key={slot} style={styles.slotGroup}>
                     <Text style={[styles.slotHeader, { color: c.muted, borderBottomColor: c.border, fontFamily: fonts.dmMono }]}>
-                      ── {slot} ──
+                      ── {slot === 'unknown' ? slot : formatHours24(slot)} ──
                     </Text>
                     {grouped[slot].map(order => (
                       <View key={order.id} style={[styles.orderCard, { borderColor: c.border, backgroundColor: c.panelBg }]}>
@@ -260,6 +284,11 @@ export default function StaffOrdersPanel() {
                         {order.is_gift && (
                           <Text style={[styles.giftBadge, { color: c.accent, fontFamily: fonts.dmMono }]}>gift</Text>
                         )}
+                        {order.status === 'ready' && order.nfc_token && (
+                          <Text style={[styles.orderEmail, { color: c.muted, fontFamily: fonts.dmMono, letterSpacing: 1.5, marginTop: 2 }]}>
+                            {order.nfc_token}
+                          </Text>
+                        )}
                         <View style={styles.orderActions}>
                           {order.status === 'paid' && (
                             <TouchableOpacity
@@ -280,7 +309,13 @@ export default function StaffOrdersPanel() {
                             </TouchableOpacity>
                           )}
                           {order.status === 'ready' && (
-                            <Text style={[styles.waitingText, { color: c.muted, fontFamily: fonts.dmMono }]}>waiting for pickup</Text>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, { borderColor: '#10B981' }]}
+                              onPress={() => markCollected(order.id, order.nfc_token)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={[styles.actionBtnText, { color: '#10B981', fontFamily: fonts.dmMono }]}>COLLECT</Text>
+                            </TouchableOpacity>
                           )}
                           {(order.status === 'paid' || order.status === 'preparing') && (
                             <TouchableOpacity

@@ -23,7 +23,10 @@ export type PanelId =
   | 'donate'
   | 'send-credit'
   | 'user-profile'
-  | 'propose-business';
+  | 'propose-business'
+  | 'memory-prompt'
+  | 'conversations'
+  | 'chat-thread';
 
 export interface OrderState {
   variety_id: number | null;

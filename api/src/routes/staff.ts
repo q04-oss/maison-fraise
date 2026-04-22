@@ -212,6 +212,43 @@ router.post('/orders/:id/ready', requireStaff, async (req: Request, res: Respons
   }
 });
 
+// POST /api/staff/orders/:id/collect — mark collected at pickup, optionally verifying nfc_token
+router.post('/orders/:id/collect', requireStaff, async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: 'invalid_id' }); return; }
+  const { nfc_token } = req.body as { nfc_token?: string };
+  try {
+    const whereClause = nfc_token
+      ? and(eq(orders.id, id), eq(orders.nfc_token, nfc_token), sql`${orders.status} IN ('paid', 'ready')`)
+      : and(eq(orders.id, id), sql`${orders.status} IN ('paid', 'ready')`);
+
+    const updated = await db
+      .update(orders)
+      .set({ status: 'collected', nfc_token_used: true, nfc_verified_at: new Date() })
+      .where(whereClause)
+      .returning({ id: orders.id, push_token: orders.push_token });
+
+    const result = (updated as any).rows ?? updated;
+    if (result.length === 0) {
+      res.status(409).json({ error: nfc_token ? 'token_mismatch' : 'not_collectable' });
+      return;
+    }
+
+    const row = result[0];
+    if (row?.push_token) {
+      sendPushNotification(row.push_token, {
+        title: '🍓 Collected',
+        body: 'Your order has been picked up. Enjoy!',
+        data: { screen: 'order-history' },
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 // POST /api/staff/orders/:id/flag — flag an issue
 router.post('/orders/:id/flag', requireStaff, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
