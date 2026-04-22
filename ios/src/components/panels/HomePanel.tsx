@@ -187,6 +187,13 @@ export default function HomePanel() {
   // ── Discover / search ──
   const [searchQuery, setSearchQuery] = useState('');
   const [userResults, setUserResults] = useState<{ id: number; display_name: string; portrait_url: string | null; verified: boolean }[]>([]);
+  const [visitCounts, setVisitCounts] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    import('../../lib/api').then(({ fetchMyVisitCounts }) => {
+      fetchMyVisitCounts().then(counts => setVisitCounts(counts)).catch(() => {});
+    });
+  }, []);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -455,6 +462,8 @@ export default function HomePanel() {
               ) : searchResults.map(b => {
                 const dist = formatDist(b);
                 const meta = [(b as any).neighbourhood ?? (b as any).city, b.hours].filter(Boolean).join('  ·  ');
+                const visits = visitCounts[b.id] ?? 0;
+                const visitLabel = visits >= 4 ? '✓' : visits > 0 ? `${visits}/4` : null;
                 return (
                   <TouchableOpacity
                     key={b.id}
@@ -467,7 +476,11 @@ export default function HomePanel() {
                       {!!meta && <Text style={[styles.locCardMeta, { color: c.muted }]}>{meta}</Text>}
                       {!!dist && <Text style={[styles.locCardDist, { color: c.muted }]}>{dist}</Text>}
                     </View>
-                    <Text style={[styles.locCardArrow, { color: c.muted }]}>→</Text>
+                    {visitLabel ? (
+                      <Text style={[styles.visitBadge, { color: visits >= 4 ? c.accent : c.muted }]}>{visitLabel}</Text>
+                    ) : (
+                      <Text style={[styles.locCardArrow, { color: c.muted }]}>→</Text>
+                    )}
                   </TouchableOpacity>
                 );
               })}
@@ -868,4 +881,5 @@ const styles = StyleSheet.create({
   nothingText: { fontSize: 13, fontFamily: fonts.dmSans, fontStyle: 'italic', paddingVertical: 8 },
   proposeNudge: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingVertical: 10, marginTop: SPACING.md, alignSelf: 'flex-start' },
   proposeNudgeText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
+  visitBadge: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 });

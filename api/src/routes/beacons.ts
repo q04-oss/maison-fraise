@@ -96,6 +96,22 @@ router.get('/visits/:businessId', requireUser, async (req: Request, res: Respons
 
 // ─── Beacon registry ──────────────────────────────────────────────────────────
 
+// GET /api/beacons/mine — operator's own beacons (requires is_shop)
+router.get('/mine', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  try {
+    const [operator] = await db.select({ business_id: users.business_id, is_shop: users.is_shop }).from(users).where(eq(users.id, userId));
+    if (!operator?.is_shop || !operator.business_id) {
+      res.status(403).json({ error: 'not_an_operator' }); return;
+    }
+    const rows = await db
+      .select({ id: beacons.id, uuid: beacons.uuid, major: beacons.major, minor: beacons.minor, name: beacons.name, active: beacons.active })
+      .from(beacons)
+      .where(eq(beacons.business_id, operator.business_id));
+    res.json(rows);
+  } catch { res.status(500).json({ error: 'internal_error' }); }
+});
+
 // GET /api/beacons — public list of active beacon UUIDs with business info
 // App fetches this on launch and caches it for background monitoring
 router.get('/', async (_req: Request, res: Response) => {
@@ -134,23 +150,19 @@ router.get('/shop/:businessId', requireUser, async (req: Request, res: Response)
   }
 });
 
-// POST /api/admin/beacons — register a beacon to a business (operator only)
+// POST /api/beacons/admin — register a beacon to the operator's business
 router.post('/admin', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
-  const { business_id, uuid, major, minor, name } = req.body;
-  if (!business_id || !uuid) {
-    res.status(400).json({ error: 'business_id and uuid required' });
-    return;
-  }
+  const { uuid, major, minor, name } = req.body;
+  if (!uuid) { res.status(400).json({ error: 'uuid required' }); return; }
   try {
     const [operator] = await db.select({ business_id: users.business_id, is_shop: users.is_shop }).from(users).where(eq(users.id, userId));
-    if (!operator?.is_shop || operator.business_id !== business_id) {
-      res.status(403).json({ error: 'Not authorized for this business' });
-      return;
+    if (!operator?.is_shop || !operator.business_id) {
+      res.status(403).json({ error: 'Not authorized' }); return;
     }
     const [beacon] = await db
       .insert(beacons)
-      .values({ business_id, uuid: uuid.toUpperCase(), major: major ?? 1, minor: minor ?? 1, name: name ?? null })
+      .values({ business_id: operator.business_id, uuid: uuid.toUpperCase(), major: major ?? 1, minor: minor ?? 1, name: name ?? null })
       .returning();
     res.json(beacon);
   } catch (err) {

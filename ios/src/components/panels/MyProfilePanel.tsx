@@ -15,6 +15,7 @@ import {
   fetchMyMaps, deleteMap,
   fetchMySaves, fetchMyFollowers, fetchFeedVisibility, setFeedVisibility,
   fetchPresenceFeed, fetchMyBusinessProposals,
+  fetchMyBeacons, registerBeacon, deactivateBeacon,
 } from '../../lib/api';
 
 function timeAgo(isoDate: string): string {
@@ -44,6 +45,13 @@ export default function MyProfilePanel() {
   const [creditBalance, setCreditBalance] = useState(0);
 
   const [maps, setMaps] = useState<{ id: number; name: string; description: string | null; entry_count: number }[]>([]);
+  const [isShop, setIsShop] = useState(false);
+  type BeaconRow = { id: number; uuid: string; major: number; minor: number; name: string | null; active: boolean };
+  const [myBeacons, setMyBeacons] = useState<BeaconRow[]>([]);
+  const [addingBeacon, setAddingBeacon] = useState(false);
+  const [beaconUuid, setBeaconUuid] = useState('');
+  const [beaconName, setBeaconName] = useState('');
+  const [savingBeacon, setSavingBeacon] = useState(false);
 
   type SocialUser = { id: number; display_name: string; portrait_url: string | null; verified: boolean };
   const [followers, setFollowers] = useState<SocialUser[]>([]);
@@ -54,14 +62,16 @@ export default function MyProfilePanel() {
   const [proposals, setProposals] = useState<any[]>([]);
 
   useEffect(() => {
-    AsyncStorage.getItem('user_db_id').then(id => {
-      const isIn = !!id;
+    AsyncStorage.multiGet(['user_db_id', 'is_shop']).then(([idEntry, shopEntry]) => {
+      const isIn = !!idEntry[1];
       setLoggedIn(isIn);
-      if (isIn) loadStats();
+      const shop = shopEntry[1] === 'true';
+      setIsShop(shop);
+      if (isIn) loadStats(shop);
     }).finally(() => setLoading(false));
   }, []);
 
-  const loadStats = () => {
+  const loadStats = (shop = isShop) => {
     setStatsLoading(true);
     fetchMyStats().catch(() => null).then(s => {
       setStats(s);
@@ -74,6 +84,34 @@ export default function MyProfilePanel() {
     fetchFeedVisibility().then(v => setFeedVisibleState(v)).catch(() => {});
     fetchPresenceFeed().then(e => setFeedEntries(e)).catch(() => {});
     fetchMyBusinessProposals().then(p => setProposals(p)).catch(() => {});
+    if (shop) fetchMyBeacons().then(b => setMyBeacons(b)).catch(() => {});
+  };
+
+  const handleAddBeacon = async () => {
+    const uuid = beaconUuid.trim().toUpperCase();
+    if (!uuid) { Alert.alert('UUID required', 'Enter the beacon UUID.'); return; }
+    setSavingBeacon(true);
+    try {
+      const b = await registerBeacon({ uuid, name: beaconName.trim() || undefined });
+      setMyBeacons(prev => [...prev, b]);
+      setBeaconUuid('');
+      setBeaconName('');
+      setAddingBeacon(false);
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not register beacon.');
+    } finally {
+      setSavingBeacon(false);
+    }
+  };
+
+  const handleRemoveBeacon = (id: number) => {
+    Alert.alert('Remove beacon?', 'It will stop detecting visits.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: async () => {
+        await deactivateBeacon(id).catch(() => {});
+        setMyBeacons(prev => prev.filter(b => b.id !== id));
+      }},
+    ]);
   };
 
   const handleFeedToggle = useCallback(async (val: boolean) => {
@@ -125,6 +163,7 @@ export default function MyProfilePanel() {
       await setAuthToken(result.token);
       if (result.display_name) await AsyncStorage.setItem('display_name', result.display_name);
       if (result.verified) await AsyncStorage.setItem('verified', 'true');
+      if (result.is_shop) await AsyncStorage.setItem('is_shop', 'true');
       setLoggedIn(true);
       loadStats();
       setPanelData({ signedIn: true });
@@ -292,6 +331,64 @@ export default function MyProfilePanel() {
               ))
             )}
           </View>
+
+          {/* Beacons — operator only */}
+          {isShop && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <View style={styles.mapsHeader}>
+                <Text style={[styles.sectionLabel, { color: c.muted }]}>BEACONS</Text>
+                <TouchableOpacity onPress={() => setAddingBeacon(v => !v)} activeOpacity={0.7}>
+                  <Text style={[styles.actionBtn, { color: c.accent }]}>{addingBeacon ? 'CANCEL' : '+ ADD'}</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.subLine, { color: c.muted }]}>
+                Customers need 4 beacon detections to add you to their map
+              </Text>
+              {addingBeacon && (
+                <View style={{ marginTop: 12, gap: 8 }}>
+                  <TextInput
+                    style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontSize: 13, fontFamily: fonts.dmMono }]}
+                    value={beaconUuid}
+                    onChangeText={setBeaconUuid}
+                    placeholder="UUID  (e.g. E2C56DB5-DFFB-48D2-B060-D0F5A71096E0)"
+                    placeholderTextColor={c.muted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="next"
+                  />
+                  <View style={styles.editRow}>
+                    <TextInput
+                      style={[styles.nameInput, { flex: 1, color: c.text, borderBottomColor: c.border, fontSize: 14 }]}
+                      value={beaconName}
+                      onChangeText={setBeaconName}
+                      placeholder="Label (optional)"
+                      placeholderTextColor={c.muted}
+                      returnKeyType="done"
+                      onSubmitEditing={handleAddBeacon}
+                    />
+                    <TouchableOpacity onPress={handleAddBeacon} disabled={savingBeacon || !beaconUuid.trim()} activeOpacity={0.7}>
+                      <Text style={[styles.actionBtn, { color: c.accent }]}>{savingBeacon ? '…' : 'SAVE'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+              {myBeacons.length === 0 && !addingBeacon && (
+                <Text style={[styles.subLine, { color: c.muted, marginTop: 4 }]}>no beacons registered</Text>
+              )}
+              {myBeacons.map(b => (
+                <View key={b.id} style={[styles.mapRow, { borderTopColor: c.border }]}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={[styles.subLine, { color: c.text, fontFamily: fonts.dmMono, fontSize: 10, letterSpacing: 0.5 }]}>{b.uuid}</Text>
+                    {b.name && <Text style={[styles.subLine, { color: c.muted }]}>{b.name}</Text>}
+                    {!b.active && <Text style={[styles.subLine, { color: c.muted }]}>inactive</Text>}
+                  </View>
+                  <TouchableOpacity onPress={() => handleRemoveBeacon(b.id)} activeOpacity={0.6}>
+                    <Text style={[styles.actionBtn, { color: c.muted }]}>×</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Audience */}
           {(followers.length > 0 || mySaves.length > 0) && (
