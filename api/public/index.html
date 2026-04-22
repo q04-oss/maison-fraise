@@ -106,11 +106,44 @@
       color: var(--muted);
     }
 
+    .device-wrap {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
     .device-render {
       width: 100%;
       height: auto;
       display: block;
       border-radius: 8px;
+    }
+
+    .device-specs {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .device-caption {
+      font-size: 0.6875rem;
+      font-family: 'Lora', serif;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .device-specs span {
+      font-size: 0.75rem;
+      font-family: 'Lora', serif;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .device-specs span::before {
+      content: '— ';
     }
 
     footer {
@@ -182,7 +215,17 @@
       </div>
 
       <div class="right">
-        <img src="/device.png" alt="box fraise device" class="device-render" />
+        <div class="device-wrap">
+          <img src="/device.png" alt="box fraise device" class="device-render" />
+          <div class="device-specs">
+            <p class="device-caption">Concept render · v1</p>
+            <span>Reflective monochrome display</span>
+            <span>Bluetooth LE</span>
+            <span>Secure enclave</span>
+            <span>In-person issuance</span>
+            <span>First-party apps only</span>
+          </div>
+        </div>
       </div>
     </div>
 
