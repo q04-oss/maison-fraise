@@ -12,7 +12,7 @@ import {
   fetchMyStats, updateDisplayName,
   deleteAuthToken, verifyAppleSignIn, setAuthToken,
   fetchReceivedGifts, fetchCreditBalance,
-  fetchMyMaps, createMap, deleteMap,
+  fetchMyMaps, deleteMap,
   fetchMySaves, fetchMyFollowers, fetchFeedVisibility, setFeedVisibility,
   fetchPresenceFeed, fetchMyBusinessProposals,
 } from '../../lib/api';
@@ -44,9 +44,6 @@ export default function MyProfilePanel() {
   const [creditBalance, setCreditBalance] = useState(0);
 
   const [maps, setMaps] = useState<{ id: number; name: string; description: string | null; entry_count: number }[]>([]);
-  const [creatingMap, setCreatingMap] = useState(false);
-  const [newMapName, setNewMapName] = useState('');
-  const [savingMap, setSavingMap] = useState(false);
 
   type SocialUser = { id: number; display_name: string; portrait_url: string | null; verified: boolean };
   const [followers, setFollowers] = useState<SocialUser[]>([]);
@@ -77,21 +74,6 @@ export default function MyProfilePanel() {
     fetchFeedVisibility().then(v => setFeedVisibleState(v)).catch(() => {});
     fetchPresenceFeed().then(e => setFeedEntries(e)).catch(() => {});
     fetchMyBusinessProposals().then(p => setProposals(p)).catch(() => {});
-  };
-
-  const handleCreateMap = async () => {
-    if (!newMapName.trim()) return;
-    setSavingMap(true);
-    try {
-      const created = await createMap(newMapName.trim());
-      setMaps(prev => [created, ...prev]);
-      setNewMapName('');
-      setCreatingMap(false);
-    } catch {
-      Alert.alert('Error', 'Could not create map.');
-    } finally {
-      setSavingMap(false);
-    }
   };
 
   const handleFeedToggle = useCallback(async (val: boolean) => {
@@ -292,45 +274,23 @@ export default function MyProfilePanel() {
             </View>
           )}
 
-          {/* Maps */}
+          {/* Map — one per user, earned through visits */}
           <View style={[styles.section, { borderBottomColor: c.border }]}>
-            <View style={styles.mapsHeader}>
-              <Text style={[styles.sectionLabel, { color: c.muted }]}>MAPS</Text>
-              <TouchableOpacity onPress={() => setCreatingMap(v => !v)} activeOpacity={0.7}>
-                <Text style={[styles.actionBtn, { color: c.accent }]}>{creatingMap ? 'CANCEL' : '+ NEW'}</Text>
-              </TouchableOpacity>
-            </View>
-            {creatingMap && (
-              <View style={styles.editRow}>
-                <TextInput
-                  style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontSize: 16 }]}
-                  value={newMapName}
-                  onChangeText={setNewMapName}
-                  placeholder="map name"
-                  placeholderTextColor={c.muted}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={handleCreateMap}
-                />
-                <TouchableOpacity onPress={handleCreateMap} disabled={savingMap || !newMapName.trim()} activeOpacity={0.7}>
-                  <Text style={[styles.actionBtn, { color: c.accent }]}>{savingMap ? '…' : 'SAVE'}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            {maps.length === 0 && !creatingMap && (
-              <Text style={[styles.subLine, { color: c.muted }]}>no maps yet</Text>
-            )}
-            {maps.map(m => (
-              <View key={m.id} style={[styles.mapRow, { borderTopColor: c.border }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.mapName, { color: c.text }]}>{m.name}</Text>
-                  <Text style={[styles.subLine, { color: c.muted }]}>{m.entry_count} {m.entry_count === 1 ? 'place' : 'places'}</Text>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>MY MAP</Text>
+            {maps.length === 0 ? (
+              <Text style={[styles.subLine, { color: c.muted }]}>
+                visit a business 4 times to add it here
+              </Text>
+            ) : (
+              maps.slice(0, 1).map(m => (
+                <View key={m.id} style={[styles.mapRow, { borderTopColor: c.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.mapName, { color: c.text }]}>{m.name}</Text>
+                    <Text style={[styles.subLine, { color: c.muted }]}>{m.entry_count} {m.entry_count === 1 ? 'place' : 'places'}</Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => handleDeleteMap(m.id, m.name)} activeOpacity={0.6}>
-                  <Text style={[styles.actionBtn, { color: c.muted }]}>×</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+              ))
+            )}
           </View>
 
           {/* Audience */}

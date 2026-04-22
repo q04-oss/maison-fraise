@@ -440,12 +440,6 @@ export async function fetchBusinessPopupStats(businessId: number) {
   }>;
 }
 
-export async function fetchBusinessVisitCount(businessId: number) {
-  const res = await fetch(`${BASE_URL}/api/businesses/${businessId}/visits/count`);
-  if (!res.ok) throw new Error('Failed to fetch visit count');
-  return res.json() as Promise<{ visit_count: number }>;
-}
-
 export async function fetchFollowerCount(userId: number) {
   const res = await fetch(`${BASE_URL}/api/users/${userId}/followers`);
   if (!res.ok) throw new Error('Failed to fetch followers');
@@ -4069,6 +4063,40 @@ export async function setFeedVisibility(visible: boolean) {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', ...auth },
     body: JSON.stringify({ visible }),
+  });
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
+// ─── Beacon visit tracking ────────────────────────────────────────────────────
+
+export async function recordBeaconVisit(businessId: number, beaconUuid: string): Promise<{ ok: boolean; visit_count: number; recorded: boolean }> {
+  const auth = await authHeader();
+  if (!auth['Authorization']) return { ok: false, visit_count: 0, recorded: false };
+  const r = await fetch(`${BASE_URL}/api/beacons/visit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({ business_id: businessId, beacon_uuid: beaconUuid }),
+  });
+  if (!r.ok) return { ok: false, visit_count: 0, recorded: false };
+  return r.json();
+}
+
+export async function fetchBusinessVisitCount(businessId: number): Promise<number> {
+  const auth = await authHeader();
+  if (!auth['Authorization']) return 0;
+  const r = await fetch(`${BASE_URL}/api/beacons/visits/${businessId}`, { headers: auth });
+  if (!r.ok) return 0;
+  const data = await r.json();
+  return data.visit_count ?? 0;
+}
+
+export async function getOrCreateMyMap(): Promise<{ id: number; name: string; entry_count: number; already_existed?: boolean }> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/maps`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify({}),
   });
   if (!r.ok) throw new Error('failed');
   return r.json();
