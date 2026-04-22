@@ -236,6 +236,36 @@ router.delete('/saves/:userId', requireUser, async (req: Request, res: Response)
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
+// GET /api/maps/saves/mine — users I've saved (who I follow)
+router.get('/saves/mine', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  try {
+    const rows = await db.execute(sql`
+      SELECT u.id, u.display_name, u.portrait_url, u.verified
+      FROM user_saves s
+      JOIN users u ON u.id = s.saved_user_id
+      WHERE s.saver_id = ${userId}
+      ORDER BY s.created_at DESC
+    `);
+    res.json((rows as any).rows ?? rows);
+  } catch { res.status(500).json({ error: 'internal_error' }); }
+});
+
+// GET /api/maps/saves/followers — users who've saved me (my audience)
+router.get('/saves/followers', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  try {
+    const rows = await db.execute(sql`
+      SELECT u.id, u.display_name, u.portrait_url, u.verified
+      FROM user_saves s
+      JOIN users u ON u.id = s.saver_id
+      WHERE s.saved_user_id = ${userId}
+      ORDER BY s.created_at DESC
+    `);
+    res.json((rows as any).rows ?? rows);
+  } catch { res.status(500).json({ error: 'internal_error' }); }
+});
+
 // GET /api/maps/saves/check/:userId — is this user saved?
 router.get('/saves/check/:userId', requireUser, async (req: Request, res: Response) => {
   const saverId: number = (req as any).userId;
@@ -276,6 +306,16 @@ router.get('/feed', requireUser, async (req: Request, res: Response) => {
       LIMIT 60
     `);
     res.json((rows as any).rows ?? rows);
+  } catch { res.status(500).json({ error: 'internal_error' }); }
+});
+
+// GET /api/maps/feed/visibility — current user's feed_visible setting
+router.get('/feed/visibility', requireUser, async (req: Request, res: Response) => {
+  const userId: number = (req as any).userId;
+  try {
+    const rows = await db.execute(sql`SELECT feed_visible FROM users WHERE id = ${userId} LIMIT 1`);
+    const row = ((rows as any).rows ?? rows)[0] as any;
+    res.json({ feed_visible: row?.feed_visible ?? false });
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 

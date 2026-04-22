@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, TextInput, Alert, Image,
+  ActivityIndicator, TextInput, Alert, Image, Switch,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Haptics from 'expo-haptics';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import {
@@ -12,7 +13,19 @@ import {
   deleteAuthToken, verifyAppleSignIn, setAuthToken,
   fetchReceivedGifts, fetchCreditBalance,
   fetchMyMaps, createMap, deleteMap,
+  fetchMySaves, fetchMyFollowers, fetchFeedVisibility, setFeedVisibility,
+  fetchPresenceFeed, fetchMyBusinessProposals,
 } from '../../lib/api';
+
+function timeAgo(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 export default function MyProfilePanel() {
   const { goBack, showPanel, setOrder, setPanelData } = usePanel();
@@ -35,6 +48,14 @@ export default function MyProfilePanel() {
   const [newMapName, setNewMapName] = useState('');
   const [savingMap, setSavingMap] = useState(false);
 
+  type SocialUser = { id: number; display_name: string; portrait_url: string | null; verified: boolean };
+  const [followers, setFollowers] = useState<SocialUser[]>([]);
+  const [mySaves, setMySaves] = useState<SocialUser[]>([]);
+  const [feedVisible, setFeedVisibleState] = useState(false);
+  const [togglingFeed, setTogglingFeed] = useState(false);
+  const [feedEntries, setFeedEntries] = useState<any[]>([]);
+  const [proposals, setProposals] = useState<any[]>([]);
+
   useEffect(() => {
     AsyncStorage.getItem('user_db_id').then(id => {
       const isIn = !!id;
@@ -51,6 +72,11 @@ export default function MyProfilePanel() {
     fetchReceivedGifts().then(g => setReceivedGifts(g)).catch(() => {});
     fetchCreditBalance().then(r => setCreditBalance(r.balance_cents)).catch(() => {});
     fetchMyMaps().then(m => setMaps(m)).catch(() => {});
+    fetchMyFollowers().then(f => setFollowers(f)).catch(() => {});
+    fetchMySaves().then(s => setMySaves(s)).catch(() => {});
+    fetchFeedVisibility().then(v => setFeedVisibleState(v)).catch(() => {});
+    fetchPresenceFeed().then(e => setFeedEntries(e)).catch(() => {});
+    fetchMyBusinessProposals().then(p => setProposals(p)).catch(() => {});
   };
 
   const handleCreateMap = async () => {
@@ -67,6 +93,19 @@ export default function MyProfilePanel() {
       setSavingMap(false);
     }
   };
+
+  const handleFeedToggle = useCallback(async (val: boolean) => {
+    setTogglingFeed(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      await setFeedVisibility(val);
+      setFeedVisibleState(val);
+    } catch {
+      Alert.alert('Error', 'Could not update setting.');
+    } finally {
+      setTogglingFeed(false);
+    }
+  }, []);
 
   const handleDeleteMap = (mapId: number, mapName: string) => {
     Alert.alert(`Delete "${mapName}"?`, 'This cannot be undone.', [
@@ -294,6 +333,119 @@ export default function MyProfilePanel() {
             ))}
           </View>
 
+          {/* Audience */}
+          {(followers.length > 0 || mySaves.length > 0) && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              {followers.length > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: c.muted }]}>SAVED BY</Text>
+                  <View style={styles.socialRow}>
+                    {followers.slice(0, 12).map(u => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.socialChip}
+                        onPress={() => { showPanel('user-profile', { userId: u.id, displayName: u.display_name }); }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.socialAvatar, { backgroundColor: c.border }]}>
+                          {u.portrait_url
+                            ? <Image source={{ uri: u.portrait_url }} style={styles.socialAvatarImg} />
+                            : <Text style={[styles.socialAvatarInitial, { color: c.muted }]}>{(u.display_name?.[0] ?? '?').toUpperCase()}</Text>}
+                        </View>
+                        <Text style={[styles.socialName, { color: c.muted }]} numberOfLines={1}>{u.display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {followers.length > 12 && (
+                      <Text style={[styles.subLine, { color: c.muted }]}>+{followers.length - 12} more</Text>
+                    )}
+                  </View>
+                </>
+              )}
+              {mySaves.length > 0 && (
+                <>
+                  <Text style={[styles.sectionLabel, { color: c.muted, marginTop: followers.length > 0 ? 12 : 0 }]}>FOLLOWING</Text>
+                  <View style={styles.socialRow}>
+                    {mySaves.slice(0, 12).map(u => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={styles.socialChip}
+                        onPress={() => { showPanel('user-profile', { userId: u.id, displayName: u.display_name }); }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.socialAvatar, { backgroundColor: c.border }]}>
+                          {u.portrait_url
+                            ? <Image source={{ uri: u.portrait_url }} style={styles.socialAvatarImg} />
+                            : <Text style={[styles.socialAvatarInitial, { color: c.muted }]}>{(u.display_name?.[0] ?? '?').toUpperCase()}</Text>}
+                        </View>
+                        <Text style={[styles.socialName, { color: c.muted }]} numberOfLines={1}>{u.display_name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                    {mySaves.length > 12 && (
+                      <Text style={[styles.subLine, { color: c.muted }]}>+{mySaves.length - 12} more</Text>
+                    )}
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
+          {/* Presence feed */}
+          <View style={[styles.section, { borderBottomColor: c.border }]}>
+            <View style={styles.feedHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionLabel, { color: c.muted }]}>SHARE MY VISITS</Text>
+                <Text style={[styles.subLine, { color: c.muted, marginTop: 4 }]}>
+                  Let people you save see where you've been
+                </Text>
+              </View>
+              <Switch
+                value={feedVisible}
+                onValueChange={handleFeedToggle}
+                disabled={togglingFeed}
+                trackColor={{ true: c.accent }}
+              />
+            </View>
+            {feedEntries.length > 0 && (
+              <>
+                <Text style={[styles.sectionLabel, { color: c.muted, marginTop: 12 }]}>THEIR VISITS</Text>
+                {feedEntries.slice(0, 8).map((e: any) => {
+                  const when = timeAgo(e.created_at);
+                  return (
+                    <View key={e.order_id} style={[styles.feedRow, { borderTopColor: c.border }]}>
+                      <Text style={[styles.feedName, { color: c.text }]}>{e.display_name}</Text>
+                      <Text style={[styles.feedPlace, { color: c.muted }]}>
+                        {e.business_name}{e.neighbourhood ? `  ·  ${e.neighbourhood}` : ''}
+                      </Text>
+                      <Text style={[styles.feedWhen, { color: c.muted }]}>{when}</Text>
+                    </View>
+                  );
+                })}
+              </>
+            )}
+          </View>
+
+          {/* Nominations */}
+          {proposals.length > 0 && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>NOMINATIONS</Text>
+              {proposals.map((p: any) => (
+                <View key={p.id} style={[styles.proposalRow, { borderTopColor: c.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.proposalName, { color: c.text }]}>{p.business_name}</Text>
+                    {!!p.business_address && (
+                      <Text style={[styles.subLine, { color: c.muted }]}>{p.business_address}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.statusBadge, { borderColor: p.status === 'interested' ? c.accent : c.border }]}>
+                    <Text style={[styles.statusText, { color: p.status === 'interested' ? c.accent : c.muted }]}>
+                      {p.status}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Nav */}
           <View>
             <TouchableOpacity style={[styles.navRow, { borderBottomColor: c.border }]} onPress={() => showPanel('send-credit')} activeOpacity={0.7}>
@@ -372,4 +524,25 @@ const styles = StyleSheet.create({
   },
   navLabel: { fontFamily: fonts.dmSans, fontSize: 15 },
   navChevron: { fontSize: 18 },
+
+  // Social / audience
+  socialRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 },
+  socialChip: { alignItems: 'center', gap: 4, width: 52 },
+  socialAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  socialAvatarImg: { width: 40, height: 40, borderRadius: 20 },
+  socialAvatarInitial: { fontSize: 15, fontFamily: fonts.dmMono },
+  socialName: { fontSize: 9, fontFamily: fonts.dmMono, letterSpacing: 0.3, textAlign: 'center' },
+
+  // Feed
+  feedHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  feedRow: { paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 6, gap: 2 },
+  feedName: { fontFamily: fonts.playfair, fontSize: 14 },
+  feedPlace: { fontFamily: fonts.dmSans, fontSize: 12 },
+  feedWhen: { fontFamily: fonts.dmMono, fontSize: 9, letterSpacing: 0.5, marginTop: 2 },
+
+  // Nominations
+  proposalRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, marginTop: 6 },
+  proposalName: { fontFamily: fonts.dmSans, fontSize: 15 },
+  statusBadge: { borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 2 },
+  statusText: { fontFamily: fonts.dmMono, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase' },
 });

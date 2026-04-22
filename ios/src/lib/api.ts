@@ -613,10 +613,11 @@ export async function updateDisplayName(display_name: string): Promise<void> {
   });
 }
 
-export async function searchUsers(q: string) {
-  const res = await fetch(`${BASE_URL}/api/users/search?q=${encodeURIComponent(q)}`);
-  if (!res.ok) throw new Error('Search failed');
-  return res.json() as Promise<{ id: number; display_name: string; is_dj: boolean; verified: boolean }[]>;
+export async function searchUsers(q: string): Promise<{ id: number; display_name: string; portrait_url: string | null; verified: boolean; save_count: number }[]> {
+  const res = await fetch(`${BASE_URL}/api/search?q=${encodeURIComponent(q)}`);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.users ?? [];
 }
 
 export async function fetchFollowing(userId: number) {
@@ -4038,6 +4039,28 @@ export async function fetchPresenceFeed() {
   const r = await fetch(`${BASE_URL}/api/maps/feed`, { headers: auth });
   if (!r.ok) throw new Error('failed');
   return r.json();
+}
+
+export async function fetchMySaves(): Promise<{ id: number; display_name: string; portrait_url: string | null; verified: boolean }[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/maps/saves/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchMyFollowers(): Promise<{ id: number; display_name: string; portrait_url: string | null; verified: boolean }[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/maps/saves/followers`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function fetchFeedVisibility(): Promise<boolean> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/maps/feed/visibility`, { headers: auth });
+  if (!r.ok) return false;
+  const data = await r.json();
+  return data.feed_visible ?? false;
 }
 
 export async function setFeedVisibility(visible: boolean) {
