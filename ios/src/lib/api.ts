@@ -363,6 +363,7 @@ export async function createPopupMerchOrder(popupId: number, body: {
   size?: string;
   recipient_user_id?: number;
   donate?: boolean;
+  community_fund?: boolean;
 }): Promise<{ id: number; client_secret: string }> {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/merch-orders`, {
@@ -381,6 +382,26 @@ export async function fetchMerchHistory(): Promise<{ sent: PopupMerchOrder[]; re
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/users/me/merch-history`, { headers: auth });
   if (!res.ok) throw new Error('Failed to fetch merch history');
+  return res.json();
+}
+
+export interface CommunityFundState {
+  balance_cents: number;
+  threshold_cents: number;
+  total_raised_cents: number;
+  popup_count: number;
+}
+
+export async function fetchCommunityFund(): Promise<CommunityFundState> {
+  const res = await fetch(`${BASE_URL}/api/community-fund`);
+  if (!res.ok) throw new Error('Failed to fetch community fund');
+  return res.json();
+}
+
+export async function fetchMyFundContributions(): Promise<{ total_cents: number; contributions: { amount_cents: number; order_type: string; created_at: string }[] }> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/community-fund/my-contributions`, { headers: auth });
+  if (!res.ok) throw new Error('Failed to fetch contributions');
   return res.json();
 }
 
@@ -437,6 +458,7 @@ export async function createPopupFoodOrder(popupId: number, body: {
   recipient_user_id?: number;
   for_anyone?: boolean;
   note?: string;
+  community_fund?: boolean;
 }): Promise<{ id: number; client_secret: string }> {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-orders`, {

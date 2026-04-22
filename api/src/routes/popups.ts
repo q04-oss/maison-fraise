@@ -623,7 +623,7 @@ router.post('/:id/food-orders', requireUser, async (req: Request, res: Response)
   const user_id: number = (req as any).userId;
   if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
 
-  const { menu_item_id, quantity = 1, recipient_user_id, for_anyone, note } = req.body;
+  const { menu_item_id, quantity = 1, recipient_user_id, for_anyone, note, community_fund } = req.body;
   if (!menu_item_id || isNaN(parseInt(menu_item_id, 10))) {
     res.status(400).json({ error: 'menu_item_id required' }); return;
   }
@@ -637,7 +637,9 @@ router.post('/:id/food-orders', requireUser, async (req: Request, res: Response)
     if (!item.price_cents) { res.status(400).json({ error: 'Item has no price' }); return; }
 
     const qty = Math.max(1, Math.min(10, parseInt(String(quantity), 10) || 1));
-    const total_cents = item.price_cents * qty;
+    const food_cents = item.price_cents * qty;
+    const fund_cents = community_fund ? 200 : 0;
+    const total_cents = food_cents + fund_cents;
 
     // recipient: null = claimable by anyone, specific user, or self
     const recipient: number | null = for_anyone
@@ -657,6 +659,7 @@ router.post('/:id/food-orders', requireUser, async (req: Request, res: Response)
         quantity: String(qty),
         recipient_user_id: recipient !== null ? String(recipient) : '',
         popup_name: popup?.name ?? '',
+        community_fund_cents: fund_cents > 0 ? String(fund_cents) : '',
       },
     });
 
@@ -820,7 +823,7 @@ router.post('/:id/merch-orders', requireUser, async (req: Request, res: Response
   const user_id: number = (req as any).userId;
   if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
 
-  const { item_id, size, recipient_user_id, donate } = req.body;
+  const { item_id, size, recipient_user_id, donate, community_fund } = req.body;
   if (!item_id) { res.status(400).json({ error: 'item_id required' }); return; }
 
   try {
@@ -838,8 +841,9 @@ router.post('/:id/merch-orders', requireUser, async (req: Request, res: Response
 
     const [popup] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, popup_id));
 
+    const fund_cents = community_fund ? 200 : 0;
     const pi = await stripe.paymentIntents.create({
-      amount: item.price_cents,
+      amount: item.price_cents + fund_cents,
       currency: 'cad',
       metadata: {
         type: 'popup_merch_order',
@@ -849,6 +853,7 @@ router.post('/:id/merch-orders', requireUser, async (req: Request, res: Response
         donate: isDonate ? 'true' : 'false',
         recipient_user_id: recipient !== null ? String(recipient) : '',
         popup_name: popup?.name ?? '',
+        community_fund_cents: fund_cents > 0 ? String(fund_cents) : '',
       },
     });
 

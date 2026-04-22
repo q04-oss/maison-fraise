@@ -36,6 +36,7 @@ export default function PopupMerchPanel() {
   const [chosenRecipient, setChosenRecipient] = useState<{ id: number; name: string } | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [paying, setPaying] = useState(false);
+  const [communityFund, setCommunityFund] = useState(true);
 
   const load = useCallback(async () => {
     if (!popupId) return;
@@ -92,6 +93,7 @@ export default function PopupMerchPanel() {
       };
       if (mode === 'donate') body.donate = true;
       else if (mode === 'gift' && chosenRecipient) body.recipient_user_id = chosenRecipient.id;
+      body.community_fund = communityFund;
 
       const { client_secret } = await createPopupMerchOrder(popupId, body);
 
@@ -254,6 +256,21 @@ export default function PopupMerchPanel() {
                 </View>
               )}
 
+              {/* Community fund add-on */}
+              <TouchableOpacity
+                style={[styles.fundRow, { borderColor: c.border }]}
+                onPress={() => setCommunityFund(v => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fundText}>
+                  <Text style={[styles.fundLabel, { color: c.text }]}>+CA$2 community fund</Text>
+                  <Text style={[styles.fundSub, { color: c.muted }]}>goes toward a free popup for the homeless</Text>
+                </View>
+                <View style={[styles.fundCheck, { borderColor: communityFund ? '#C0392B' : c.border, backgroundColor: communityFund ? '#C0392B' : 'transparent' }]}>
+                  {communityFund && <Text style={styles.fundCheckMark}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.buyBtn, { backgroundColor: mode === 'donate' ? '#C0392B' : c.accent }, paying && { opacity: 0.5 }]}
                 onPress={handleBuy}
@@ -263,7 +280,7 @@ export default function PopupMerchPanel() {
                 {paying
                   ? <ActivityIndicator color={c.panelBg} />
                   : <Text style={[styles.buyBtnText, { color: c.panelBg }]}>
-                      {mode === 'donate' ? `donate ${priceFmt(selected.price_cents)}` : `buy ${priceFmt(selected.price_cents)}`}
+                      {mode === 'donate' ? `donate ${priceFmt(selected.price_cents + (communityFund ? 200 : 0))}` : `buy ${priceFmt(selected.price_cents + (communityFund ? 200 : 0))}`}
                     </Text>
                 }
               </TouchableOpacity>
@@ -395,6 +412,12 @@ const styles = StyleSheet.create({
   chosenRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chosenName: { fontSize: 13, fontFamily: fonts.dmSans },
   clearBtn: { fontSize: 18, lineHeight: 22 },
+  fundRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 12 },
+  fundText: { flex: 1, gap: 2 },
+  fundLabel: { fontSize: 13, fontFamily: fonts.dmSans, fontWeight: '600' },
+  fundSub: { fontSize: 11, fontFamily: fonts.dmSans },
+  fundCheck: { width: 22, height: 22, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  fundCheckMark: { fontSize: 13, color: '#fff', fontWeight: '700' },
   buyBtn: { height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   buyBtnText: { fontSize: 14, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   orderRow: {

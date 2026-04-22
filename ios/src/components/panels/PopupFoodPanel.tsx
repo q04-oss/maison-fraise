@@ -34,6 +34,7 @@ export default function PopupFoodPanel() {
   const [recipientMode, setRecipientMode] = useState<RecipientMode>('self');
   const [note, setNote] = useState('');
   const [paying, setPaying] = useState(false);
+  const [communityFund, setCommunityFund] = useState(true);
 
   // For buying for a specific person
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,6 +95,7 @@ export default function PopupFoodPanel() {
         menu_item_id: selected.id,
         quantity: selfQty,
         note: note.trim() || undefined,
+        community_fund: communityFund,
         ...(chosenRecipient ? { recipient_user_id: chosenRecipient.id } : {}),
       };
       const { client_secret } = await createPopupFoodOrder(popupId, selfBody);
@@ -310,9 +312,24 @@ export default function PopupFoodPanel() {
                 maxLength={120}
               />
 
+              {/* Community fund add-on */}
+              <TouchableOpacity
+                style={[styles.fundRow, { borderColor: c.border }]}
+                onPress={() => setCommunityFund(v => !v)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fundText}>
+                  <Text style={[styles.fundLabel, { color: c.text }]}>+CA$2 community fund</Text>
+                  <Text style={[styles.fundSub, { color: c.muted }]}>goes toward a free popup for the homeless</Text>
+                </View>
+                <View style={[styles.fundCheck, { borderColor: communityFund ? '#C0392B' : c.border, backgroundColor: communityFund ? '#C0392B' : 'transparent' }]}>
+                  {communityFund && <Text style={styles.fundCheckMark}>✓</Text>}
+                </View>
+              </TouchableOpacity>
+
               {selected.price_cents != null && (
                 <Text style={[styles.totalLine, { color: c.muted }]}>
-                  total {priceFmt(selected.price_cents * quantity)}
+                  total {priceFmt(selected.price_cents * quantity + (communityFund ? 200 : 0))}
                 </Text>
               )}
 
@@ -468,6 +485,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.dmSans,
   },
+  fundRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: StyleSheet.hairlineWidth, borderRadius: 8, padding: 12 },
+  fundText: { flex: 1, gap: 2 },
+  fundLabel: { fontSize: 13, fontFamily: fonts.dmSans, fontWeight: '600' },
+  fundSub: { fontSize: 11, fontFamily: fonts.dmSans },
+  fundCheck: { width: 22, height: 22, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  fundCheckMark: { fontSize: 13, color: '#fff', fontWeight: '700' },
   totalLine: { fontSize: 12, fontFamily: fonts.dmMono, textAlign: 'right' },
   refundNote: { fontSize: 11, fontFamily: fonts.dmSans, fontStyle: 'italic', textAlign: 'center' },
   buyBtn: { height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },

@@ -1661,4 +1661,24 @@ export const creditTransactions = pgTable('credit_transactions', {
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Community fund ───────────────────────────────────────────────────────────
+
+export const communityFund = pgTable('community_fund', {
+  id: serial('id').primaryKey(),
+  balance_cents: integer('balance_cents').notNull().default(0),
+  total_raised_cents: integer('total_raised_cents').notNull().default(0),
+  threshold_cents: integer('threshold_cents').notNull().default(50000),
+  popup_count: integer('popup_count').notNull().default(0),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const communityFundContributions = pgTable('community_fund_contributions', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').references(() => users.id),
+  amount_cents: integer('amount_cents').notNull().default(200),
+  order_type: text('order_type').notNull(), // 'popup_food' | 'popup_merch' | 'box_order' | 'direct'
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 // @final-audit

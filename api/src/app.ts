@@ -89,6 +89,7 @@ import mapsRouter from './routes/maps';
 import proposalsRouter from './routes/proposals';
 import artRouter from './routes/art';
 import artAdminRouter from './routes/art-admin';
+import communityFundRouter from './routes/community-fund';
 import { logger } from './lib/logger';
 import { db } from './db';
 import { editorialPieces, users, notifications, memberships, batches, varieties as varietiesTable } from './db/schema';
@@ -264,6 +265,7 @@ app.use('/api/maps', mapsRouter);
 app.use('/api/proposals', proposalsRouter);
 app.use('/api/art', artRouter);
 app.use('/api/art-admin', artAdminRouter);
+app.use('/api/community-fund', communityFundRouter);
 app.use('/api/ar-poem', arPoemRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)

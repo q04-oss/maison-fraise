@@ -4,7 +4,7 @@ import { eq, sql, and, inArray } from 'drizzle-orm';
 import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
 import { db } from '../db';
-import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts, creditTransactions, pendingCreditTransfers } from '../db/schema';
+import { orders, varieties, timeSlots, popupRsvps, popupRequests, campaignCommissions, users, businesses, memberships, fundContributions, earningsLedger, portalAccess, tokens, seasonPatronages, patronTokens, greenhouses, greenhouseFunding, provenanceTokens, locationFunding, messages, collectifs, collectifCommitments, tournaments, tournamentEntries, adCampaigns, toiletVisits, personalToilets, gifts, creditTransactions, pendingCreditTransfers, communityFund, communityFundContributions } from '../db/schema';
 import { sendPushNotification } from '../lib/push';
 import { sendRsvpConfirmed, sendOrderConfirmation, sendTipReceived, sendGiftNotification, sendOutreachNotification, sendBusinessDonationNotification, sendCreditNotification } from '../lib/resend';
 import { sendStickerSMS, sendCreditSMS } from '../lib/twilio';
@@ -1150,6 +1150,31 @@ router.post('/webhook', async (req: Request, res: Response) => {
             }).catch(() => {});
           }
           logger.info(`Personal toilet visit ${visitId} paid, host ${hostUserId} credited ${amountCents}c`);
+        }
+      }
+
+      // ── Community fund add-on (present on any payment type) ─────────────────
+      const fundCents = parseInt(pi.metadata?.community_fund_cents ?? '', 10);
+      if (!isNaN(fundCents) && fundCents > 0) {
+        const buyerUserId = parseInt(pi.metadata?.buyer_user_id ?? pi.metadata?.user_id ?? '', 10);
+        const orderType = type ?? 'direct';
+        try {
+          await db.insert(communityFundContributions).values({
+            user_id: !isNaN(buyerUserId) ? buyerUserId : null,
+            amount_cents: fundCents,
+            order_type: orderType,
+            stripe_payment_intent_id: `fund_${pi.id}`,
+          }).onConflictDoNothing();
+          await db.update(communityFund)
+            .set({
+              balance_cents: sql`balance_cents + ${fundCents}`,
+              total_raised_cents: sql`total_raised_cents + ${fundCents}`,
+              updated_at: new Date(),
+            })
+            .where(eq(communityFund.id, 1));
+          logger.info(`Community fund +${fundCents}c from ${orderType} PI ${pi.id}`);
+        } catch (err) {
+          logger.error('Community fund contribution error', err);
         }
       }
     }

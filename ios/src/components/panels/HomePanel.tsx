@@ -13,7 +13,7 @@ import { useApp } from '../../../App';
 import {
   fetchVarieties, fetchTodayStats, fetchBatchStatus,
   createOrder, confirmOrder, payOrderWithBalance,
-  fetchOrdersByEmail, fetchAdBalance,
+  fetchOrdersByEmail, fetchAdBalance, fetchCommunityFund, CommunityFundState,
 } from '../../lib/api';
 import { useColors, fonts, SPACING } from '../../theme';
 import { STRAWBERRIES, CHOCOLATES, FINISHES } from '../../data/seed';
@@ -55,6 +55,7 @@ export default function HomePanel() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userDbId, setUserDbId] = useState<number | null>(null);
   const [adBalanceCents, setAdBalanceCents] = useState(0);
+  const [communityFund, setCommunityFundState] = useState<CommunityFundState | null>(null);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
@@ -62,6 +63,7 @@ export default function HomePanel() {
       if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
     });
     fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
+    fetchCommunityFund().then(f => setCommunityFundState(f)).catch(() => {});
   }, []);
 
   // Handle panelData signals
@@ -422,6 +424,18 @@ export default function HomePanel() {
             <Text style={[styles.ambientStat, { color: c.muted }]}>
               {businesses.filter(b => b.type === 'partner').length} locations · edmonton
             </Text>
+            {communityFund && communityFund.threshold_cents > 0 && (
+              <View style={styles.fundBlock}>
+                <View style={[styles.fundTrack, { backgroundColor: c.border }]}>
+                  <View style={[styles.fundFill, { backgroundColor: '#C0392B', width: `${Math.min(100, Math.round((communityFund.balance_cents / communityFund.threshold_cents) * 100))}%` as any }]} />
+                </View>
+                <Text style={[styles.fundCaption, { color: c.muted }]}>
+                  {`CA$${(communityFund.balance_cents / 100).toFixed(0)} of CA$${(communityFund.threshold_cents / 100).toFixed(0)} · next community popup`}
+                  {communityFund.popup_count > 0 ? `  ·  ${communityFund.popup_count} done` : ''}
+                </Text>
+              </View>
+            )}
+
             {nearestCollection && (
               <TouchableOpacity
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleLocationSelect(nearestCollection); }}
@@ -840,6 +854,10 @@ const styles = StyleSheet.create({
   ambientDate: { fontSize: 32, fontFamily: fonts.playfair },
   ambientSeason: { fontSize: 13, fontFamily: fonts.playfair, fontStyle: 'italic' },
   ambientStat: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1, marginTop: 6 },
+  fundBlock: { marginTop: 10, gap: 5 },
+  fundTrack: { height: 2, borderRadius: 1, overflow: 'hidden' },
+  fundFill: { height: 2, borderRadius: 1 },
+  fundCaption: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
   nearestHint: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 0.5 },
 
   // Discover

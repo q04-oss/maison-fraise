@@ -274,6 +274,27 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  // ── Community fund ───────────────────────────────────────────────────────────
+  await run('community_fund', sql`CREATE TABLE IF NOT EXISTS community_fund (
+    id SERIAL PRIMARY KEY,
+    balance_cents INTEGER NOT NULL DEFAULT 0,
+    total_raised_cents INTEGER NOT NULL DEFAULT 0,
+    threshold_cents INTEGER NOT NULL DEFAULT 50000,
+    popup_count INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+  await run('community_fund_seed', sql`INSERT INTO community_fund (id, balance_cents, total_raised_cents, threshold_cents, popup_count)
+    VALUES (1, 0, 0, 50000, 0) ON CONFLICT (id) DO NOTHING`);
+
+  await run('community_fund_contributions', sql`CREATE TABLE IF NOT EXISTS community_fund_contributions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    amount_cents INTEGER NOT NULL DEFAULT 200,
+    order_type TEXT NOT NULL,
+    stripe_payment_intent_id TEXT UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Indexes ──────────────────────────────────────────────────────────────────
   await run('nfc_connections_pair_unique', sql`
     CREATE UNIQUE INDEX IF NOT EXISTS nfc_connections_pair_unique

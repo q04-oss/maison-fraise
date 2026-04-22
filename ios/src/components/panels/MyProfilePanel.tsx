@@ -20,6 +20,7 @@ import {
   fetchPresenceFeed, fetchMyBusinessProposals,
   fetchMyBeacons, registerBeacon, deactivateBeacon,
   fetchMerchHistory, PopupMerchOrder,
+  fetchMyFundContributions,
 } from '../../lib/api';
 
 function timeAgo(isoDate: string): string {
@@ -66,6 +67,7 @@ export default function MyProfilePanel() {
   const [proposals, setProposals] = useState<any[]>([]);
   const [merchSent, setMerchSent] = useState<PopupMerchOrder[]>([]);
   const [merchReceived, setMerchReceived] = useState<PopupMerchOrder[]>([]);
+  const [fundTotalCents, setFundTotalCents] = useState(0);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_db_id', 'is_shop']).then(([idEntry, shopEntry]) => {
@@ -91,6 +93,7 @@ export default function MyProfilePanel() {
     fetchPresenceFeed().then(e => setFeedEntries(e)).catch(() => {});
     fetchMyBusinessProposals().then(p => setProposals(p)).catch(() => {});
     fetchMerchHistory().then(h => { setMerchSent(h.sent); setMerchReceived(h.received); }).catch(() => {});
+    fetchMyFundContributions().then(r => setFundTotalCents(r.total_cents)).catch(() => {});
     if (shop) fetchMyBeacons().then(b => setMyBeacons(b)).catch(() => {});
   };
 
@@ -317,6 +320,15 @@ export default function MyProfilePanel() {
               <Text style={[styles.sectionLabel, { color: c.muted }]}>CREDIT</Text>
               <Text style={[styles.balance, { color: c.text }]}>CA${(creditBalance / 100).toFixed(2)}</Text>
               <Text style={[styles.subLine, { color: c.muted }]}>Applies automatically at checkout</Text>
+            </View>
+          )}
+
+          {/* Community fund */}
+          {fundTotalCents > 0 && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <Text style={[styles.sectionLabel, { color: c.muted }]}>COMMUNITY FUND</Text>
+              <Text style={[styles.balance, { color: c.text }]}>CA${(fundTotalCents / 100).toFixed(2)}</Text>
+              <Text style={[styles.subLine, { color: c.muted }]}>contributed toward free popups for the homeless</Text>
             </View>
           )}
 
