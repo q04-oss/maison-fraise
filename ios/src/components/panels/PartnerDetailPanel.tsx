@@ -10,7 +10,7 @@ import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { PARTNER_MENUS, CHOCOLATES, FINISHES, PartnerMenu, MenuSection, MenuItem } from '../../data/seed';
-import { createOrder, confirmOrder, payOrderWithBalance, fetchAdBalance, fetchMyMaps, createMap, addToMap } from '../../lib/api';
+import { createOrder, confirmOrder, payOrderWithBalance, fetchAdBalance, fetchBusinessVisitCount, getOrCreateMyMap, addToMap } from '../../lib/api';
 import { haversineKm } from '../../lib/geo';
 import { useApp } from '../../../App';
 
@@ -131,6 +131,10 @@ export default function PartnerDetailPanel() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userDbId, setUserDbId] = useState<number | null>(null);
   const [adBalanceCents, setAdBalanceCents] = useState(0);
+  const [visitCount, setVisitCount] = useState<number | null>(null);
+  const [mapAdded, setMapAdded] = useState(false);
+
+  const VISITS_REQUIRED = 4;
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_email', 'user_db_id']).then(([email, dbId]) => {
@@ -138,42 +142,28 @@ export default function PartnerDetailPanel() {
       if (dbId[1]) setUserDbId(parseInt(dbId[1], 10));
     });
     fetchAdBalance().then(r => setAdBalanceCents(r.ad_balance_cents)).catch(() => {});
-  }, []);
+    if (biz?.id) {
+      fetchBusinessVisitCount(biz.id).then(c => setVisitCount(c)).catch(() => setVisitCount(0));
+    }
+  }, [biz?.id]);
 
   const handleAddToMap = useCallback(async () => {
     if (!biz?.id) return;
-    if (!userDbId) { Alert.alert('Sign in required', 'Sign in to save places to your maps.'); return; }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!userDbId) { Alert.alert('Sign in required', 'Sign in to save places to your map.'); return; }
+    const visits = visitCount ?? 0;
+    if (visits < VISITS_REQUIRED) {
+      const remaining = VISITS_REQUIRED - visits;
+      Alert.alert(
+        'Not yet',
+        `Visit ${biz.name} ${remaining} more ${remaining === 1 ? 'time' : 'times'} to add it to your map. Your beacon needs to detect you there.`,
+      );
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const maps = await fetchMyMaps();
-      if (maps.length === 0) {
-        Alert.prompt('Create a map', 'Name your first map', async (name) => {
-          if (!name?.trim()) return;
-          const created = await createMap(name.trim());
-          await addToMap(created.id, biz.id);
-          Alert.alert('Added', `Saved to "${created.name}".`);
-        });
-        return;
-      }
-      const options = maps.map((m: any) => ({
-        text: `${m.name} (${m.entry_count} places)`,
-        onPress: async () => {
-          await addToMap(m.id, biz.id);
-          Alert.alert('Added', `Saved to "${m.name}".`);
-        },
-      }));
-      Alert.alert('Add to map', biz.name, [
-        ...options,
-        { text: 'New map…', onPress: () => {
-          Alert.prompt('New map', 'Name your map', async (name) => {
-            if (!name?.trim()) return;
-            const created = await createMap(name.trim());
-            await addToMap(created.id, biz.id);
-            Alert.alert('Added', `Saved to "${created.name}".`);
-          });
-        }},
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      const map = await getOrCreateMyMap();
+      await addToMap(map.id, biz.id);
+      setMapAdded(true);
     } catch {
       Alert.alert('Something went wrong', 'Try again.');
     }
@@ -520,9 +510,17 @@ export default function PartnerDetailPanel() {
                 <Text style={[styles.infoAction, { color: c.muted }]}>order</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={handleAddToMap} activeOpacity={0.6}>
-              <Text style={[styles.infoAction, { color: c.muted }]}>+ map</Text>
-            </TouchableOpacity>
+            {mapAdded ? (
+              <Text style={[styles.infoAction, { color: c.accent }]}>on map ✓</Text>
+            ) : (
+              <TouchableOpacity onPress={handleAddToMap} activeOpacity={0.6}>
+                {visitCount !== null && visitCount < VISITS_REQUIRED ? (
+                  <Text style={[styles.infoAction, { color: c.muted }]}>{visitCount}/{VISITS_REQUIRED} visits</Text>
+                ) : (
+                  <Text style={[styles.infoAction, { color: visitCount !== null && visitCount >= VISITS_REQUIRED ? c.text : c.muted }]}>+ map</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 

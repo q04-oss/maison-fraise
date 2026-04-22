@@ -118,20 +118,32 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
-// POST /api/maps — create a map
+// POST /api/maps — get or create the user's single map
+// Each user has exactly one map. If one already exists it is returned unchanged.
 router.post('/', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   const { name, description } = req.body;
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    res.status(400).json({ error: 'name required' }); return;
-  }
   try {
+    // Return existing map if present
+    const existing = await db.execute(sql`
+      SELECT m.id, m.name, m.description, m.created_at,
+             COUNT(e.id)::int AS entry_count
+      FROM user_maps m
+      LEFT JOIN user_map_entries e ON e.map_id = m.id
+      WHERE m.user_id = ${userId}
+      GROUP BY m.id
+      LIMIT 1
+    `);
+    const map = ((existing as any).rows ?? existing)[0];
+    if (map) { res.json({ ...map, already_existed: true }); return; }
+
+    const mapName = (typeof name === 'string' && name.trim()) ? name.trim() : 'my map';
     const rows = await db.execute(sql`
       INSERT INTO user_maps (user_id, name, description)
-      VALUES (${userId}, ${name.trim()}, ${description ?? null})
+      VALUES (${userId}, ${mapName}, ${description ?? null})
       RETURNING id, name, description, created_at
     `);
-    res.json(((rows as any).rows ?? rows)[0]);
+    res.json({ ...((rows as any).rows ?? rows)[0], entry_count: 0 });
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
@@ -181,6 +193,17 @@ router.post('/:id/entries', requireUser, async (req: Request, res: Response) => 
     if (!((ownerRows as any).rows ?? ownerRows)[0]) {
       res.status(403).json({ error: 'forbidden' }); return;
     }
+
+    // Require 4 beacon-validated visits before a business can be added to the map
+    const visitRows = await db.execute(sql`
+      SELECT COUNT(*)::int AS visit_count FROM user_business_visits
+      WHERE user_id = ${userId} AND business_id = ${parseInt(business_id, 10)}
+    `);
+    const visitCount: number = (((visitRows as any).rows ?? visitRows)[0] as any)?.visit_count ?? 0;
+    if (visitCount < 4) {
+      res.status(403).json({ error: 'not_enough_visits', visit_count: visitCount, required: 4 }); return;
+    }
+
     await db.execute(sql`
       INSERT INTO user_map_entries (map_id, business_id, note)
       VALUES (${mapId}, ${parseInt(business_id, 10)}, ${note ?? null})

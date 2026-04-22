@@ -1,7 +1,7 @@
 import { Platform, NativeEventEmitter, NativeModules } from 'react-native';
 import Beacons from 'react-native-beacons-manager';
 import * as Notifications from 'expo-notifications';
-import { fetchBeacons, fetchBeaconShopUser } from './api';
+import { fetchBeacons, fetchBeaconShopUser, recordBeaconVisit } from './api';
 
 export interface BeaconRegion {
   uuid: string;
@@ -42,6 +42,9 @@ export async function loadAndMonitorBeacons() {
     regionDidEnterSubscription = BeaconsEventEmitter.addListener('regionDidEnter', async (region: any) => {
       const match = knownBeacons.find(b => b.uuid.toLowerCase() === region.uuid?.toLowerCase());
       if (!match) return;
+
+      // Record the visit — silently, rate-limiting is handled server-side
+      recordBeaconVisit(match.business_id, match.uuid).catch(() => {});
 
       const shopUser = await fetchBeaconShopUser(match.business_id).catch(() => null);
       if (!shopUser) return;
