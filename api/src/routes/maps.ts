@@ -61,21 +61,29 @@ router.get('/mine', requireUser, async (req: Request, res: Response) => {
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
-// GET /api/maps/user/:userId — another user's maps
+// GET /api/maps/user/:userId — another user's maps + save count
 router.get('/user/:userId', async (req: Request, res: Response) => {
   const profileUserId = parseInt(req.params.userId, 10);
   if (isNaN(profileUserId)) { res.status(400).json({ error: 'invalid_id' }); return; }
   try {
-    const rows = await db.execute(sql`
-      SELECT m.id, m.name, m.description, m.created_at,
-             COUNT(e.id)::int AS entry_count
-      FROM user_maps m
-      LEFT JOIN user_map_entries e ON e.map_id = m.id
-      WHERE m.user_id = ${profileUserId}
-      GROUP BY m.id
-      ORDER BY m.created_at DESC
-    `);
-    res.json((rows as any).rows ?? rows);
+    const [mapsRows, saveRows] = await Promise.all([
+      db.execute(sql`
+        SELECT m.id, m.name, m.description, m.created_at,
+               COUNT(e.id)::int AS entry_count
+        FROM user_maps m
+        LEFT JOIN user_map_entries e ON e.map_id = m.id
+        WHERE m.user_id = ${profileUserId}
+        GROUP BY m.id
+        ORDER BY m.created_at DESC
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int AS save_count
+        FROM user_saves WHERE saved_user_id = ${profileUserId}
+      `),
+    ]);
+    const maps = (mapsRows as any).rows ?? mapsRows;
+    const save_count = (((saveRows as any).rows ?? saveRows)[0] as any)?.save_count ?? 0;
+    res.json({ maps, save_count });
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
