@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView, StyleSheet,
-  ActivityIndicator, TextInput, Alert, Image, Switch,
+  ActivityIndicator, TextInput, Alert, Image, Switch, Share,
 } from 'react-native';
+
+const MAP_BASE_URL = 'https://api.fraise.chat/map';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as Haptics from 'expo-haptics';
@@ -327,6 +329,19 @@ export default function MyProfilePanel() {
                     <Text style={[styles.mapName, { color: c.text }]}>{m.name}</Text>
                     <Text style={[styles.subLine, { color: c.muted }]}>{m.entry_count} {m.entry_count === 1 ? 'place' : 'places'}</Text>
                   </View>
+                  {m.entry_count > 0 && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        AsyncStorage.getItem('user_db_id').then(id => {
+                          if (!id) return;
+                          Share.share({ message: `My map on Box Fraise`, url: `${MAP_BASE_URL}/${id}` }).catch(() => {});
+                        });
+                      }}
+                      activeOpacity={0.6}
+                    >
+                      <Text style={[styles.actionBtn, { color: c.muted }]}>share →</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))
             )}

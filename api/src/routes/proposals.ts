@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { resend } from '../lib/resend';
 import { requireUser } from '../lib/auth';
+import { sendPushNotification } from '../lib/push';
 import crypto from 'crypto';
 
 const router = Router();
@@ -117,10 +118,23 @@ router.post('/claim/:token', async (req: Request, res: Response) => {
       UPDATE business_proposals
       SET status = 'interested', claimed_at = now()
       WHERE claim_token = ${token} AND status = 'pending'
-      RETURNING business_name, proposed_by_name
+      RETURNING business_name, proposed_by_name, proposed_by_user_id
     `);
     const updated = ((rows as any).rows ?? rows)[0] as any;
     if (!updated) { res.status(404).json({ error: 'not_found' }); return; }
+
+    // Push the proposer — fire and forget
+    if (updated.proposed_by_user_id) {
+      db.execute(sql`SELECT push_token FROM users WHERE id = ${updated.proposed_by_user_id} LIMIT 1`)
+        .then(r => {
+          const token = (((r as any).rows ?? r)[0] as any)?.push_token;
+          if (token) sendPushNotification(token, {
+            title: `${updated.business_name} is interested`,
+            body: `Your nomination was noticed — they want to be on Box Fraise.`,
+            data: { screen: 'proposals' },
+          }).catch(() => {});
+        }).catch(() => {});
+    }
 
     // Notify the team
     await resend.emails.send({

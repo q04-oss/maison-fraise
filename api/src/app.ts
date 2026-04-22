@@ -452,6 +452,92 @@ app.get('/proposal/:token', (req, res, next) => {
   proposalsRouter(req, res, next);
 });
 
+// Public map deep link — /map/:userId
+app.get('/map/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  if (isNaN(userId)) { res.status(404).send('<h1>Not found</h1>'); return; }
+  try {
+    const userRows = await db.execute(sql`
+      SELECT display_name FROM users WHERE id = ${userId} LIMIT 1
+    `);
+    const user = (((userRows as any).rows ?? userRows)[0] as any);
+    if (!user) { res.status(404).send('<h1>Not found</h1>'); return; }
+
+    const mapRows = await db.execute(sql`
+      SELECT m.id, m.name FROM user_maps m WHERE m.user_id = ${userId} LIMIT 1
+    `);
+    const map = (((mapRows as any).rows ?? mapRows)[0] as any);
+
+    let entries: any[] = [];
+    if (map) {
+      const entryRows = await db.execute(sql`
+        SELECT b.name, b.address, b.neighbourhood, b.hours, b.instagram_handle, b.type
+        FROM user_map_entries e
+        JOIN businesses b ON b.id = e.business_id
+        WHERE e.map_id = ${map.id}
+        ORDER BY e.sort_order ASC, e.created_at ASC
+      `);
+      entries = (entryRows as any).rows ?? entryRows;
+    }
+
+    const displayName = user.display_name ?? 'someone';
+    const placeItems = entries.map((e: any) => {
+      const meta = [e.neighbourhood, e.hours].filter(Boolean).join('  ·  ');
+      const ig = e.instagram_handle ? `<a href="https://instagram.com/${e.instagram_handle}" style="color:#8A8A8E;text-decoration:none;">@${e.instagram_handle}</a>` : '';
+      return `
+        <div style="padding:20px 0;border-bottom:1px solid #E5E1DA;">
+          <div style="font-family:Georgia,serif;font-size:18px;color:#1C1C1E;margin-bottom:4px;">${e.name}</div>
+          ${meta ? `<div style="font-family:'Courier New',monospace;font-size:11px;color:#8A8A8E;letter-spacing:0.5px;margin-bottom:4px;">${meta}</div>` : ''}
+          ${e.address ? `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#6A6A6E;">${e.address}</div>` : ''}
+          ${ig ? `<div style="margin-top:4px;font-size:12px;">${ig}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${displayName}'s map — Box Fraise</title>
+  <meta property="og:title" content="${displayName}'s map" />
+  <meta property="og:description" content="${entries.length} place${entries.length === 1 ? '' : 's'} worth visiting" />
+  <meta property="og:site_name" content="Box Fraise" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Georgia,serif;background:#FAF9F7;color:#1C1C1E;padding:0 24px}
+    .wrap{max-width:560px;margin:0 auto;padding:80px 0 120px}
+    .brand{font-size:12px;letter-spacing:2px;color:#8A8A8E;text-transform:uppercase;font-family:'Courier New',monospace;margin-bottom:60px}
+    .brand a{color:#8A8A8E;text-decoration:none}
+    h1{font-size:32px;font-weight:normal;margin-bottom:8px;line-height:1.3}
+    .count{font-family:'Courier New',monospace;font-size:11px;color:#8A8A8E;letter-spacing:1px;margin-bottom:48px}
+    .empty{font-family:'Courier New',monospace;font-size:13px;color:#8A8A8E;margin-top:48px}
+    .applink{margin-top:48px;padding-top:32px;border-top:1px solid #E5E1DA}
+    .applink a{font-family:'Courier New',monospace;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#1C1C1E;text-decoration:none;background:#1C1C1E;color:#FAF9F7;padding:12px 24px;display:inline-block}
+    @media(prefers-color-scheme:dark){
+      body{background:#0E0E0E;color:#F0EDE8}
+      h1{color:#F0EDE8}
+      div[style*="1C1C1E"]{color:#F0EDE8 !important}
+      .brand,.count,.empty{color:#555}
+      .brand a{color:#555}
+      div[style*="E5E1DA"]{border-color:#2A2A2A !important}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><a href="/">Box Fraise</a></div>
+  <h1>${displayName}</h1>
+  <div class="count">${entries.length} ${entries.length === 1 ? 'place' : 'places'}</div>
+  ${entries.length > 0 ? placeItems : '<div class="empty">no places yet</div>'}
+  <div class="applink">
+    <a href="https://apps.apple.com/app/box-fraise">Get the app →</a>
+  </div>
+</div>
+</body>
+</html>`);
+  } catch { res.status(500).send('<h1>Error</h1>'); }
+});
+
 // Sentry error handler — must be after all routes
 app.use(Sentry.expressErrorHandler());
 

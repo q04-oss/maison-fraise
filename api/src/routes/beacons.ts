@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { beacons, businesses, users, messages } from '../db/schema';
 import { requireUser } from '../lib/auth';
+import { sendPushNotification } from '../lib/push';
 
 const router = Router();
 
@@ -62,6 +63,35 @@ router.post('/visit', requireUser, async (req: Request, res: Response) => {
     `);
     const visit_count = (((countRows as any).rows ?? countRows)[0] as any)?.visit_count ?? 0;
     res.json({ ok: true, visit_count, recorded: true });
+
+    // Presence feed push — notify savers if the visitor has feed_visible = true
+    // Fire after response so it doesn't slow down the client
+    db.execute(sql`
+      SELECT u.feed_visible, u.display_name, b.name AS business_name
+      FROM users u
+      JOIN businesses b ON b.id = ${business_id}
+      WHERE u.id = ${userId}
+      LIMIT 1
+    `).then(async infoRows => {
+      const info = (((infoRows as any).rows ?? infoRows)[0] as any);
+      if (!info?.feed_visible) return;
+
+      const saverRows = await db.execute(sql`
+        SELECT u.push_token
+        FROM user_saves s
+        JOIN users u ON u.id = s.saver_id
+        WHERE s.saved_user_id = ${userId}
+          AND u.push_token IS NOT NULL
+      `);
+      const savers = (saverRows as any).rows ?? saverRows;
+      await Promise.all((savers as any[]).map((s: any) =>
+        s.push_token ? sendPushNotification(s.push_token, {
+          title: info.business_name,
+          body: `${info.display_name} just visited.`,
+          data: { screen: 'feed' },
+        }).catch(() => {}) : Promise.resolve()
+      ));
+    }).catch(() => {});
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 

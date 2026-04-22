@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, ActivityIndicator, Alert, Share } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { TrueSheet } from '@lodev09/react-native-true-sheet';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchUserMaps, fetchMap, saveUser, unsaveUser, checkUserSaved } from '../../lib/api';
+
+const MAP_BASE_URL = 'https://api.fraise.chat/map';
 
 const SHEET_NAME = 'main-sheet';
 
@@ -60,6 +62,14 @@ export default function UserProfilePanel() {
     }
   }, [saved, userId]);
 
+  const handleShareMap = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Share.share({
+      message: `${displayName}'s map on Box Fraise`,
+      url: `${MAP_BASE_URL}/${userId}`,
+    }).catch(() => {});
+  }, [userId, displayName]);
+
   const handleOpenMap = useCallback(async (map: UserMap) => {
     if (map.entry_count === 0) {
       Alert.alert('Empty map', 'This map has no locations yet.');
@@ -97,16 +107,21 @@ export default function UserProfilePanel() {
             <Text style={[styles.saveCount, { color: c.muted }]}>{saveCount} {saveCount === 1 ? 'save' : 'saves'}</Text>
           )}
         </View>
-        <TouchableOpacity
-          style={[styles.saveBtn, { borderColor: saved ? c.accent : c.border }]}
-          onPress={handleSaveToggle}
-          disabled={savingInProgress}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.saveBtnText, { color: saved ? c.accent : c.muted }]}>
-            {saved ? 'saved' : 'save'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleShareMap} activeOpacity={0.7} style={styles.shareBtn}>
+            <Text style={[styles.saveBtnText, { color: c.muted }]}>share</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveBtn, { borderColor: saved ? c.accent : c.border }]}
+            onPress={handleSaveToggle}
+            disabled={savingInProgress}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.saveBtnText, { color: saved ? c.accent : c.muted }]}>
+              {saved ? 'saved' : 'save'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={[styles.divider, { backgroundColor: c.border }]} />
@@ -151,6 +166,8 @@ const styles = StyleSheet.create({
   identity: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md, paddingTop: SPACING.lg, paddingBottom: SPACING.md },
   name: { fontSize: 28, fontFamily: fonts.playfair },
   saveCount: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1, marginTop: 4 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  shareBtn: { paddingHorizontal: 12, paddingVertical: 6 },
   saveBtn: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6 },
   saveBtnText: { fontSize: 11, fontFamily: fonts.dmMono, letterSpacing: 1 },
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: SPACING.md, marginBottom: SPACING.md },
