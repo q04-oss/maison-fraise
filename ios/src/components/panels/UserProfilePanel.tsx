@@ -35,7 +35,8 @@ export default function UserProfilePanel() {
       fetchUserMaps(userId),
       checkUserSaved(userId),
     ]).then(([profileData, saveData]) => {
-      setMaps(profileData.maps ?? profileData);
+      const allMaps = profileData.maps ?? profileData;
+      setMaps(allMaps.slice(0, 1)); // one map per user
       setSaveCount(profileData.save_count ?? 0);
       setSaved(saveData.saved);
     }).catch(() => {}).finally(() => setLoading(false));
@@ -110,12 +111,12 @@ export default function UserProfilePanel() {
 
       <View style={[styles.divider, { backgroundColor: c.border }]} />
 
-      <Text style={[styles.sectionLabel, { color: c.muted }]}>maps</Text>
+      <Text style={[styles.sectionLabel, { color: c.muted }]}>map</Text>
 
       {loading ? (
         <ActivityIndicator color={c.muted} style={{ marginTop: SPACING.lg }} />
       ) : maps.length === 0 ? (
-        <Text style={[styles.empty, { color: c.muted }]}>no maps yet</Text>
+        <Text style={[styles.empty, { color: c.muted }]}>no map yet</Text>
       ) : (
         maps.map(map => (
           <TouchableOpacity

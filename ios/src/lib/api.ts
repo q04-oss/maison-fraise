@@ -696,7 +696,7 @@ export async function verifyAppleSignIn(params: {
   firstName?: string;
   lastName?: string;
   email?: string;
-}): Promise<{ user_id: number; token: string; is_new: boolean; email?: string }> {
+}): Promise<{ user_id: number; token: string; is_new: boolean; email?: string; display_name?: string; verified?: boolean; is_shop?: boolean; business_id?: number | null }> {
   const r = await fetch(`${BASE_URL}/api/auth/apple/verify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -4069,6 +4069,38 @@ export async function setFeedVisibility(visible: boolean) {
 }
 
 // ─── Beacon visit tracking ────────────────────────────────────────────────────
+
+export async function fetchMyVisitCounts(): Promise<Record<number, number>> {
+  const auth = await authHeader();
+  if (!auth['Authorization']) return {};
+  const r = await fetch(`${BASE_URL}/api/beacons/visits/mine`, { headers: auth });
+  if (!r.ok) return {};
+  const rows: { business_id: number; visit_count: number }[] = await r.json();
+  return Object.fromEntries(rows.map(r => [r.business_id, r.visit_count]));
+}
+
+export async function fetchMyBeacons(): Promise<{ id: number; uuid: string; major: number; minor: number; name: string | null; active: boolean }[]> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/beacons/mine`, { headers: auth });
+  if (!r.ok) return [];
+  return r.json();
+}
+
+export async function registerBeacon(payload: { uuid: string; major?: number; minor?: number; name?: string }): Promise<any> {
+  const auth = await authHeader();
+  const r = await fetch(`${BASE_URL}/api/beacons/admin`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(payload),
+  });
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error ?? 'failed'); }
+  return r.json();
+}
+
+export async function deactivateBeacon(id: number): Promise<void> {
+  const auth = await authHeader();
+  await fetch(`${BASE_URL}/api/beacons/admin/${id}`, { method: 'DELETE', headers: auth });
+}
 
 export async function recordBeaconVisit(businessId: number, beaconUuid: string): Promise<{ ok: boolean; visit_count: number; recorded: boolean }> {
   const auth = await authHeader();
