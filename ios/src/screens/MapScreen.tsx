@@ -84,6 +84,39 @@ const calloutStyles = StyleSheet.create({
   cta: { fontSize: 9, color: '#C9973A', marginTop: 2, letterSpacing: 0.5 },
 });
 
+function PopupCallout({ biz, live, onPress }: { biz: any; live: boolean; onPress: () => void }) {
+  const confirmed = biz.food_popup_status === 'confirmed';
+  const paidCount: number = biz.food_paid_count ?? 0;
+  const threshold: number | null = biz.min_orders_to_confirm ?? null;
+
+  const dateStr = confirmed && biz.starts_at
+    ? new Date(biz.starts_at).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' })
+    : null;
+
+  return (
+    <Callout onPress={onPress} tooltip>
+      <View style={calloutStyles.container}>
+        <View style={calloutStyles.row}>
+          <View style={[calloutStyles.dot, { backgroundColor: live ? '#C0392B' : '#C0392B' }]} />
+          <Text style={[calloutStyles.status, { color: '#C0392B' }]} numberOfLines={1}>
+            {live ? 'LIVE NOW' : confirmed ? 'CONFIRMED' : 'POPUP'}
+          </Text>
+        </View>
+        <Text style={calloutStyles.name} numberOfLines={1}>{biz.name}</Text>
+        {confirmed && dateStr
+          ? <Text style={calloutStyles.subtitle} numberOfLines={1}>{dateStr}</Text>
+          : threshold
+            ? <Text style={calloutStyles.subtitle} numberOfLines={1}>{paidCount} of {threshold} to confirm</Text>
+            : paidCount > 0
+              ? <Text style={calloutStyles.subtitle} numberOfLines={1}>{paidCount} prepaid</Text>
+              : null
+        }
+        <Text style={calloutStyles.cta}>tap to open  →</Text>
+      </View>
+    </Callout>
+  );
+}
+
 function AuditionPopupPin({ live }: { live: boolean }) {
   const anim0 = useRef(new Animated.Value(0)).current;
   const anim1 = useRef(new Animated.Value(0)).current;
@@ -548,12 +581,12 @@ export default function MapScreen() {
               key={`popup-${b.id}`}
               coordinate={{ latitude: b.lat, longitude: b.lng }}
               tracksViewChanges={live}
-              onPress={() => handlePopupPress(b)}
             >
               {live
                 ? <LivePopupPin color="#C0392B" />
                 : <View style={[styles.pinCircle, { backgroundColor: '#C0392B' }]} />
               }
+              <PopupCallout biz={b} live={live} onPress={() => handlePopupPress(b)} />
             </Marker>
           );
         })}

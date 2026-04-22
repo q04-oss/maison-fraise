@@ -307,6 +307,60 @@ router.post('/webhook', async (req: Request, res: Response) => {
             }
           }).catch(() => {});
         }
+      } else if (type === 'popup_food_order') {
+        const [foodOrder] = await db
+          .select({ id: sql<number>`id`, status: sql<string>`status`, popup_id: sql<number>`popup_id` })
+          .from(sql`popup_food_orders`)
+          .where(sql`stripe_payment_intent_id = ${pi.id}`);
+        if (foodOrder && foodOrder.status === 'pending') {
+          await db.execute(sql`UPDATE popup_food_orders SET status = 'paid' WHERE id = ${foodOrder.id}`);
+          logger.info(`Popup food order ${foodOrder.id} paid`);
+
+          const popup_id = foodOrder.popup_id;
+          const [popupRow] = await db
+            .select({
+              food_popup_status: sql<string>`food_popup_status`,
+              min_orders: sql<number>`min_orders_to_confirm`,
+            })
+            .from(sql`businesses`)
+            .where(sql`id = ${popup_id}`);
+
+          if (popupRow && popupRow.food_popup_status === 'announced' && popupRow.min_orders) {
+            const [{ cnt }] = await db
+              .select({ cnt: sql<number>`cast(count(*) as int)` })
+              .from(sql`popup_food_orders`)
+              .where(sql`popup_id = ${popup_id} AND status IN ('paid', 'claimed')`);
+
+            if (cnt >= popupRow.min_orders) {
+              await db.execute(sql`UPDATE businesses SET food_popup_status = 'confirmed', confirmed_at = now() WHERE id = ${popup_id}`);
+              logger.info(`Popup ${popup_id} confirmed after ${cnt} orders`);
+
+              const buyers = await db
+                .select({ push_token: sql<string | null>`u.push_token` })
+                .from(sql`popup_food_orders pfo JOIN users u ON u.id = pfo.buyer_user_id`)
+                .where(sql`pfo.popup_id = ${popup_id} AND pfo.status IN ('paid', 'claimed') AND u.push_token IS NOT NULL`);
+
+              const [bizRow] = await db
+                .select({ name: sql<string>`name`, starts_at: sql<string>`starts_at` })
+                .from(sql`businesses`)
+                .where(sql`id = ${popup_id}`);
+
+              const dateStr = bizRow?.starts_at
+                ? new Date(bizRow.starts_at).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                : 'soon';
+
+              await Promise.allSettled(
+                buyers
+                  .filter(b => b.push_token)
+                  .map(b => sendPushNotification(b.push_token!, {
+                    title: `${bizRow?.name ?? 'Popup'} is confirmed`,
+                    body: `Enough orders came in. It's happening — ${dateStr}.`,
+                    data: { screen: 'popup', popup_id },
+                  }).catch(() => {}))
+              );
+            }
+          }
+        }
       } else if (type === 'popup_request') {
         const [request] = await db
           .select()

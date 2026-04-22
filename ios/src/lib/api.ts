@@ -318,6 +318,85 @@ export async function createPopupRsvp(popupId: number) {
   return res.json() as Promise<{ id: number; client_secret: string }>;
 }
 
+export interface PopupMenuItem {
+  id: number;
+  name: string;
+  description: string | null;
+  price_cents: number | null;
+  category: string;
+}
+
+export interface PopupFoodOrder {
+  id: number;
+  menu_item_id: number;
+  item_name: string;
+  item_category: string;
+  buyer_user_id: number;
+  recipient_user_id: number | null;
+  quantity: number;
+  total_cents: number;
+  status: string;
+  note: string | null;
+  claimed_at: string | null;
+  created_at: string;
+}
+
+export async function fetchPopupFoodMenu(popupId: number): Promise<PopupMenuItem[]> {
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-menu`);
+  if (!res.ok) throw new Error('Failed to fetch food menu');
+  return res.json();
+}
+
+export interface PopupFoodOrdersResponse {
+  mine: PopupFoodOrder[];
+  claimable: PopupFoodOrder[];
+  status: 'announced' | 'confirmed';
+  confirmed_at: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  paid_count: number;
+  min_orders_to_confirm: number | null;
+}
+
+export async function fetchPopupFoodOrders(popupId: number): Promise<PopupFoodOrdersResponse> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-orders`, { headers: auth });
+  if (!res.ok) throw new Error('Failed to fetch food orders');
+  return res.json();
+}
+
+export async function createPopupFoodOrder(popupId: number, body: {
+  menu_item_id: number;
+  quantity?: number;
+  recipient_user_id?: number;
+  for_anyone?: boolean;
+  note?: string;
+}): Promise<{ id: number; client_secret: string }> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? 'Failed to create order');
+  }
+  return res.json();
+}
+
+export async function claimPopupFoodOrder(popupId: number, orderId: number): Promise<void> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-orders/${orderId}/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? 'Failed to claim order');
+  }
+}
+
 export async function checkInPopup(popupId: number, nfc_token: string) {
   const auth = await authHeader();
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/checkin`, {

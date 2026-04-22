@@ -224,6 +224,27 @@ export async function ensureSchema(): Promise<void> {
     created_at timestamptz NOT NULL DEFAULT now()
   )`);
 
+  // ── Food popup crowd-confirm columns ─────────────────────────────────────────
+  await run('businesses.food_popup_status', sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS food_popup_status text NOT NULL DEFAULT 'announced'`);
+  await run('businesses.min_orders_to_confirm', sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS min_orders_to_confirm integer`);
+  await run('businesses.confirmed_at', sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS confirmed_at timestamptz`);
+
+  // ── Popup food orders ────────────────────────────────────────────────────────
+  await run('popup_food_orders', sql`CREATE TABLE IF NOT EXISTS popup_food_orders (
+    id SERIAL PRIMARY KEY,
+    popup_id INTEGER NOT NULL REFERENCES businesses(id),
+    menu_item_id INTEGER NOT NULL REFERENCES business_menu_items(id),
+    buyer_user_id INTEGER NOT NULL REFERENCES users(id),
+    recipient_user_id INTEGER REFERENCES users(id),
+    quantity INTEGER NOT NULL DEFAULT 1,
+    total_cents INTEGER NOT NULL,
+    stripe_payment_intent_id TEXT UNIQUE,
+    status TEXT NOT NULL DEFAULT 'pending',
+    note TEXT,
+    claimed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Indexes ──────────────────────────────────────────────────────────────────
   await run('nfc_connections_pair_unique', sql`
     CREATE UNIQUE INDEX IF NOT EXISTS nfc_connections_pair_unique

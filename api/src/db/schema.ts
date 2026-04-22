@@ -234,6 +234,10 @@ export const businesses = pgTable('businesses', {
   beacon_uuid: text('beacon_uuid').unique(),
   // Walk-in purchases: only true for the chocolatier's own counter (Marché Atwater)
   allows_walkin: boolean('allows_walkin').notNull().default(false),
+  // Food popup crowd-confirm
+  food_popup_status: text('food_popup_status').notNull().default('announced'), // 'announced' | 'confirmed'
+  min_orders_to_confirm: integer('min_orders_to_confirm'),
+  confirmed_at: timestamp('confirmed_at'),
   // Sticker store
   sticker_concept: text('sticker_concept'),
   sticker_emoji: text('sticker_emoji'),
@@ -489,6 +493,21 @@ export const popupCheckins = pgTable('popup_checkins', {
   popup_id: integer('popup_id').notNull().references(() => businesses.id),
   user_id: integer('user_id').notNull().references(() => users.id),
   nfc_token: text('nfc_token'),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const popupFoodOrders = pgTable('popup_food_orders', {
+  id: serial('id').primaryKey(),
+  popup_id: integer('popup_id').notNull().references(() => businesses.id),
+  menu_item_id: integer('menu_item_id').notNull().references(() => businessMenuItems.id),
+  buyer_user_id: integer('buyer_user_id').notNull().references(() => users.id),
+  recipient_user_id: integer('recipient_user_id').references(() => users.id), // null = claimable by anyone
+  quantity: integer('quantity').notNull().default(1),
+  total_cents: integer('total_cents').notNull(),
+  stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
+  status: text('status').notNull().default('pending'), // 'pending' | 'paid' | 'claimed' | 'cancelled'
+  note: text('note'),
+  claimed_at: timestamp('claimed_at'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

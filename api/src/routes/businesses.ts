@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { eq, asc, and, sql, lt, gte } from 'drizzle-orm';
 import { db } from '../db';
-import { businesses, portraits, businessVisits, employmentContracts, users, locations } from '../db/schema';
+import { businesses, portraits, businessVisits, employmentContracts, users, locations, popupFoodOrders } from '../db/schema';
 import { stripe } from '../lib/stripe';
 import { logger } from '../lib/logger';
 import { requireUser } from '../lib/auth';
@@ -15,6 +15,16 @@ db.execute(sql`ALTER TABLE businesses ADD COLUMN IF NOT EXISTS venture_id intege
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const rows = await db.select().from(businesses);
+    const popupIds = rows.filter(b => b.type === 'popup').map(b => b.id);
+    const foodCountRows = popupIds.length > 0
+      ? await db
+          .select({ popup_id: popupFoodOrders.popup_id, cnt: sql<number>`cast(count(*) as int)` })
+          .from(popupFoodOrders)
+          .where(sql`popup_id IN (${sql.join(popupIds.map(id => sql`${id}`), sql`, `)}) AND status IN ('paid','claimed')`)
+          .groupBy(popupFoodOrders.popup_id)
+      : [];
+    const foodCountByBiz = new Map(foodCountRows.map(r => [r.popup_id, r.cnt]));
+
     const [contracts, shopAccounts, locationRows] = await Promise.all([
       db.select({
         business_id: employmentContracts.business_id,
@@ -47,6 +57,7 @@ router.get('/', async (_req: Request, res: Response) => {
       placed_user_name: placedByBiz.get(b.id) ?? null,
       shop_user_id: shopByBiz.get(b.id) ?? null,
       location_id: locationByBiz.get(b.id) ?? null,
+      food_paid_count: b.type === 'popup' ? (foodCountByBiz.get(b.id) ?? 0) : undefined,
     })));
   } catch (err) {
     logger.error('[businesses] GET / error:', err);

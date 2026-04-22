@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert } from 'rea
 import { usePanel, Variety } from '../../context/PanelContext';
 import { useColors, fonts } from '../../theme';
 import { SPACING } from '../../theme';
-import { formatHours24 } from '../../lib/geo';
 
 export default function LocationPanel() {
   const { goBack, showPanel, setOrder, setActiveLocation, activeLocation, varieties, businesses, order } = usePanel();
@@ -34,8 +33,24 @@ export default function LocationPanel() {
   };
 
   const isPopup = activeLocation?.type === 'popup';
-  const popupDate = isPopup && activeLocation?.launched_at
-    ? (activeLocation.hours ? formatHours24(activeLocation.hours) : new Date(activeLocation.launched_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' }))
+  const loc = activeLocation as any;
+
+  const foodStatus: string = loc?.food_popup_status ?? 'announced';
+  const isConfirmed = isPopup && foodStatus === 'confirmed';
+  const isLive = isPopup && (() => {
+    if (!loc?.launched_at) return false;
+    const start = new Date(loc.launched_at);
+    const end = loc.ends_at ? new Date(loc.ends_at) : new Date(start.getTime() + 4 * 60 * 60 * 1000);
+    const now = new Date();
+    return now >= start && now < end;
+  })();
+
+  const paidCount: number = loc?.food_paid_count ?? 0;
+  const threshold: number | null = loc?.min_orders_to_confirm ?? null;
+  const progressPct = threshold ? Math.min(1, paidCount / threshold) : null;
+
+  const confirmedDateStr = isConfirmed && loc?.starts_at
+    ? new Date(loc.starts_at).toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
     : null;
 
   return (
@@ -45,46 +60,92 @@ export default function LocationPanel() {
           <Text style={[styles.backBtnText, { color: c.accent }]}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          {isPopup && <Text style={[styles.headerBadge, { color: '#C0392B' }]}>POPUP</Text>}
+          {isPopup && (
+            <Text style={[styles.headerBadge, { color: '#C0392B' }]}>
+              {isLive ? 'LIVE NOW' : isConfirmed ? 'CONFIRMED' : 'POPUP'}
+            </Text>
+          )}
           <Text style={[styles.title, { color: c.text }]} numberOfLines={1}>{activeLocation?.name ?? '—'}</Text>
-          {popupDate && <Text style={[styles.headerDate, { color: c.muted }]}>{popupDate}</Text>}
+          {isPopup && (
+            <Text style={[styles.headerDate, { color: isLive ? '#C0392B' : c.muted }]}>
+              {isLive ? 'happening now' : isConfirmed && confirmedDateStr ? confirmedDateStr : 'date TBD'}
+            </Text>
+          )}
         </View>
         <View style={styles.headerSpacer} />
       </View>
+
       {!isPopup && activeLocation?.address && (
         <Text style={[styles.address, { color: c.muted }]}>{activeLocation.address}</Text>
       )}
 
       <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.sectionLabel, { color: c.muted }]}>{isPopup ? 'AVAILABLE AT THIS POPUP' : 'AVAILABLE TODAY'}</Text>
-        {varieties.length === 0 ? (
-          <Text style={[styles.emptyText, { color: c.muted }]}>Nothing ready today.</Text>
-        ) : (
-          varieties.map(v => (
-            <TouchableOpacity
-              key={v.id}
-              style={[styles.varietyRow, { borderBottomColor: c.border }]}
-              onPress={() => handleVarietyPress(v)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.varietyDot, { backgroundColor: c.accent }]} />
-              <View style={styles.varietyInfo}>
-                <Text style={[styles.varietyName, { color: c.text }]}>{v.name}</Text>
-                {v.farm && (
-                  <Text style={[styles.varietyFarm, { color: c.muted }]}>{v.farm}</Text>
-                )}
-              </View>
-              <View style={styles.varietyRight}>
-                <Text style={[styles.varietyPrice, { color: c.text }]}>CA${(v.price_cents / 100).toFixed(2)}</Text>
-                <Text style={[styles.varietyStock, {
-                  color: v.stock_remaining <= 3 ? '#FF3B30' : v.stock_remaining <= 8 ? c.accent : c.muted
-                }]}>
-                  {v.stock_remaining <= 3 ? 'Almost gone' : v.stock_remaining <= 8 ? 'Selling fast' : `${v.stock_remaining} left`}
+
+        {/* ── Popup status block ── */}
+        {isPopup && (
+          <View style={[styles.popupStatus, { borderBottomColor: c.border }]}>
+            {loc?.description ? (
+              <Text style={[styles.popupDesc, { color: c.muted }]}>{loc.description}</Text>
+            ) : null}
+
+            {!isConfirmed && (
+              <>
+                <Text style={[styles.popupStatusText, { color: c.muted }]}>
+                  {threshold
+                    ? `${paidCount} of ${threshold} orders to confirm`
+                    : `${paidCount} prepaid`}
                 </Text>
-              </View>
+                {progressPct !== null && (
+                  <View style={[styles.progressTrack, { backgroundColor: c.border }]}>
+                    <View style={[styles.progressFill, { backgroundColor: '#C0392B', width: `${Math.round(progressPct * 100)}%` as any }]} />
+                  </View>
+                )}
+              </>
+            )}
+
+            <TouchableOpacity
+              style={[styles.foodMenuBtn, { backgroundColor: '#C0392B' }]}
+              onPress={() => showPanel('popup-food', { popupId: activeLocation.id, popupName: activeLocation.name })}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.foodMenuBtnText, { color: '#fff' }]}>
+                {isLive ? 'order food' : 'prepay for food'}
+              </Text>
+              <Text style={[styles.foodMenuArrow, { color: '#fff' }]}>→</Text>
             </TouchableOpacity>
-          ))
+          </View>
         )}
+
+        {varieties.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: c.muted }]}>{isPopup ? 'ALSO AVAILABLE' : 'AVAILABLE TODAY'}</Text>
+            {varieties.map(v => (
+              <TouchableOpacity
+                key={v.id}
+                style={[styles.varietyRow, { borderBottomColor: c.border }]}
+                onPress={() => handleVarietyPress(v)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.varietyDot, { backgroundColor: c.accent }]} />
+                <View style={styles.varietyInfo}>
+                  <Text style={[styles.varietyName, { color: c.text }]}>{v.name}</Text>
+                  {v.farm && (
+                    <Text style={[styles.varietyFarm, { color: c.muted }]}>{v.farm}</Text>
+                  )}
+                </View>
+                <View style={styles.varietyRight}>
+                  <Text style={[styles.varietyPrice, { color: c.text }]}>CA${(v.price_cents / 100).toFixed(2)}</Text>
+                  <Text style={[styles.varietyStock, {
+                    color: v.stock_remaining <= 3 ? '#FF3B30' : v.stock_remaining <= 8 ? c.accent : c.muted
+                  }]}>
+                    {v.stock_remaining <= 3 ? 'Almost gone' : v.stock_remaining <= 8 ? 'Selling fast' : `${v.stock_remaining} left`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
+
         <View style={{ height: SPACING.xl }} />
       </ScrollView>
     </View>
@@ -109,6 +170,28 @@ const styles = StyleSheet.create({
   headerDate: { fontSize: 13, fontFamily: fonts.dmSans },
   headerSpacer: { width: 40 },
   address: { fontSize: 13, fontFamily: fonts.dmSans, textAlign: 'center', paddingTop: 4, paddingBottom: 4, paddingHorizontal: SPACING.md },
+  list: { flex: 1 },
+  popupStatus: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 10,
+  },
+  popupDesc: { fontSize: 13, fontFamily: fonts.dmSans, lineHeight: 19 },
+  popupStatusText: { fontSize: 12, fontFamily: fonts.dmMono },
+  progressTrack: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: 3, borderRadius: 2 },
+  foodMenuBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  foodMenuBtnText: { fontSize: 14, fontFamily: fonts.dmSans, fontWeight: '600' },
+  foodMenuArrow: { fontSize: 16 },
   sectionLabel: {
     fontSize: 10,
     fontFamily: fonts.dmMono,
@@ -117,7 +200,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  list: { flex: 1 },
   emptyText: { fontSize: 15, fontFamily: fonts.dmSans, textAlign: 'center', marginTop: 32, fontStyle: 'italic' },
   varietyRow: {
     flexDirection: 'row',
@@ -134,5 +216,4 @@ const styles = StyleSheet.create({
   varietyRight: { alignItems: 'flex-end', gap: 4 },
   varietyPrice: { fontSize: 15, fontFamily: fonts.dmMono },
   varietyStock: { fontSize: 11, fontFamily: fonts.dmSans },
-  chatLabel: { fontSize: 10, fontFamily: fonts.dmMono, letterSpacing: 1 },
 });

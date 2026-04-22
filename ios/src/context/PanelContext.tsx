@@ -26,7 +26,8 @@ export type PanelId =
   | 'propose-business'
   | 'memory-prompt'
   | 'conversations'
-  | 'chat-thread';
+  | 'chat-thread'
+  | 'popup-food';
 
 export interface OrderState {
   variety_id: number | null;

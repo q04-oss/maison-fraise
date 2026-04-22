@@ -26,6 +26,7 @@ import ProposeBusinessPanel from './panels/ProposeBusinessPanel';
 import MemoryPromptPanel from './panels/MemoryPromptPanel';
 import ConversationsPanel from './panels/ConversationsPanel';
 import ChatThreadPanel from './panels/ChatThreadPanel';
+import PopupFoodPanel from './panels/PopupFoodPanel';
 import { TierGate, PANEL_TIER_REQUIREMENTS } from './TierGate';
 
 const PANELS: Record<string, React.ComponentType<any>> = {
@@ -52,6 +53,7 @@ const PANELS: Record<string, React.ComponentType<any>> = {
   'memory-prompt': MemoryPromptPanel,
   'conversations': ConversationsPanel,
   'chat-thread': ChatThreadPanel,
+  'popup-food': PopupFoodPanel,
 };
 
 const FULL_HEIGHT_PANELS = new Set([
@@ -60,6 +62,7 @@ const FULL_HEIGHT_PANELS = new Set([
   'staff-orders',
   'merch',
   'gift',
+  'popup-food',
 ]);
 
 // Panels that collapse the sheet so native system UI (NFC prompt) appears unobstructed

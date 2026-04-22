@@ -4,7 +4,9 @@ import { db } from '../db';
 import {
   businesses, users, popupRsvps, popupCheckins,
   popupNominations, djOffers, legitimacyEvents,
+  popupFoodOrders, businessMenuItems,
 } from '../db/schema';
+import { isNull, isNotNull } from 'drizzle-orm';
 import { stripe } from '../lib/stripe';
 import { sendPushNotification } from '../lib/push';
 import { sendNominationReceived } from '../lib/resend';
@@ -468,6 +470,273 @@ router.post('/:id/dj-pass', requireUser, async (req: Request, res: Response) => 
     }
 
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ─── Food popup ordering ───────────────────────────────────────────────────────
+
+// POST /api/popups/:id/cancel-food-popup — cancel and refund all prepaid orders
+router.post('/:id/cancel-food-popup', requireUser, async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const paid = await db
+      .select({ id: popupFoodOrders.id, stripe_payment_intent_id: popupFoodOrders.stripe_payment_intent_id })
+      .from(popupFoodOrders)
+      .where(and(
+        eq(popupFoodOrders.popup_id, popup_id),
+        sql`${popupFoodOrders.status} IN ('paid', 'claimed')`,
+        isNotNull(popupFoodOrders.stripe_payment_intent_id),
+      ));
+
+    let refunded = 0;
+    await Promise.allSettled(
+      paid.map(async o => {
+        try {
+          await stripe.refunds.create({ payment_intent: o.stripe_payment_intent_id! });
+          await db.execute(sql`UPDATE popup_food_orders SET status = 'cancelled' WHERE id = ${o.id}`);
+          refunded++;
+        } catch (e) {
+          logger.error(`Refund failed for order ${o.id}:`, e);
+        }
+      })
+    );
+
+    await db.execute(sql`UPDATE businesses SET food_popup_status = 'cancelled' WHERE id = ${popup_id}`);
+    res.json({ cancelled: true, refunded });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/popups/:id/food-menu
+router.get('/:id/food-menu', async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const items = await db
+      .select()
+      .from(businessMenuItems)
+      .where(and(eq(businessMenuItems.business_id, popup_id), eq(businessMenuItems.is_available, true)))
+      .orderBy(businessMenuItems.sort_order);
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/popups/:id/food-orders — my orders + claimable orders
+router.get('/:id/food-orders', requireUser, async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    // My orders: I bought or I'm the recipient
+    const mine = await db
+      .select({
+        id: popupFoodOrders.id,
+        menu_item_id: popupFoodOrders.menu_item_id,
+        item_name: businessMenuItems.name,
+        item_category: businessMenuItems.category,
+        buyer_user_id: popupFoodOrders.buyer_user_id,
+        recipient_user_id: popupFoodOrders.recipient_user_id,
+        quantity: popupFoodOrders.quantity,
+        total_cents: popupFoodOrders.total_cents,
+        status: popupFoodOrders.status,
+        note: popupFoodOrders.note,
+        claimed_at: popupFoodOrders.claimed_at,
+        created_at: popupFoodOrders.created_at,
+      })
+      .from(popupFoodOrders)
+      .innerJoin(businessMenuItems, eq(popupFoodOrders.menu_item_id, businessMenuItems.id))
+      .where(
+        and(
+          eq(popupFoodOrders.popup_id, popup_id),
+          sql`(${popupFoodOrders.buyer_user_id} = ${user_id} OR ${popupFoodOrders.recipient_user_id} = ${user_id})`,
+          sql`${popupFoodOrders.status} IN ('paid', 'claimed')`,
+        ),
+      );
+
+    // Claimable: authorized or paid, no recipient, not bought by me
+    const claimable = await db
+      .select({
+        id: popupFoodOrders.id,
+        menu_item_id: popupFoodOrders.menu_item_id,
+        item_name: businessMenuItems.name,
+        item_category: businessMenuItems.category,
+        buyer_user_id: popupFoodOrders.buyer_user_id,
+        quantity: popupFoodOrders.quantity,
+        total_cents: popupFoodOrders.total_cents,
+        status: popupFoodOrders.status,
+        note: popupFoodOrders.note,
+        created_at: popupFoodOrders.created_at,
+      })
+      .from(popupFoodOrders)
+      .innerJoin(businessMenuItems, eq(popupFoodOrders.menu_item_id, businessMenuItems.id))
+      .where(
+        and(
+          eq(popupFoodOrders.popup_id, popup_id),
+          sql`${popupFoodOrders.status} IN ('paid')`,
+          isNull(popupFoodOrders.recipient_user_id),
+          sql`${popupFoodOrders.buyer_user_id} != ${user_id}`,
+        ),
+      );
+
+    // Popup status + counts
+    const [popup] = await db
+      .select({
+        food_popup_status: businesses.food_popup_status,
+        min_orders_to_confirm: businesses.min_orders_to_confirm,
+        confirmed_at: businesses.confirmed_at,
+        starts_at: businesses.starts_at,
+        ends_at: businesses.ends_at,
+      })
+      .from(businesses)
+      .where(eq(businesses.id, popup_id));
+
+    const [{ paid_count }] = await db
+      .select({ paid_count: sql<number>`cast(count(*) as int)` })
+      .from(popupFoodOrders)
+      .where(and(eq(popupFoodOrders.popup_id, popup_id), sql`${popupFoodOrders.status} IN ('paid', 'claimed')`));
+
+    res.json({
+      mine,
+      claimable,
+      status: popup?.food_popup_status ?? 'announced',
+      confirmed_at: popup?.confirmed_at ?? null,
+      starts_at: popup?.starts_at ?? null,
+      ends_at: popup?.ends_at ?? null,
+      paid_count,
+      min_orders_to_confirm: popup?.min_orders_to_confirm ?? null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/popups/:id/food-orders — purchase a food item
+router.post('/:id/food-orders', requireUser, async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+
+  const { menu_item_id, quantity = 1, recipient_user_id, for_anyone, note } = req.body;
+  if (!menu_item_id || isNaN(parseInt(menu_item_id, 10))) {
+    res.status(400).json({ error: 'menu_item_id required' }); return;
+  }
+
+  try {
+    const [item] = await db
+      .select()
+      .from(businessMenuItems)
+      .where(and(eq(businessMenuItems.id, parseInt(menu_item_id, 10)), eq(businessMenuItems.business_id, popup_id)));
+    if (!item) { res.status(404).json({ error: 'Menu item not found' }); return; }
+    if (!item.price_cents) { res.status(400).json({ error: 'Item has no price' }); return; }
+
+    const qty = Math.max(1, Math.min(10, parseInt(String(quantity), 10) || 1));
+    const total_cents = item.price_cents * qty;
+
+    // recipient: null = claimable by anyone, specific user, or self
+    const recipient: number | null = for_anyone
+      ? null
+      : (recipient_user_id ? parseInt(String(recipient_user_id), 10) : user_id);
+
+    const [popup] = await db.select({ name: businesses.name }).from(businesses).where(eq(businesses.id, popup_id));
+
+    const pi = await stripe.paymentIntents.create({
+      amount: total_cents,
+      currency: 'cad',
+      metadata: {
+        type: 'popup_food_order',
+        popup_id: String(popup_id),
+        buyer_user_id: String(user_id),
+        menu_item_id: String(item.id),
+        quantity: String(qty),
+        recipient_user_id: recipient !== null ? String(recipient) : '',
+        popup_name: popup?.name ?? '',
+      },
+    });
+
+    const [order] = await db
+      .insert(popupFoodOrders)
+      .values({
+        popup_id,
+        menu_item_id: item.id,
+        buyer_user_id: user_id,
+        recipient_user_id: recipient,
+        quantity: qty,
+        total_cents,
+        stripe_payment_intent_id: pi.id,
+        status: 'pending',
+        note: note ?? null,
+      })
+      .returning();
+
+    res.status(201).json({ id: order.id, client_secret: pi.client_secret });
+  } catch (err) {
+    logger.error('Popup food order creation error', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/popups/:id/announce — send mass push to all users, set status announced
+router.post('/:id/announce', requireUser, async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+  try {
+    const [popup] = await db.select().from(businesses).where(eq(businesses.id, popup_id));
+    if (!popup) { res.status(404).json({ error: 'Popup not found' }); return; }
+
+    const { min_orders } = req.body;
+    if (min_orders) {
+      await db.execute(sql`UPDATE businesses SET min_orders_to_confirm = ${parseInt(String(min_orders), 10)} WHERE id = ${popup_id}`);
+    }
+
+    // Push to all users with a push token
+    const allUsers = await db.select({ push_token: users.push_token }).from(users).where(sql`push_token IS NOT NULL`);
+    const pushes = allUsers
+      .filter(u => u.push_token)
+      .map(u => sendPushNotification(u.push_token!, {
+        title: popup.name,
+        body: `New popup announced. Prepay to lock in your spot — date confirmed once enough orders come in.`,
+        data: { screen: 'popup', popup_id },
+      }).catch(() => {}));
+    await Promise.allSettled(pushes);
+
+    res.json({ announced: true, pushed: allUsers.length });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/popups/:id/food-orders/:orderId/claim — claim an open order
+router.post('/:id/food-orders/:orderId/claim', requireUser, async (req: Request, res: Response) => {
+  const popup_id = parseInt(req.params.id, 10);
+  const order_id = parseInt(req.params.orderId, 10);
+  const user_id: number = (req as any).userId;
+  if (isNaN(popup_id) || isNaN(order_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
+
+  try {
+    const updated = await db
+      .update(popupFoodOrders)
+      .set({ recipient_user_id: user_id, status: 'claimed', claimed_at: new Date() })
+      .where(
+        and(
+          eq(popupFoodOrders.id, order_id),
+          eq(popupFoodOrders.popup_id, popup_id),
+          eq(popupFoodOrders.status, 'paid'),
+          isNull(popupFoodOrders.recipient_user_id),
+          sql`${popupFoodOrders.buyer_user_id} != ${user_id}`,
+        ),
+      )
+      .returning({ id: popupFoodOrders.id });
+
+    if (updated.length === 0) {
+      res.status(409).json({ error: 'Order not claimable' }); return;
+    }
+    res.json({ claimed: true });
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
