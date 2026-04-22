@@ -405,6 +405,31 @@ export async function fetchMyFundContributions(): Promise<{ total_cents: number;
   return res.json();
 }
 
+export interface CommunityPopupInterest {
+  id: number;
+  concept: string | null;
+  note: string | null;
+  status: 'pending' | 'contacted' | 'done';
+  created_at: string;
+}
+
+export async function fetchMyPopupInterest(): Promise<CommunityPopupInterest | null> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/community-fund/my-interest`, { headers: auth });
+  if (!res.ok) throw new Error('Failed to fetch interest');
+  return res.json();
+}
+
+export async function submitPopupInterest(body: { concept?: string; note?: string; business_id?: number }): Promise<void> {
+  const auth = await authHeader();
+  const res = await fetch(`${BASE_URL}/api/community-fund/interest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...auth },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error('Failed to submit interest');
+}
+
 export interface PopupMenuItem {
   id: number;
   name: string;

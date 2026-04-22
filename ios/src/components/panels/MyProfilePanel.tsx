@@ -21,6 +21,7 @@ import {
   fetchMyBeacons, registerBeacon, deactivateBeacon,
   fetchMerchHistory, PopupMerchOrder,
   fetchMyFundContributions,
+  fetchMyPopupInterest, submitPopupInterest, CommunityPopupInterest,
 } from '../../lib/api';
 
 function timeAgo(isoDate: string): string {
@@ -68,6 +69,11 @@ export default function MyProfilePanel() {
   const [merchSent, setMerchSent] = useState<PopupMerchOrder[]>([]);
   const [merchReceived, setMerchReceived] = useState<PopupMerchOrder[]>([]);
   const [fundTotalCents, setFundTotalCents] = useState(0);
+  const [popupInterest, setPopupInterest] = useState<CommunityPopupInterest | null | undefined>(undefined);
+  const [interestConcept, setInterestConcept] = useState('');
+  const [interestNote, setInterestNote] = useState('');
+  const [submittingInterest, setSubmittingInterest] = useState(false);
+  const [showInterestForm, setShowInterestForm] = useState(false);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_db_id', 'is_shop']).then(([idEntry, shopEntry]) => {
@@ -94,7 +100,10 @@ export default function MyProfilePanel() {
     fetchMyBusinessProposals().then(p => setProposals(p)).catch(() => {});
     fetchMerchHistory().then(h => { setMerchSent(h.sent); setMerchReceived(h.received); }).catch(() => {});
     fetchMyFundContributions().then(r => setFundTotalCents(r.total_cents)).catch(() => {});
-    if (shop) fetchMyBeacons().then(b => setMyBeacons(b)).catch(() => {});
+    if (shop) {
+      fetchMyBeacons().then(b => setMyBeacons(b)).catch(() => {});
+      fetchMyPopupInterest().then(i => setPopupInterest(i)).catch(() => {});
+    }
   };
 
   const handleAddBeacon = async () => {
@@ -122,6 +131,21 @@ export default function MyProfilePanel() {
         setMyBeacons(prev => prev.filter(b => b.id !== id));
       }},
     ]);
+  };
+
+  const handleSubmitInterest = async () => {
+    setSubmittingInterest(true);
+    try {
+      await submitPopupInterest({ concept: interestConcept.trim() || undefined, note: interestNote.trim() || undefined });
+      const updated = await fetchMyPopupInterest();
+      setPopupInterest(updated);
+      setShowInterestForm(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not submit.');
+    } finally {
+      setSubmittingInterest(false);
+    }
   };
 
   const handleFeedToggle = useCallback(async (val: boolean) => {
@@ -419,6 +443,64 @@ export default function MyProfilePanel() {
                   </TouchableOpacity>
                 </View>
               ))}
+            </View>
+          )}
+
+          {/* Community popup interest — shop only */}
+          {isShop && popupInterest !== undefined && (
+            <View style={[styles.section, { borderBottomColor: c.border }]}>
+              <View style={styles.mapsHeader}>
+                <Text style={[styles.sectionLabel, { color: c.muted }]}>COMMUNITY POPUP</Text>
+                {!popupInterest && (
+                  <TouchableOpacity onPress={() => setShowInterestForm(v => !v)} activeOpacity={0.7}>
+                    <Text style={[styles.actionBtn, { color: c.accent }]}>{showInterestForm ? 'CANCEL' : 'I\'M INTERESTED'}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <Text style={[styles.subLine, { color: c.muted }]}>
+                Express interest in cooking a free meal for the community
+              </Text>
+
+              {popupInterest ? (
+                <View style={{ marginTop: 8, gap: 4 }}>
+                  {popupInterest.concept && (
+                    <Text style={[styles.subLine, { color: c.text }]}>{popupInterest.concept}</Text>
+                  )}
+                  <View style={[styles.statusBadge, { borderColor: popupInterest.status === 'contacted' ? c.accent : c.border, alignSelf: 'flex-start', marginTop: 4 }]}>
+                    <Text style={[styles.statusText, { color: popupInterest.status === 'contacted' ? c.accent : c.muted }]}>
+                      {popupInterest.status === 'pending' ? 'in the queue' : popupInterest.status === 'contacted' ? 'we\'ll be in touch' : 'done'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => { setInterestConcept(popupInterest.concept ?? ''); setInterestNote(popupInterest.note ?? ''); setShowInterestForm(true); setPopupInterest(null); }} activeOpacity={0.6}>
+                    <Text style={[styles.actionBtn, { color: c.muted, marginTop: 6 }]}>edit →</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : showInterestForm ? (
+                <View style={{ marginTop: 12, gap: 10 }}>
+                  <TextInput
+                    style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontSize: 14 }]}
+                    value={interestConcept}
+                    onChangeText={setInterestConcept}
+                    placeholder="your concept (e.g. smash burgers, jerk chicken)"
+                    placeholderTextColor={c.muted}
+                    autoCapitalize="sentences"
+                    returnKeyType="next"
+                  />
+                  <TextInput
+                    style={[styles.nameInput, { color: c.text, borderBottomColor: c.border, fontSize: 13 }]}
+                    value={interestNote}
+                    onChangeText={setInterestNote}
+                    placeholder="anything else we should know (optional)"
+                    placeholderTextColor={c.muted}
+                    autoCapitalize="sentences"
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmitInterest}
+                  />
+                  <TouchableOpacity onPress={handleSubmitInterest} disabled={submittingInterest} activeOpacity={0.7}>
+                    <Text style={[styles.actionBtn, { color: c.accent }]}>{submittingInterest ? '…' : 'SUBMIT'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           )}
 
