@@ -1681,4 +1681,16 @@ export const communityFundContributions = pgTable('community_fund_contributions'
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
+// ─── Community popup interest ─────────────────────────────────────────────────
+
+export const communityPopupInterest = pgTable('community_popup_interest', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  business_id: integer('business_id').references(() => businesses.id),
+  concept: text('concept'), // what they'd make
+  note: text('note'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'contacted' | 'done'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
 // @final-audit

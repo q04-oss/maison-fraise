@@ -295,6 +295,17 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  // ── Community popup interest ─────────────────────────────────────────────────
+  await run('community_popup_interest', sql`CREATE TABLE IF NOT EXISTS community_popup_interest (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    business_id INTEGER REFERENCES businesses(id),
+    concept TEXT,
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Indexes ──────────────────────────────────────────────────────────────────
   await run('nfc_connections_pair_unique', sql`
     CREATE UNIQUE INDEX IF NOT EXISTS nfc_connections_pair_unique
