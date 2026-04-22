@@ -1,10 +1,19 @@
-import { Router, Request, Response } from 'express';
-import { eq, desc, sql } from 'drizzle-orm';
+import { Router, Request, Response, NextFunction } from 'express';
+import { eq, desc, sql, isNotNull } from 'drizzle-orm';
 import { db } from '../db';
-import { communityFund, communityFundContributions, communityPopupInterest, users, businesses } from '../db/schema';
+import { communityFund, communityFundContributions, communityPopupInterest, communityEvents, users } from '../db/schema';
 import { requireUser } from '../lib/auth';
+import { sendPushNotification } from '../lib/push';
 
 const router = Router();
+
+function requirePin(req: Request, res: Response, next: NextFunction): void {
+  const pin = req.headers['x-admin-pin'];
+  if (!pin || pin !== process.env.ADMIN_PIN) {
+    res.status(401).json({ error: 'Unauthorized' }); return;
+  }
+  next();
+}
 
 // GET /api/community-fund — public, returns current fund state
 router.get('/', async (_req: Request, res: Response) => {
@@ -34,6 +43,73 @@ router.get('/my-contributions', requireUser, async (req: Request, res: Response)
     const total_cents = rows.reduce((sum, r) => sum + r.amount_cents, 0);
     res.json({ total_cents, contributions: rows });
   } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/community-fund/events — public, past community meals
+router.get('/events', async (_req: Request, res: Response) => {
+  try {
+    const events = await db
+      .select()
+      .from(communityEvents)
+      .orderBy(desc(communityEvents.event_date));
+    res.json(events);
+  } catch {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/community-fund/complete-event — admin marks an event done
+router.post('/complete-event', requirePin, async (req: Request, res: Response) => {
+  const { event_date, operator_names, people_fed, location, description, photo_url } = req.body;
+  if (!event_date || !operator_names) {
+    res.status(400).json({ error: 'event_date and operator_names required' }); return;
+  }
+  try {
+
+    const [fund] = await db.select().from(communityFund).where(eq(communityFund.id, 1));
+    if (!fund) { res.status(500).json({ error: 'Fund not initialised' }); return; }
+
+    // Record the event
+    await db.insert(communityEvents).values({
+      event_date,
+      operator_names,
+      people_fed: people_fed ?? 0,
+      location: location ?? null,
+      description: description ?? null,
+      photo_url: photo_url ?? null,
+      fund_raised_cents: fund.balance_cents,
+    });
+
+    // Reset balance, increment popup_count
+    await db.update(communityFund)
+      .set({
+        balance_cents: 0,
+        popup_count: sql`popup_count + 1`,
+        updated_at: new Date(),
+      })
+      .where(eq(communityFund.id, 1));
+
+    // Push to all users who contributed
+    const contributors = await db
+      .select({ push_token: users.push_token })
+      .from(communityFundContributions)
+      .innerJoin(users, eq(communityFundContributions.user_id, users.id))
+      .where(isNotNull(users.push_token));
+
+    const uniqueTokens = [...new Set(contributors.map(c => c.push_token).filter(Boolean) as string[])];
+    const peopleFedStr = people_fed ? `${people_fed} people fed` : 'community meal done';
+    await Promise.allSettled(uniqueTokens.map(token =>
+      sendPushNotification(token, {
+        title: 'Community meal happened',
+        body: `${peopleFedStr} · ${operator_names}. Your $2 made it real.`,
+        data: { screen: 'community-fund' },
+      })
+    ));
+
+    res.json({ ok: true, pushed: uniqueTokens.length });
+  } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -89,11 +165,8 @@ router.get('/my-interest', requireUser, async (req: Request, res: Response) => {
 });
 
 // GET /api/community-fund/interest-queue — admin, lists all pending operator interest
-router.get('/interest-queue', requireUser, async (req: Request, res: Response) => {
-  const user_id = (req as any).userId as number;
+router.get('/interest-queue', requirePin, async (req: Request, res: Response) => {
   try {
-    const [me] = await db.select({ is_admin: users.is_admin }).from(users).where(eq(users.id, user_id)).limit(1);
-    if (!me?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
 
     const rows = await db
       .select({
@@ -118,14 +191,11 @@ router.get('/interest-queue', requireUser, async (req: Request, res: Response) =
 });
 
 // PATCH /api/community-fund/interest/:id — admin, update status (contacted / done)
-router.patch('/interest/:id', requireUser, async (req: Request, res: Response) => {
-  const user_id = (req as any).userId as number;
+router.patch('/interest/:id', requirePin, async (req: Request, res: Response) => {
   const id = parseInt(req.params.id, 10);
   const { status } = req.body;
   if (!['pending', 'contacted', 'done'].includes(status)) { res.status(400).json({ error: 'Invalid status' }); return; }
   try {
-    const [me] = await db.select({ is_admin: users.is_admin }).from(users).where(eq(users.id, user_id)).limit(1);
-    if (!me?.is_admin) { res.status(403).json({ error: 'Forbidden' }); return; }
     await db.update(communityPopupInterest).set({ status }).where(eq(communityPopupInterest.id, id));
     res.json({ ok: true });
   } catch {

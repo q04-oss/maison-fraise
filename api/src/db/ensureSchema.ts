@@ -295,6 +295,19 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  // ── Community events ─────────────────────────────────────────────────────────
+  await run('community_events', sql`CREATE TABLE IF NOT EXISTS community_events (
+    id SERIAL PRIMARY KEY,
+    event_date DATE NOT NULL,
+    operator_names TEXT NOT NULL,
+    people_fed INTEGER NOT NULL DEFAULT 0,
+    location TEXT,
+    description TEXT,
+    photo_url TEXT,
+    fund_raised_cents INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Community popup interest ─────────────────────────────────────────────────
   await run('community_popup_interest', sql`CREATE TABLE IF NOT EXISTS community_popup_interest (
     id SERIAL PRIMARY KEY,

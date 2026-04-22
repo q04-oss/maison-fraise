@@ -1165,6 +1165,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
             order_type: orderType,
             stripe_payment_intent_id: `fund_${pi.id}`,
           }).onConflictDoNothing();
+          const [before] = await db.select({ balance_cents: communityFund.balance_cents, threshold_cents: communityFund.threshold_cents }).from(communityFund).where(eq(communityFund.id, 1));
           await db.update(communityFund)
             .set({
               balance_cents: sql`balance_cents + ${fundCents}`,
@@ -1172,6 +1173,24 @@ router.post('/webhook', async (req: Request, res: Response) => {
               updated_at: new Date(),
             })
             .where(eq(communityFund.id, 1));
+
+          // Push Austin when threshold is first crossed
+          if (before && before.balance_cents < before.threshold_cents) {
+            const newBalance = before.balance_cents + fundCents;
+            if (newBalance >= before.threshold_cents) {
+              const adminUserId = parseInt(process.env.ADMIN_USER_ID ?? '', 10);
+              if (!isNaN(adminUserId)) {
+                const [admin] = await db.select({ push_token: users.push_token }).from(users).where(eq(users.id, adminUserId)).limit(1);
+                if (admin?.push_token) {
+                  sendPushNotification(admin.push_token, {
+                    title: 'Community fund reached CA$' + (before.threshold_cents / 100).toFixed(0),
+                    body: 'Time to book a chef and feed some people.',
+                    data: { screen: 'community-fund' },
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
           logger.info(`Community fund +${fundCents}c from ${orderType} PI ${pi.id}`);
         } catch (err) {
           logger.error('Community fund contribution error', err);

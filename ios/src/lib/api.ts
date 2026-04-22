@@ -430,6 +430,24 @@ export async function submitPopupInterest(body: { concept?: string; note?: strin
   if (!res.ok) throw new Error('Failed to submit interest');
 }
 
+export interface CommunityEvent {
+  id: number;
+  event_date: string;
+  operator_names: string;
+  people_fed: number;
+  location: string | null;
+  description: string | null;
+  photo_url: string | null;
+  fund_raised_cents: number;
+  created_at: string;
+}
+
+export async function fetchCommunityEvents(): Promise<CommunityEvent[]> {
+  const res = await fetch(`${BASE_URL}/api/community-fund/events`);
+  if (!res.ok) throw new Error('Failed to fetch events');
+  return res.json();
+}
+
 export interface PopupMenuItem {
   id: number;
   name: string;
