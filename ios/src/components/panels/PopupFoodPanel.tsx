@@ -319,8 +319,8 @@ export default function PopupFoodPanel() {
                 activeOpacity={0.7}
               >
                 <View style={styles.fundText}>
-                  <Text style={[styles.fundLabel, { color: c.text }]}>+CA$2 community fund</Text>
-                  <Text style={[styles.fundSub, { color: c.muted }]}>goes toward a free popup for the homeless</Text>
+                  <Text style={[styles.fundLabel, { color: c.text }]}>+CA$2 to feed someone</Text>
+                  <Text style={[styles.fundSub, { color: c.muted }]}>funds a community meal when we hit the goal</Text>
                 </View>
                 <View style={[styles.fundCheck, { borderColor: communityFund ? '#C0392B' : c.border, backgroundColor: communityFund ? '#C0392B' : 'transparent' }]}>
                   {communityFund && <Text style={styles.fundCheckMark}>✓</Text>}
