@@ -416,7 +416,7 @@ export async function fetchPopupFoodMenu(popupId: number): Promise<PopupMenuItem
 export interface PopupFoodOrdersResponse {
   mine: PopupFoodOrder[];
   claimable: PopupFoodOrder[];
-  status: 'announced' | 'confirmed';
+  status: 'announced' | 'confirmed' | 'live';
   confirmed_at: string | null;
   starts_at: string | null;
   ends_at: string | null;
@@ -437,11 +437,13 @@ export async function createPopupFoodOrder(popupId: number, body: {
   recipient_user_id?: number;
   for_anyone?: boolean;
   note?: string;
+  community_fund?: boolean;
 }): Promise<{ id: number; client_secret: string }> {
   const auth = await authHeader();
+  const idempotencyKey = `food-${popupId}-${body.menu_item_id}-${Date.now()}`;
   const res = await fetch(`${BASE_URL}/api/popups/${popupId}/food-orders`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...auth },
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': idempotencyKey, ...auth },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

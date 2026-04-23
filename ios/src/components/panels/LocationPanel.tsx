@@ -37,9 +37,9 @@ export default function LocationPanel() {
 
   const foodStatus: string = loc?.food_popup_status ?? 'announced';
   const isConfirmed = isPopup && foodStatus === 'confirmed';
-  const isLive = isPopup && (() => {
-    if (!loc?.launched_at) return false;
-    const start = new Date(loc.launched_at);
+  const isLive = isPopup && isConfirmed && (() => {
+    if (!loc?.starts_at) return false;
+    const start = new Date(loc.starts_at);
     const end = loc.ends_at ? new Date(loc.ends_at) : new Date(start.getTime() + 4 * 60 * 60 * 1000);
     const now = new Date();
     return now >= start && now < end;

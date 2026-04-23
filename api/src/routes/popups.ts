@@ -13,6 +13,13 @@ import { sendPushNotification } from '../lib/push';
 import { sendNominationReceived } from '../lib/resend';
 import { logger } from '../lib/logger';
 import { requireUser } from '../lib/auth';
+import { NextFunction } from 'express';
+
+function requirePin(req: Request, res: Response, next: NextFunction): void {
+  const pin = req.headers['x-admin-pin'];
+  if (!pin || pin !== process.env.ADMIN_PIN) { res.status(401).json({ error: 'Unauthorized' }); return; }
+  next();
+}
 
 const router = Router();
 
@@ -479,7 +486,7 @@ router.post('/:id/dj-pass', requireUser, async (req: Request, res: Response) => 
 // ─── Food popup ordering ───────────────────────────────────────────────────────
 
 // POST /api/popups/:id/cancel-food-popup — cancel and refund all prepaid orders
-router.post('/:id/cancel-food-popup', requireUser, async (req: Request, res: Response) => {
+router.post('/:id/cancel-food-popup', requirePin, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
   if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
@@ -683,7 +690,7 @@ router.post('/:id/food-orders', requireUser, async (req: Request, res: Response)
 });
 
 // POST /api/popups/:id/announce — send mass push to all users, set status announced
-router.post('/:id/announce', requireUser, async (req: Request, res: Response) => {
+router.post('/:id/announce', requirePin, async (req: Request, res: Response) => {
   const popup_id = parseInt(req.params.id, 10);
   if (isNaN(popup_id)) { res.status(400).json({ error: 'Invalid id' }); return; }
   try {
@@ -829,7 +836,14 @@ router.post('/:id/merch-orders', requireUser, async (req: Request, res: Response
       .from(popupMerchItems)
       .where(and(eq(popupMerchItems.id, parseInt(String(item_id), 10)), eq(popupMerchItems.popup_id, popup_id)));
     if (!item) { res.status(404).json({ error: 'Item not found' }); return; }
-    if (item.stock_remaining <= 0) { res.status(409).json({ error: 'Out of stock' }); return; }
+
+    // Atomic stock check: decrement only if stock > 0, re-check result
+    const [decremented] = await db
+      .update(popupMerchItems)
+      .set({ stock_remaining: sql`${popupMerchItems.stock_remaining} - 1` })
+      .where(and(eq(popupMerchItems.id, item.id), sql`${popupMerchItems.stock_remaining} > 0`))
+      .returning({ stock_remaining: popupMerchItems.stock_remaining });
+    if (!decremented) { res.status(409).json({ error: 'Out of stock' }); return; }
 
     const isDonate = !!donate;
     const recipient: number | null = isDonate

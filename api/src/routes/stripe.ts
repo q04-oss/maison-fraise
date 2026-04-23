@@ -337,29 +337,28 @@ router.post('/webhook', async (req: Request, res: Response) => {
           .from(sql`popup_food_orders`)
           .where(sql`stripe_payment_intent_id = ${pi.id}`);
         if (foodOrder && foodOrder.status === 'pending') {
-          await db.execute(sql`UPDATE popup_food_orders SET status = 'paid' WHERE id = ${foodOrder.id}`);
+          await db.execute(sql`UPDATE popup_food_orders SET status = 'paid' WHERE id = ${foodOrder.id} AND status = 'pending'`);
           logger.info(`Popup food order ${foodOrder.id} paid`);
 
           const popup_id = foodOrder.popup_id;
-          const [popupRow] = await db
-            .select({
-              food_popup_status: sql<string>`food_popup_status`,
-              min_orders: sql<number>`min_orders_to_confirm`,
-            })
-            .from(sql`businesses`)
-            .where(sql`id = ${popup_id}`);
 
-          if (popupRow && popupRow.food_popup_status === 'announced' && popupRow.min_orders) {
-            const [{ cnt }] = await db
-              .select({ cnt: sql<number>`cast(count(*) as int)` })
-              .from(sql`popup_food_orders`)
-              .where(sql`popup_id = ${popup_id} AND status IN ('paid', 'claimed')`);
+          // Atomic confirmation: update only if still 'announced' and threshold met
+          const confirmed = await db.execute(sql`
+            UPDATE businesses SET food_popup_status = 'confirmed', confirmed_at = now()
+            WHERE id = ${popup_id}
+              AND food_popup_status = 'announced'
+              AND min_orders_to_confirm IS NOT NULL
+              AND (
+                SELECT COUNT(*) FROM popup_food_orders
+                WHERE popup_id = ${popup_id} AND status IN ('paid', 'claimed')
+              ) >= min_orders_to_confirm
+            RETURNING id
+          `);
+          const didConfirm = ((confirmed as any).rows ?? confirmed).length > 0;
 
-            if (cnt >= popupRow.min_orders) {
-              await db.execute(sql`UPDATE businesses SET food_popup_status = 'confirmed', confirmed_at = now() WHERE id = ${popup_id}`);
-              logger.info(`Popup ${popup_id} confirmed after ${cnt} orders`);
-
-              const buyers = await db
+          if (didConfirm) {
+            logger.info(`Popup ${popup_id} confirmed`);
+            const buyers = await db
                 .select({ push_token: sql<string | null>`u.push_token` })
                 .from(sql`popup_food_orders pfo JOIN users u ON u.id = pfo.buyer_user_id`)
                 .where(sql`pfo.popup_id = ${popup_id} AND pfo.status IN ('paid', 'claimed') AND u.push_token IS NOT NULL`);

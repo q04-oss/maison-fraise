@@ -51,7 +51,9 @@ export default function PopupFoodPanel() {
       ]);
       setMenu(menuData);
       setData(ordersData);
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not load', err.message ?? 'Try again.');
+    }
     setLoading(false);
   }, [popupId]);
 
@@ -112,7 +114,7 @@ export default function PopupFoodPanel() {
         return;
       }
 
-      // Buy extras as open claims (separate payment intents)
+      // Buy extras as open claims — only after primary payment succeeds
       for (let i = 0; i < extraQty; i++) {
         try {
           const { client_secret: cs } = await createPopupFoodOrder(popupId, {
@@ -122,8 +124,10 @@ export default function PopupFoodPanel() {
             note: note.trim() || undefined,
           });
           const { error: ie } = await initPaymentSheet({ paymentIntentClientSecret: cs, merchantDisplayName: 'Maison Fraise', style: 'automatic' });
-          if (!ie) await presentPaymentSheet();
-        } catch {}
+          if (ie) break;
+          const { error: pe } = await presentPaymentSheet();
+          if (pe) break;
+        } catch { break; }
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -160,8 +164,7 @@ export default function PopupFoodPanel() {
 
   const openClaims = data?.claimable ?? [];
   const myOrders = data?.mine ?? [];
-  const myContributions = myOrders.filter(o => o.buyer_user_id !== o.recipient_user_id && o.recipient_user_id !== null).length
-    + (data?.claimable.filter(o => o.buyer_user_id === panelData?.myUserId).length ?? 0);
+  const myContributions = myOrders.filter(o => o.buyer_user_id !== o.recipient_user_id && o.recipient_user_id !== null).length;
 
   if (!popupId) return null;
 

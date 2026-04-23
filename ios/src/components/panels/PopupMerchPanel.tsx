@@ -46,7 +46,9 @@ export default function PopupMerchPanel() {
       ]);
       setItems(itemsData);
       setOrders(ordersData);
-    } catch {}
+    } catch (err: any) {
+      Alert.alert('Could not load', err.message ?? 'Try again.');
+    }
     setLoading(false);
   }, [popupId]);
 

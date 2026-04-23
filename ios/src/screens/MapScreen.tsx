@@ -452,8 +452,9 @@ export default function MapScreen() {
   };
 
   const isLive = (b: any): boolean => {
-    if (!b.launched_at) return false;
-    const start = new Date(b.launched_at);
+    if (b.food_popup_status !== 'confirmed') return false;
+    if (!b.starts_at) return false;
+    const start = new Date(b.starts_at);
     const end = b.ends_at
       ? new Date(b.ends_at)
       : new Date(start.getTime() + 4 * 60 * 60 * 1000);

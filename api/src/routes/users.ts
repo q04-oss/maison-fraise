@@ -1066,8 +1066,7 @@ router.get('/me/merch-history', requireUser, async (req: Request, res: Response)
         status: popupMerchOrders.status,
         donated: popupMerchOrders.donated,
         recipient_user_id: popupMerchOrders.recipient_user_id,
-        recipient_name: sql<string | null>`(SELECT name FROM users WHERE id = ${popupMerchOrders.recipient_user_id})`,
-        recipient_code: sql<string | null>`(SELECT referral_code FROM users WHERE id = ${popupMerchOrders.recipient_user_id})`,
+        recipient_name: sql<string | null>`(SELECT display_name FROM users WHERE id = ${popupMerchOrders.recipient_user_id})`,
         created_at: popupMerchOrders.created_at,
       })
       .from(popupMerchOrders)
@@ -1085,8 +1084,7 @@ router.get('/me/merch-history', requireUser, async (req: Request, res: Response)
         total_cents: popupMerchOrders.total_cents,
         status: popupMerchOrders.status,
         buyer_user_id: popupMerchOrders.buyer_user_id,
-        buyer_name: sql<string>`(SELECT name FROM users WHERE id = ${popupMerchOrders.buyer_user_id})`,
-        buyer_code: sql<string>`(SELECT referral_code FROM users WHERE id = ${popupMerchOrders.buyer_user_id})`,
+        buyer_name: sql<string | null>`(SELECT display_name FROM users WHERE id = ${popupMerchOrders.buyer_user_id})`,
         created_at: popupMerchOrders.created_at,
       })
       .from(popupMerchOrders)
