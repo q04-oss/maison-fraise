@@ -308,6 +308,96 @@ app.get('/device', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/device.html'));
 });
 
+// ── Privacy hop — /go?url=... ──────────────────────────────────────────────
+// Checks the destination domain against the Disconnect.me tracker list and
+// shows a grade before forwarding. No query is logged.
+{
+  const trackerSet: Set<string> = new Set(
+    (require('./lib/trackers.json') as string[]).map((d: string) => d.toLowerCase())
+  );
+
+  function countTrackers(hostname: string): number {
+    // Check the hostname and each parent domain
+    const parts = hostname.toLowerCase().replace(/^www\./, '').split('.');
+    let count = 0;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const candidate = parts.slice(i).join('.');
+      if (trackerSet.has(candidate)) count++;
+    }
+    return count;
+  }
+
+  app.get('/go', (req, res) => {
+    const raw = req.query.url as string;
+    if (!raw) { res.redirect('/'); return; }
+
+    let url: URL;
+    try {
+      url = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw);
+    } catch {
+      res.redirect('/'); return;
+    }
+
+    const hostname = url.hostname.replace(/^www\./, '');
+    const trackerCount = countTrackers(url.hostname);
+    const dest = url.toString();
+
+    const grade = trackerCount === 0 ? 'clean' : trackerCount <= 3 ? 'moderate' : 'heavy';
+    const gradeColor = grade === 'clean' ? '#2d6a4f' : grade === 'moderate' ? '#b5700a' : '#9b1c1c';
+    const gradeLabel = grade === 'clean'
+      ? 'No known trackers'
+      : `${trackerCount} known tracker${trackerCount === 1 ? '' : 's'} detected`;
+
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Leaving fraise.box</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=Lora:ital@0;1&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;font-family:'DM Mono',monospace;padding:2rem;gap:1.5rem}
+    .back{position:fixed;top:1.25rem;left:1.5rem;font-size:.75rem;color:#aaa;text-decoration:none;letter-spacing:.03em}
+    .back:hover{color:#4a1519}
+    .domain{font-family:'Lora',serif;font-size:1.5rem;font-weight:400;color:#111;text-align:center;word-break:break-all}
+    .grade{display:flex;align-items:center;gap:.6rem;font-size:.8rem;letter-spacing:.04em}
+    .dot{width:10px;height:10px;border-radius:50%;background:${gradeColor};flex-shrink:0}
+    .grade-label{color:${gradeColor}}
+    .detail{font-size:.7rem;color:#999;text-align:center;max-width:380px;line-height:1.7}
+    .actions{display:flex;gap:.75rem;margin-top:.5rem}
+    .btn{padding:.55rem 1.5rem;border-radius:9999px;font-family:'DM Mono',monospace;font-size:.8rem;letter-spacing:.04em;cursor:pointer;text-decoration:none;border:1px solid}
+    .btn-go{background:#111;color:#fff;border-color:#111}
+    .btn-go:hover{background:#4a1519;border-color:#4a1519}
+    .btn-back{background:#fff;color:#888;border-color:#e0e0e0}
+    .btn-back:hover{border-color:#4a1519;color:#4a1519}
+    .note{font-size:.65rem;color:#ccc;letter-spacing:.03em}
+  </style>
+</head>
+<body>
+  <a class="back" href="/">← fraise.box</a>
+  <div class="domain">${hostname}</div>
+  <div class="grade">
+    <div class="dot"></div>
+    <span class="grade-label">${gradeLabel}</span>
+  </div>
+  <p class="detail">
+    ${grade === 'clean'
+      ? 'This domain does not appear in any known tracker list. That doesn\'t guarantee it won\'t collect data — but it\'s a good sign.'
+      : grade === 'moderate'
+      ? 'This domain or its subdomains appear in tracker blocklists. It may collect analytics or advertising data.'
+      : 'This domain runs multiple known trackers. It is likely collecting detailed analytics, ad targeting data, or both.'}
+  </p>
+  <div class="actions">
+    <a class="btn btn-back" href="/">Go back</a>
+    <a class="btn btn-go" href="${dest}" rel="noopener">Continue anyway</a>
+  </div>
+  <p class="note">fraise.box did not log this request.</p>
+</body>
+</html>`);
+  });
+}
+
 app.get('/privacy', (_req, res) => {
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Privacy Policy — Box Fraise</title>
   <style>body{font-family:Georgia,serif;max-width:680px;margin:60px auto;padding:0 24px;color:#1a1a1a;line-height:1.7}h1{font-size:24px}h2{font-size:18px;margin-top:32px}p{margin:12px 0}</style></head>

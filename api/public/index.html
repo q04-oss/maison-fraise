@@ -259,10 +259,10 @@
         return;
       }
 
-      // URL — navigate directly
+      // URL — route through privacy hop
       if (isUrl(query)) {
         const url = /^https?:\/\//i.test(query) ? query : 'https://' + query;
-        window.location.href = url;
+        window.location.href = '/go?url=' + encodeURIComponent(url);
         return;
       }
 
