@@ -304,6 +304,10 @@ app.get('/chocolatier', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/chocolatier.html'));
 });
 
+app.get('/device', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/device.html'));
+});
+
 app.get('/privacy', (_req, res) => {
   res.send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Privacy Policy — Box Fraise</title>
   <style>body{font-family:Georgia,serif;max-width:680px;margin:60px auto;padding:0 24px;color:#1a1a1a;line-height:1.7}h1{font-size:24px}h2{font-size:18px;margin-top:32px}p{margin:12px 0}</style></head>
