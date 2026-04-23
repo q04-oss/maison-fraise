@@ -349,6 +349,7 @@
       { id:'slots',     label:'Slots' },
       { id:'varieties', label:'Varieties' },
       { id:'workers',   label:'Workers' },
+      { id:'table',     label:'Table' },
     ];
     document.getElementById('tab-row').innerHTML = tabs.map(t =>
       `<div class="tab ${t.id === currentTab ? 'active' : ''}" onclick="switchTab('${t.id}')">${t.label}</div>`
@@ -362,6 +363,7 @@
     else if (tab === 'slots')      renderSlotsTab();
     else if (tab === 'varieties')  renderVarietiesTab();
     else if (tab === 'workers')    renderWorkersTab();
+    else if (tab === 'table')      renderTableTab();
   }
 
   // ── ORDERS TAB ────────────────────────────────────────
@@ -923,6 +925,129 @@
     if (!confirm('Revoke this worker\'s access?')) return;
     await fetch(`${BASE}/api/admin/worker-requests/${id}`, { method: 'DELETE', headers: { 'X-Admin-PIN': currentPin } });
     renderWorkersTab();
+  }
+
+  // ── TABLE TAB ──────────────────────────────────────────
+  async function renderTableTab() {
+    const body = document.getElementById('dash-body');
+    body.innerHTML = '<div class="empty">loading —</div>';
+    try {
+      const [eventsRes, instructorsRes] = await Promise.all([
+        fetch(`${BASE}/api/table/events`, { headers: { 'X-Admin-PIN': currentPin } }),
+        fetch(`${BASE}/api/table/instructors`, { headers: { 'X-Admin-PIN': currentPin } }),
+      ]);
+      const events = eventsRes.ok ? await eventsRes.json() : [];
+      const instructors = instructorsRes.ok ? await instructorsRes.json() : [];
+
+      const formatDate = iso => {
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      };
+
+      body.innerHTML = `
+        <div class="section-label">Instructors</div>
+        <div style="margin-bottom:12px;">
+          ${instructors.length === 0 ? '<div class="empty">No instructors yet.</div>' : instructors.map(i => `
+            <div class="order-row" style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-family:'DM Mono',monospace;">${i.name}</div>
+                ${i.bio ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${i.bio.slice(0,80)}${i.bio.length>80?'…':''}</div>` : ''}
+              </div>
+              <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);">id ${i.id}</div>
+            </div>
+          `).join('')}
+        </div>
+
+        <form id="add-instructor-form" style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px;">
+          <div class="section-label" style="margin-top:8px;">Add Instructor</div>
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="name" id="i-name" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="bio (optional)" id="i-bio" />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="photo url (optional)" id="i-photo" />
+          <button type="submit" class="pin-btn" style="padding:10px;">Add Instructor</button>
+        </form>
+
+        <div class="section-label">Upcoming Events</div>
+        <div style="margin-bottom:12px;">
+          ${events.length === 0 ? '<div class="empty">No events yet.</div>' : events.map(e => `
+            <div class="order-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div>
+                <div style="font-size:13px;font-family:'DM Mono',monospace;">${e.title}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">${formatDate(e.event_date)} · ${e.venue_name} · ${e.instructor_name}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">CA$${(e.price_cents/100).toFixed(0)} · ${e.seats_taken}/${e.capacity} seats</div>
+              </div>
+              <button onclick="toggleEvent(${e.id}, ${!e.active})" style="background:${e.active ? 'rgba(80,200,120,0.15)' : 'rgba(220,80,80,0.15)'};border:1px solid ${e.active ? 'rgba(80,200,120,0.4)' : 'rgba(220,80,80,0.4)'};color:${e.active ? 'var(--green)' : 'var(--red)'};font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">
+                ${e.active ? 'active' : 'inactive'}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+
+        <form id="add-event-form" style="display:flex;flex-direction:column;gap:8px;">
+          <div class="section-label" style="margin-top:8px;">Add Event</div>
+          <select id="e-instructor" class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;cursor:pointer;">
+            <option value="">select instructor</option>
+            ${instructors.map(i => `<option value="${i.id}">${i.name}</option>`).join('')}
+          </select>
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="title (e.g. knife skills)" id="e-title" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="venue name" id="e-venue" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="venue address (optional)" id="e-address" />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="date & time (e.g. 2026-05-10T18:00)" id="e-date" type="datetime-local" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="price in CAD (e.g. 120)" id="e-price" type="number" min="1" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="capacity (default 12)" id="e-capacity" type="number" min="1" value="12" />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="duration in minutes (default 120)" id="e-duration" type="number" min="30" value="120" />
+          <textarea class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;resize:vertical;min-height:80px;font-family:'DM Mono',monospace;" placeholder="description (optional)" id="e-desc"></textarea>
+          <button type="submit" class="pin-btn" style="padding:10px;">Add Event</button>
+        </form>
+      `;
+
+      document.getElementById('add-instructor-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const name = document.getElementById('i-name').value.trim();
+        const bio = document.getElementById('i-bio').value.trim();
+        const photo_url = document.getElementById('i-photo').value.trim();
+        if (!name) return;
+        const res = await fetch(`${BASE}/api/table/instructors`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+          body: JSON.stringify({ name, bio: bio || null, photo_url: photo_url || null }),
+        });
+        if (res.ok) renderTableTab();
+        else alert('Failed to add instructor.');
+      });
+
+      document.getElementById('add-event-form').addEventListener('submit', async e => {
+        e.preventDefault();
+        const instructor_id = parseInt(document.getElementById('e-instructor').value);
+        const title = document.getElementById('e-title').value.trim();
+        const venue_name = document.getElementById('e-venue').value.trim();
+        const venue_address = document.getElementById('e-address').value.trim();
+        const event_date = document.getElementById('e-date').value;
+        const price_cents = Math.round(parseFloat(document.getElementById('e-price').value) * 100);
+        const capacity = parseInt(document.getElementById('e-capacity').value) || 12;
+        const duration_minutes = parseInt(document.getElementById('e-duration').value) || 120;
+        const description = document.getElementById('e-desc').value.trim();
+        if (!instructor_id || !title || !venue_name || !event_date || !price_cents) return alert('Fill in all required fields.');
+        const res = await fetch(`${BASE}/api/table/events`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+          body: JSON.stringify({ instructor_id, title, venue_name, venue_address: venue_address || null, event_date, price_cents, capacity, duration_minutes, description: description || null }),
+        });
+        if (res.ok) renderTableTab();
+        else alert('Failed to add event.');
+      });
+
+    } catch {
+      document.getElementById('dash-body').innerHTML = '<div class="empty">Error loading table data.</div>';
+    }
+  }
+
+  async function toggleEvent(id, active) {
+    await fetch(`${BASE}/api/table/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ active }),
+    });
+    renderTableTab();
   }
 </script>
 </body>

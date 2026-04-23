@@ -1,9 +1,17 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { tableEvents, tableInstructors, tableBookings } from '../db/schema';
 import { eq, and, gt, sql } from 'drizzle-orm';
 import { stripe } from '../lib/stripe';
-import { requireUser } from '../lib/auth';
+
+function requirePin(req: Request, res: Response, next: NextFunction): void {
+  const pin = req.headers['x-admin-pin'];
+  if (!pin || pin !== process.env.ADMIN_PIN) {
+    res.status(401).json({ error: 'Invalid or missing X-Admin-PIN header' });
+    return;
+  }
+  next();
+}
 
 const router = Router();
 
@@ -149,8 +157,14 @@ export async function handleTablePayment(paymentIntentId: string) {
     .where(eq(tableEvents.id, booking.event_id));
 }
 
+// Admin: GET /api/table/instructors
+router.get('/instructors', requirePin, async (_req: any, res: any) => {
+  const instructors = await db.select().from(tableInstructors).orderBy(tableInstructors.id);
+  res.json(instructors);
+});
+
 // Admin: POST /api/table/instructors
-router.post('/instructors', requireUser, async (req: any, res: any) => {
+router.post('/instructors', requirePin, async (req: any, res: any) => {
   const { name, bio, photo_url } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const [instructor] = await db.insert(tableInstructors).values({ name, bio, photo_url }).returning();
@@ -158,7 +172,7 @@ router.post('/instructors', requireUser, async (req: any, res: any) => {
 });
 
 // Admin: POST /api/table/events
-router.post('/events', requireUser, async (req: any, res: any) => {
+router.post('/events', requirePin, async (req: any, res: any) => {
   const { instructor_id, title, venue_name, venue_address, event_date, duration_minutes, price_cents, capacity, description } = req.body;
   if (!instructor_id || !title || !venue_name || !event_date || !price_cents) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -178,7 +192,7 @@ router.post('/events', requireUser, async (req: any, res: any) => {
 });
 
 // Admin: PATCH /api/table/events/:id
-router.patch('/events/:id', requireUser, async (req: any, res: any) => {
+router.patch('/events/:id', requirePin, async (req: any, res: any) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
   const { active, capacity, price_cents, description } = req.body;
