@@ -1308,6 +1308,7 @@ export async function archiveConversation(userId: number): Promise<void> {
 
 export async function registerKeys(payload: {
   identityKey: string;
+  signingKey: string;
   signedPreKey: string;
   signedPreKeySig: string;
   oneTimePreKeys: { keyId: string; publicKey: string }[];

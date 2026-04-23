@@ -83,11 +83,20 @@ export default function App() {
     } catch { /* non-fatal */ }
   }, []);
 
-  // Initialise E2E keys after session is available
+  // Initialise E2E keys — runs on mount and on every foreground resume so that
+  // keys are set up after a fresh login without needing a cold restart.
+  // initKeys() is idempotent: it exits immediately if keys are already stored.
   useEffect(() => {
-    AsyncStorage.getItem('user_db_id').then(id => {
-      if (id) import('./src/lib/crypto').then(({ initKeys }) => initKeys()).catch(() => {});
+    const tryInit = () => {
+      AsyncStorage.getItem('user_db_id').then(id => {
+        if (id) import('./src/lib/crypto').then(({ initKeys }) => initKeys()).catch(() => {});
+      });
+    };
+    tryInit();
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') tryInit();
     });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {

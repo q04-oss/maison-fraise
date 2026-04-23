@@ -34,6 +34,14 @@ router.post('/visit', requireUser, async (req: Request, res: Response) => {
     res.status(400).json({ error: 'business_id and beacon_uuid required' }); return;
   }
   try {
+    // Validate that beacon_uuid is actually registered to this business
+    const validBeacon = await db.execute(sql`
+      SELECT id FROM beacons WHERE business_id = ${business_id} AND uuid = ${beacon_uuid} AND active = true LIMIT 1
+    `);
+    if (!((validBeacon as any).rows ?? validBeacon)[0]) {
+      res.status(403).json({ error: 'beacon_not_registered' }); return;
+    }
+
     // Check cooldown — one visit per business per 6h
     const recent = await db.execute(sql`
       SELECT id FROM user_business_visits

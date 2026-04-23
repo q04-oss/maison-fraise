@@ -41,8 +41,13 @@ db.execute(sql`
   )
 `).catch(() => {});
 
-// Memory confirmation columns on evening_tokens
+// Memory confirmation / decline columns on evening_tokens
 db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS memory_asked_at timestamptz`).catch(() => {});
+// Per-user asked and decline tracking (replaces single memory_asked_at for both-party visibility)
+db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS user_a_asked_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS user_b_asked_at timestamptz`).catch(() => {});
+db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS user_a_declined BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
+db.execute(sql`ALTER TABLE evening_tokens ADD COLUMN IF NOT EXISTS user_b_declined BOOLEAN NOT NULL DEFAULT FALSE`).catch(() => {});
 
 const COMMISSION_RATE = 0.20;
 
@@ -488,11 +493,13 @@ router.get('/memory-prompts', requireUser, async (req: Request, res: Response) =
     `);
     const prompts = (rows as any).rows ?? rows;
 
-    // Mark memory_asked_at for any newly surfaced prompts (fire and forget)
+    // Mark per-user asked timestamp for any newly surfaced prompts (fire and forget)
     for (const p of prompts as any[]) {
-      if (!p.memory_asked_at) {
+      const isUserA = p.user_a_id === userId;
+      const askedField = isUserA ? 'user_a_asked_at' : 'user_b_asked_at';
+      if (!p[askedField]) {
         db.execute(sql`
-          UPDATE evening_tokens SET memory_asked_at = NOW() WHERE id = ${p.token_id}
+          UPDATE evening_tokens SET ${sql.raw(askedField)} = NOW() WHERE id = ${p.token_id}
         `).catch(() => {});
       }
     }
@@ -533,7 +540,11 @@ router.post('/evening-tokens/:bookingId/confirm', requireUser, async (req: Reque
     const field = isUserA ? 'user_a_confirmed' : 'user_b_confirmed';
 
     if (!confirmed) {
-      // Decline — just mark their side as declined (we use false = not confirmed, so this is a no-op in terms of minting)
+      // Persist the decline so both parties can see it
+      const declineField = isUserA ? 'user_a_declined' : 'user_b_declined';
+      await db.execute(sql`
+        UPDATE evening_tokens SET ${sql.raw(declineField)} = true WHERE booking_id = ${bookingId}
+      `);
       res.json({ confirmed: false, minted: false });
       return;
     }
@@ -551,10 +562,19 @@ router.post('/evening-tokens/:bookingId/confirm', requireUser, async (req: Reque
     const updated = ((updatedRows as any).rows ?? updatedRows)[0] as any;
 
     if (updated.user_a_confirmed && updated.user_b_confirmed && !updated.minted_at) {
-      // Both confirmed — mint the memory
-      await db.execute(sql`
-        UPDATE evening_tokens SET minted_at = NOW() WHERE booking_id = ${bookingId}
+      // Atomically claim the mint — only the first concurrent winner proceeds
+      const mintResult = await db.execute(sql`
+        UPDATE evening_tokens SET minted_at = NOW()
+        WHERE booking_id = ${bookingId} AND minted_at IS NULL
+        RETURNING user_a_id, user_b_id
       `);
+      const mintRow = ((mintResult as any).rows ?? mintResult)[0];
+
+      if (!mintRow) {
+        // Another concurrent confirmation already minted — report success but don't double-open chat
+        res.json({ confirmed: true, minted: false });
+        return;
+      }
 
       const partnerId = isUserA ? token.user_b_id : token.user_a_id;
 

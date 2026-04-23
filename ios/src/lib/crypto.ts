@@ -4,8 +4,11 @@
  * Protocol: ECDH P-256 key agreement → HKDF-SHA-256 → AES-256-GCM
  *
  * Key storage: expo-secure-store (device-encrypted)
- *   fraise_identity_private  — PKCS8 DER hex of identity private key
+ *   fraise_identity_private   — PKCS8 DER hex of ECDH identity private key
  *   fraise_signed_pre_private — PKCS8 DER hex of signed pre-key private key
+ *
+ * Signing: separate ECDSA P-256 keypair signs the signed-pre-key at init.
+ * Private signing key is discarded after registration (not needed for decrypt).
  *
  * Session cache (per recipient): fraise_session_{userId}
  *   { sharedSecret: hex, ephemeralPublicKey: base64 }
@@ -102,42 +105,36 @@ export async function initKeys(): Promise<void> {
     const identityPublic = await exportPublicKeyBase64(identityPair.publicKey);
     const signedPrePublic = await exportPublicKeyBase64(signedPrePair.publicKey);
 
-    // For signature we derive a sig from identity private + signed-pre-key public bytes
-    // (simplified: ECDH-derived bits used as signature proof; server stores but doesn't verify)
-    const sigBytes = await s.deriveBits(
-      { name: 'ECDH', public: signedPrePair.publicKey },
-      identityPair.privateKey,
-      256,
+    // Signing key pair (ECDSA P-256) — produces a real verifiable signature over the signed-pre-key.
+    // Private key is discarded after registration; it is not needed for message decryption.
+    const signingPair = await s.generateKey(
+      { name: 'ECDSA', namedCurve: 'P-256' },
+      true,
+      ['sign', 'verify'],
     );
-    const signedPreKeySig = buf2b64(sigBytes);
+    const signingPublic = await exportPublicKeyBase64(signingPair.publicKey);
+    const sigBuf = await s.sign(
+      { name: 'ECDSA', hash: 'SHA-256' },
+      signingPair.privateKey,
+      b64buf(signedPrePublic).buffer as ArrayBuffer,
+    );
+    const signedPreKeySig = buf2b64(sigBuf);
 
-    // Generate one-time pre-keys
-    const otpKeys: { keyId: string; publicKey: string }[] = [];
-    for (let i = 0; i < 5; i++) {
-      const kp = await s.generateKey(
-        { name: 'ECDH', namedCurve: 'P-256' },
-        true,
-        ['deriveKey', 'deriveBits'],
-      );
-      const pub = await exportPublicKeyBase64(kp.publicKey);
-      const priv = await exportPrivateKeyHex(kp.privateKey);
-      const keyId = `otp-${Date.now()}-${i}`;
-      await SecureStore.setItemAsync(`fraise_otp_${keyId}`, priv);
-      otpKeys.push({ keyId, publicKey: pub });
-    }
-
-    // Persist private keys
-    await SecureStore.setItemAsync('fraise_identity_private', await exportPrivateKeyHex(identityPair.privateKey));
-    await SecureStore.setItemAsync('fraise_signed_pre_private', await exportPrivateKeyHex(signedPrePair.privateKey));
-
-    // Upload to server
+    // Upload to server BEFORE persisting private keys.
+    // If registration fails the device stays uninitialised and will retry on the next start.
+    // One-time pre-key upload is deferred until consumption logic is implemented server-side.
     const { registerKeys } = await import('./api');
     await registerKeys({
       identityKey: identityPublic,
+      signingKey: signingPublic,
       signedPreKey: signedPrePublic,
       signedPreKeySig,
-      oneTimePreKeys: otpKeys,
+      oneTimePreKeys: [],
     });
+
+    // Persist private keys only after successful registration
+    await SecureStore.setItemAsync('fraise_identity_private', await exportPrivateKeyHex(identityPair.privateKey));
+    await SecureStore.setItemAsync('fraise_signed_pre_private', await exportPrivateKeyHex(signedPrePair.privateKey));
   } catch {
     // Non-fatal — plaintext fallback remains available
   }
@@ -186,8 +183,15 @@ export async function encryptMessage(recipientId: number, plaintext: string): Pr
     const combined = new Uint8Array(32);
     for (let i = 0; i < 32; i++) combined[i] = a[i] ^ b[i];
 
-    // Import as AES-GCM key
-    const aesKey = await s.importKey('raw', combined.buffer as ArrayBuffer, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+    // Run through HKDF-SHA-256 to derive a properly keyed AES-GCM key
+    const hkdfKey = await s.importKey('raw', combined.buffer as ArrayBuffer, { name: 'HKDF' }, false, ['deriveKey']);
+    const aesKey = await s.deriveKey(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode('box-fraise-chat-v1') },
+      hkdfKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt'],
+    );
 
     // Encrypt
     const cryptoObj = (globalThis.crypto ?? (global as any).crypto) as Crypto;
@@ -246,7 +250,15 @@ export async function decryptMessage(message: {
     const combined = new Uint8Array(32);
     for (let i = 0; i < 32; i++) combined[i] = a[i] ^ b[i];
 
-    const aesKey = await s.importKey('raw', combined.buffer as ArrayBuffer, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    // Mirror the HKDF step from encryptMessage
+    const hkdfKey = await s.importKey('raw', combined.buffer as ArrayBuffer, { name: 'HKDF' }, false, ['deriveKey']);
+    const aesKey = await s.deriveKey(
+      { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode('box-fraise-chat-v1') },
+      hkdfKey,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt'],
+    );
 
     const iv = b64buf(nonce).buffer as ArrayBuffer;
     const ciphertext = b64buf(message.body).buffer as ArrayBuffer;

@@ -47,6 +47,8 @@ export default function ChatThreadPanel() {
   const [pendingMessages, setPendingMessages] = useState<{ key: string; body: string }[]>([]);
   const listRef = useRef<FlatList>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks whether the last messages state change was a prepend (load-older) to suppress auto-scroll
+  const wasPrependRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.multiGet(['user_db_id', 'user_email']).then(([idEntry, emailEntry]) => {
@@ -95,6 +97,7 @@ export default function ChatThreadPanel() {
           const plaintext = await decryptMessage(m);
           return { ...m, body: plaintext };
         }));
+        wasPrependRef.current = true;
         setMessages(prev => [...decrypted, ...prev]);
         if (decrypted.length < 50) setHasMore(false);
       }
@@ -111,6 +114,10 @@ export default function ChatThreadPanel() {
 
   useEffect(() => {
     if (messages.length > 0) {
+      if (wasPrependRef.current) {
+        wasPrependRef.current = false;
+        return; // Old messages prepended — preserve scroll position
+      }
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length]);
@@ -138,7 +145,8 @@ export default function ChatThreadPanel() {
           : undefined,
       );
       setPendingMessages(prev => prev.filter(p => p.key !== tempKey));
-      setMessages(prev => [...prev, msg]);
+      // If the message was encrypted the server stores ciphertext; show the original plaintext locally
+      setMessages(prev => [...prev, encrypted ? { ...msg, body } : msg]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     } catch {
       setPendingMessages(prev => prev.filter(p => p.key !== tempKey));

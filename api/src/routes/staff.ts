@@ -219,8 +219,8 @@ router.post('/orders/:id/collect', requireStaff, async (req: Request, res: Respo
   const { nfc_token } = req.body as { nfc_token?: string };
   try {
     const whereClause = nfc_token
-      ? and(eq(orders.id, id), eq(orders.nfc_token, nfc_token), sql`${orders.status} IN ('paid', 'ready')`)
-      : and(eq(orders.id, id), sql`${orders.status} IN ('paid', 'ready')`);
+      ? and(eq(orders.id, id), eq(orders.nfc_token, nfc_token), eq(orders.nfc_token_used, false), sql`${orders.status} IN ('paid', 'ready')`)
+      : and(eq(orders.id, id), eq(orders.nfc_token_used, false), sql`${orders.status} IN ('paid', 'ready')`);
 
     const updated = await db
       .update(orders)

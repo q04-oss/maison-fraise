@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { sql } from 'drizzle-orm';
 import { db } from '../db';
 import { requireUser } from '../lib/auth';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
@@ -27,6 +28,10 @@ db.execute(sql`
     UNIQUE (map_id, business_id)
   )
 `).catch(() => {});
+
+// Enforce one map per user at the database level so concurrent creates can't race
+db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_maps_user_id_unique ON user_maps(user_id)`)
+  .catch((err) => { logger.error('CRITICAL: failed to create user_maps_user_id_unique index', err); });
 
 db.execute(sql`
   CREATE TABLE IF NOT EXISTS user_saves (
@@ -118,32 +123,23 @@ router.get('/:id', async (req: Request, res: Response) => {
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 
-// POST /api/maps — get or create the user's single map
-// Each user has exactly one map. If one already exists it is returned unchanged.
+// POST /api/maps — get or create the user's single map (atomic — no TOCTOU race)
+// Each user has exactly one map enforced by the user_maps_user_id_unique index.
 router.post('/', requireUser, async (req: Request, res: Response) => {
   const userId: number = (req as any).userId;
   const { name, description } = req.body;
   try {
-    // Return existing map if present
-    const existing = await db.execute(sql`
-      SELECT m.id, m.name, m.description, m.created_at,
-             COUNT(e.id)::int AS entry_count
-      FROM user_maps m
-      LEFT JOIN user_map_entries e ON e.map_id = m.id
-      WHERE m.user_id = ${userId}
-      GROUP BY m.id
-      LIMIT 1
-    `);
-    const map = ((existing as any).rows ?? existing)[0];
-    if (map) { res.json({ ...map, already_existed: true }); return; }
-
     const mapName = (typeof name === 'string' && name.trim()) ? name.trim() : 'my map';
+    // ON CONFLICT DO UPDATE SET id = id is a no-op that still returns the existing row
     const rows = await db.execute(sql`
       INSERT INTO user_maps (user_id, name, description)
       VALUES (${userId}, ${mapName}, ${description ?? null})
-      RETURNING id, name, description, created_at
+      ON CONFLICT (user_id) DO UPDATE SET id = user_maps.id
+      RETURNING id, name, description, created_at,
+                (SELECT COUNT(e.id)::int FROM user_map_entries e WHERE e.map_id = user_maps.id) AS entry_count
     `);
-    res.json({ ...((rows as any).rows ?? rows)[0], entry_count: 0 });
+    const map = ((rows as any).rows ?? rows)[0];
+    res.json(map);
   } catch { res.status(500).json({ error: 'internal_error' }); }
 });
 

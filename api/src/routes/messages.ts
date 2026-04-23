@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { eq, or, and, sql, lt } from 'drizzle-orm';
+import { eq, or, and, sql, lt, desc } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '../db';
 import { messages, users, nfcConnections, orders, varieties, timeSlots, eveningTokens, reservationOffers, reservationBookings, businesses } from '../db/schema';
@@ -480,11 +480,13 @@ router.get('/:userId', requireUser, async (req: Request, res: Response) => {
       ? and(baseWhere, lt(messages.id, beforeId))
       : baseWhere;
 
+    // Order DESC so LIMIT always returns the N most recent messages before the cursor,
+    // then reverse to give the client oldest-first within that page.
     const thread = await db
       .select()
       .from(messages)
       .where(whereClause)
-      .orderBy(messages.created_at)
+      .orderBy(desc(messages.id))
       .limit(limit);
 
     // Mark received messages as read
@@ -493,7 +495,7 @@ router.get('/:userId', requireUser, async (req: Request, res: Response) => {
       .set({ read: true })
       .where(and(eq(messages.recipient_id, currentUserId), eq(messages.sender_id, otherId)));
 
-    res.json(thread);
+    res.json([...thread].reverse());
   } catch (err) {
     res.status(500).json({ error: 'Internal server error' });
   }

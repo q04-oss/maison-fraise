@@ -537,7 +537,7 @@ router.post('/scan-collect', requireUser, async (req: Request, res: Response) =>
   const userId = (req as any).userId as number;
   const { nfc_token } = req.body;
 
-  if (!nfc_token || typeof nfc_token !== 'string' || !/^[0-9a-fA-F-]{32,}$/.test(nfc_token)) {
+  if (!nfc_token || typeof nfc_token !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nfc_token)) {
     res.status(400).json({ ok: false, error: 'invalid_token' });
     return;
   }

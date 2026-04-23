@@ -452,6 +452,10 @@ app.get('/proposal/:token', (req, res, next) => {
   proposalsRouter(req, res, next);
 });
 
+function escapeHtml(s: string): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 // Public map deep link — /map/:userId
 app.get('/map/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId, 10);
@@ -480,15 +484,18 @@ app.get('/map/:userId', async (req, res) => {
       entries = (entryRows as any).rows ?? entryRows;
     }
 
-    const displayName = user.display_name ?? 'someone';
+    const displayName = escapeHtml(user.display_name ?? 'someone');
     const placeItems = entries.map((e: any) => {
-      const meta = [e.neighbourhood, e.hours].filter(Boolean).join('  ·  ');
-      const ig = e.instagram_handle ? `<a href="https://instagram.com/${e.instagram_handle}" style="color:#8A8A8E;text-decoration:none;">@${e.instagram_handle}</a>` : '';
+      const neighbourhood = e.neighbourhood ? escapeHtml(e.neighbourhood) : null;
+      const hours = e.hours ? escapeHtml(e.hours) : null;
+      const meta = [neighbourhood, hours].filter(Boolean).join('  ·  ');
+      const igHandle = e.instagram_handle ? escapeHtml(e.instagram_handle) : null;
+      const ig = igHandle ? `<a href="https://instagram.com/${igHandle}" style="color:#8A8A8E;text-decoration:none;">@${igHandle}</a>` : '';
       return `
         <div style="padding:20px 0;border-bottom:1px solid #E5E1DA;">
-          <div style="font-family:Georgia,serif;font-size:18px;color:#1C1C1E;margin-bottom:4px;">${e.name}</div>
+          <div style="font-family:Georgia,serif;font-size:18px;color:#1C1C1E;margin-bottom:4px;">${escapeHtml(e.name ?? '')}</div>
           ${meta ? `<div style="font-family:'Courier New',monospace;font-size:11px;color:#8A8A8E;letter-spacing:0.5px;margin-bottom:4px;">${meta}</div>` : ''}
-          ${e.address ? `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#6A6A6E;">${e.address}</div>` : ''}
+          ${e.address ? `<div style="font-family:'DM Sans',sans-serif;font-size:13px;color:#6A6A6E;">${escapeHtml(e.address)}</div>` : ''}
           ${ig ? `<div style="margin-top:4px;font-size:12px;">${ig}</div>` : ''}
         </div>`;
     }).join('');
