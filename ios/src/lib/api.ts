@@ -2116,6 +2116,19 @@ export async function fetchAdBalance(): Promise<{ ad_balance_cents: number }> {
   return r.json();
 }
 
+export interface CommunityFundState {
+  balance_cents: number;
+  threshold_cents: number;
+  total_raised_cents: number;
+  popup_count: number;
+}
+
+export async function fetchCommunityFund(): Promise<CommunityFundState> {
+  const r = await fetch(`${BASE_URL}/api/community-fund`);
+  if (!r.ok) throw new Error('failed');
+  return r.json();
+}
+
 export async function initiateToiletVisit(business_id: number, payment_method: 'stripe' | 'ad_balance'): Promise<{ visit_id: number; client_secret?: string; access_code?: string; fee_cents: number }> {
   const auth = await authHeader();
   const r = await fetch(`${BASE_URL}/api/toilets/visit`, {
