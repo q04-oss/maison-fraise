@@ -103,6 +103,12 @@
       letter-spacing: 0.04em;
     }
     .event-seats.sold-out { color: #c0392b; }
+    .event-date-tbd {
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
 
     .empty {
       padding-block: 3rem;
@@ -160,6 +166,15 @@
       flex-shrink: 0;
     }
     .modal-close:hover { color: var(--text); }
+
+    .date-tbd-notice {
+      font-size: 0.72rem;
+      color: var(--muted);
+      background: var(--card);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      line-height: 1.6;
+    }
 
     .modal-instructor {
       display: flex;
@@ -285,6 +300,65 @@
     .confirmation-title { font-size: 0.9rem; font-weight: 500; }
     .confirmation-sub { font-size: 0.75rem; color: var(--muted); line-height: 1.7; }
 
+    /* ── Refund panel ── */
+    .refund-panel {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .refund-panel h2 {
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .refund-panel p {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .refund-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-width: 400px;
+    }
+    .refund-select {
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      background: var(--input);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      color: var(--text);
+      outline: none;
+      appearance: none;
+    }
+    .btn-refund {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: none;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      padding: 0.6rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      align-self: flex-start;
+    }
+    .btn-refund:hover { border-color: var(--text); }
+    .refund-msg {
+      font-size: 0.72rem;
+      color: var(--muted);
+      display: none;
+    }
+    .refund-msg.visible { display: block; }
+    .refund-msg.ok { color: var(--text); }
+
     /* ── Loading ── */
     #events-loading {
       padding-block: 2rem;
@@ -310,10 +384,28 @@
 
     <div class="eyebrow">edmonton</div>
     <h1>table</h1>
-    <p class="tagline">skills worth learning, taught by the people who built them.<br>hosted in working venues.</p>
+    <p class="tagline">skills worth learning, taught by the people who built them.<br>hosted in working venues. date confirmed once seats fill.</p>
 
     <div class="events" id="events-container">
       <div id="events-loading">loading —</div>
+    </div>
+
+    <!-- Refund panel — only shows if there are confirmed-date events -->
+    <div class="refund-panel" id="refund-panel" style="display:none">
+      <h2>can't make it?</h2>
+      <p>if the date doesn't work for you, enter your email below and we'll refund your spot.</p>
+      <div class="refund-form">
+        <div>
+          <label for="refund-event">event</label>
+          <select class="refund-select" id="refund-event"></select>
+        </div>
+        <div>
+          <label for="refund-email">your email</label>
+          <input type="email" id="refund-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="refund-msg" id="refund-msg"></div>
+        <button class="btn-refund" id="btn-refund">request refund</button>
+      </div>
     </div>
 
     <footer>box fraise &nbsp;·&nbsp; fraise.box &nbsp;·&nbsp; 2026</footer>
@@ -328,6 +420,10 @@
           <div class="modal-meta" id="modal-meta"></div>
         </div>
         <button class="modal-close" id="modal-close">×</button>
+      </div>
+
+      <div class="date-tbd-notice" id="date-tbd-notice" style="display:none">
+        date tbd — once seats fill, a date is set. if it doesn't work for you, full refund, no questions.
       </div>
 
       <div class="modal-instructor" id="modal-instructor"></div>
@@ -385,8 +481,8 @@
     cardElement.mount('#card-element');
 
     let currentEvent = null;
+    let allEvents = [];
 
-    // Format date
     function formatDate(iso) {
       const d = new Date(iso);
       const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -398,12 +494,12 @@
       return `CA$${(cents / 100).toFixed(0)}`;
     }
 
-    // Load events
     async function loadEvents() {
       try {
         const res = await fetch('/api/table/events');
-        const events = await res.json();
-        renderEvents(events);
+        allEvents = await res.json();
+        renderEvents(allEvents);
+        setupRefundPanel(allEvents);
       } catch {
         document.getElementById('events-loading').textContent = 'unable to load events.';
       }
@@ -421,38 +517,54 @@
       container.innerHTML = events.map(e => {
         const seatsLeft = e.capacity - e.seats_taken;
         const soldOut = seatsLeft <= 0;
+        const dateStr = e.date_tbd ? 'date tbd' : formatDate(e.event_date);
         return `
           <div class="event" data-id="${e.id}" onclick="openEvent(${e.id})">
             <div>
               <div class="event-title">${e.title.toLowerCase()}</div>
-              <div class="event-meta">${formatDate(e.event_date)} &nbsp;·&nbsp; ${e.instructor_name.toLowerCase()} &nbsp;·&nbsp; ${e.venue_name.toLowerCase()}</div>
+              <div class="event-meta">${e.instructor_name.toLowerCase()} &nbsp;·&nbsp; ${e.venue_name.toLowerCase()}</div>
             </div>
             <div class="event-right">
               <div class="event-price">${formatPrice(e.price_cents)}</div>
-              <div class="event-seats${soldOut ? ' sold-out' : ''}">${soldOut ? 'sold out' : seatsLeft + ' left'}</div>
+              ${soldOut
+                ? '<div class="event-seats sold-out">sold out</div>'
+                : `<div class="event-seats">${seatsLeft} left</div>`}
+              <div class="event-date-tbd">${dateStr}</div>
             </div>
           </div>
         `;
       }).join('');
+    }
 
-      // Store events for modal
-      window._events = events;
+    function setupRefundPanel(events) {
+      const confirmed = events.filter(e => !e.date_tbd);
+      if (!confirmed.length) return;
+
+      const panel = document.getElementById('refund-panel');
+      const select = document.getElementById('refund-event');
+      panel.style.display = 'block';
+      select.innerHTML = confirmed.map(e =>
+        `<option value="${e.id}">${e.title.toLowerCase()} · ${formatDate(e.event_date)}</option>`
+      ).join('');
     }
 
     async function openEvent(id) {
-      const event = window._events?.find(e => e.id === id);
+      const event = allEvents.find(e => e.id === id);
       if (!event) return;
       currentEvent = event;
 
-      // Header
       document.getElementById('modal-title').textContent = event.title.toLowerCase();
-      document.getElementById('modal-meta').textContent =
-        `${formatDate(event.event_date)} · ${event.duration_minutes} min · ${event.venue_name.toLowerCase()}`;
-      if (event.venue_address) {
-        document.getElementById('modal-meta').textContent += ` · ${event.venue_address}`;
+
+      if (event.date_tbd) {
+        document.getElementById('modal-meta').textContent =
+          `date tbd · ${event.duration_minutes} min · ${event.venue_name.toLowerCase()}`;
+        document.getElementById('date-tbd-notice').style.display = 'block';
+      } else {
+        document.getElementById('modal-meta').textContent =
+          `${formatDate(event.event_date)} · ${event.duration_minutes} min · ${event.venue_name.toLowerCase()}`;
+        document.getElementById('date-tbd-notice').style.display = 'none';
       }
 
-      // Instructor
       const photo = event.instructor_photo_url
         ? `<img class="instructor-photo" src="${event.instructor_photo_url}" alt="${event.instructor_name}" />`
         : `<div class="instructor-photo"></div>`;
@@ -464,12 +576,10 @@
         </div>
       `;
 
-      // Description
       const descEl = document.getElementById('modal-description');
       descEl.textContent = event.description ?? '';
       descEl.style.display = event.description ? 'block' : 'none';
 
-      // Split
       const total = event.price_cents;
       document.getElementById('modal-split').innerHTML = `
         <div class="modal-split-row"><span>instructor (65%)</span><span>${formatPrice(Math.round(total * 0.65))}</span></div>
@@ -477,7 +587,6 @@
         <div class="modal-split-row"><span>fraise (15%)</span><span>${formatPrice(Math.round(total * 0.15))}</span></div>
       `;
 
-      // Reset form
       document.getElementById('input-seats').value = '1';
       updateTotal();
       document.getElementById('form-error').classList.remove('visible');
@@ -498,8 +607,7 @@
     function updateTotal() {
       if (!currentEvent) return;
       const seats = parseInt(document.getElementById('input-seats').value) || 1;
-      const total = currentEvent.price_cents * seats;
-      document.getElementById('total-display').textContent = formatPrice(total);
+      document.getElementById('total-display').textContent = formatPrice(currentEvent.price_cents * seats);
     }
 
     document.getElementById('input-seats').addEventListener('input', updateTotal);
@@ -508,9 +616,8 @@
       document.getElementById('overlay').classList.remove('open');
     });
     document.getElementById('overlay').addEventListener('click', (e) => {
-      if (e.target === document.getElementById('overlay')) {
+      if (e.target === document.getElementById('overlay'))
         document.getElementById('overlay').classList.remove('open');
-      }
     });
 
     document.getElementById('btn-book').addEventListener('click', async () => {
@@ -553,18 +660,51 @@
           return;
         }
 
-        // Success
         document.getElementById('booking-form').style.display = 'none';
         const conf = document.getElementById('confirmation');
         conf.classList.add('visible');
-        document.getElementById('confirmation-sub').textContent =
-          `${currentEvent.title.toLowerCase()} · ${formatDate(currentEvent.event_date)} · ${currentEvent.venue_name.toLowerCase()}. a confirmation will be sent to ${email}.`;
+        document.getElementById('confirmation-sub').textContent = event.date_tbd
+          ? `${currentEvent.title.toLowerCase()} · ${currentEvent.venue_name.toLowerCase()}. we'll email ${email} when the date is confirmed.`
+          : `${currentEvent.title.toLowerCase()} · ${formatDate(currentEvent.event_date)} · ${currentEvent.venue_name.toLowerCase()}. confirmation sent to ${email}.`;
 
       } catch (err) {
         errEl.textContent = err.message ?? 'something went wrong.';
         errEl.classList.add('visible');
         btn.disabled = false;
         btn.textContent = 'reserve seat';
+      }
+    });
+
+    // Refund request
+    document.getElementById('btn-refund').addEventListener('click', async () => {
+      const event_id = document.getElementById('refund-event').value;
+      const email = document.getElementById('refund-email').value.trim();
+      const msgEl = document.getElementById('refund-msg');
+
+      if (!email) {
+        msgEl.textContent = 'enter your email.';
+        msgEl.className = 'refund-msg visible';
+        return;
+      }
+
+      document.getElementById('btn-refund').disabled = true;
+      msgEl.textContent = 'processing —';
+      msgEl.className = 'refund-msg visible';
+
+      try {
+        const res = await fetch(`/api/table/events/${event_id}/refund-request`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Refund failed');
+        msgEl.textContent = 'refund issued. should appear within 5–10 business days.';
+        msgEl.className = 'refund-msg visible ok';
+      } catch (err) {
+        msgEl.textContent = err.message ?? 'something went wrong.';
+        msgEl.className = 'refund-msg visible';
+        document.getElementById('btn-refund').disabled = false;
       }
     });
 

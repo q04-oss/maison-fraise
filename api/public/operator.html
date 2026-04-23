@@ -932,17 +932,22 @@
     const body = document.getElementById('dash-body');
     body.innerHTML = '<div class="empty">loading —</div>';
     try {
-      const [eventsRes, instructorsRes] = await Promise.all([
+      const [eventsRes, instructorsRes, bookingsRes] = await Promise.all([
         fetch(`${BASE}/api/table/events`, { headers: { 'X-Admin-PIN': currentPin } }),
         fetch(`${BASE}/api/table/instructors`, { headers: { 'X-Admin-PIN': currentPin } }),
+        fetch(`${BASE}/api/table/bookings`, { headers: { 'X-Admin-PIN': currentPin } }),
       ]);
       const events = eventsRes.ok ? await eventsRes.json() : [];
       const instructors = instructorsRes.ok ? await instructorsRes.json() : [];
+      const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
 
       const formatDate = iso => {
+        if (!iso) return 'date tbd';
         const d = new Date(iso);
         return d.toLocaleDateString('en-CA', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
       };
+
+      const statusColor = s => s === 'confirmed' ? 'var(--green)' : s === 'refunded' ? 'var(--muted)' : 'var(--yellow, #f0a500)';
 
       body.innerHTML = `
         <div class="section-label">Instructors</div>
@@ -966,14 +971,20 @@
           <button type="submit" class="pin-btn" style="padding:10px;">Add Instructor</button>
         </form>
 
-        <div class="section-label">Upcoming Events</div>
+        <div class="section-label">Events</div>
         <div style="margin-bottom:12px;">
           ${events.length === 0 ? '<div class="empty">No events yet.</div>' : events.map(e => `
             <div class="order-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-              <div>
+              <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-family:'DM Mono',monospace;">${e.title}</div>
                 <div style="font-size:11px;color:var(--muted);margin-top:2px;">${formatDate(e.event_date)} · ${e.venue_name} · ${e.instructor_name}</div>
                 <div style="font-size:11px;color:var(--muted);margin-top:1px;">CA$${(e.price_cents/100).toFixed(0)} · ${e.seats_taken}/${e.capacity} seats</div>
+                ${e.date_tbd ? `
+                  <form onsubmit="confirmEventDate(event, ${e.id})" style="display:flex;gap:6px;margin-top:8px;">
+                    <input type="datetime-local" id="confirm-date-${e.id}" class="pin-input" style="font-size:11px;letter-spacing:0;text-align:left;padding:6px 8px;flex:1;" required />
+                    <button type="submit" class="pin-btn" style="padding:6px 12px;font-size:11px;">Set date</button>
+                  </form>
+                ` : ''}
               </div>
               <button onclick="toggleEvent(${e.id}, ${!e.active})" style="background:${e.active ? 'rgba(80,200,120,0.15)' : 'rgba(220,80,80,0.15)'};border:1px solid ${e.active ? 'rgba(80,200,120,0.4)' : 'rgba(220,80,80,0.4)'};color:${e.active ? 'var(--green)' : 'var(--red)'};font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">
                 ${e.active ? 'active' : 'inactive'}
@@ -982,7 +993,7 @@
           `).join('')}
         </div>
 
-        <form id="add-event-form" style="display:flex;flex-direction:column;gap:8px;">
+        <form id="add-event-form" style="display:flex;flex-direction:column;gap:8px;margin-bottom:32px;">
           <div class="section-label" style="margin-top:8px;">Add Event</div>
           <select id="e-instructor" class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;cursor:pointer;">
             <option value="">select instructor</option>
@@ -991,13 +1002,32 @@
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="title (e.g. knife skills)" id="e-title" required />
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="venue name" id="e-venue" required />
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="venue address (optional)" id="e-address" />
-          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="date & time (e.g. 2026-05-10T18:00)" id="e-date" type="datetime-local" required />
+          <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="date & time — leave blank for TBD" id="e-date" type="datetime-local" />
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="price in CAD (e.g. 120)" id="e-price" type="number" min="1" required />
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="capacity (default 12)" id="e-capacity" type="number" min="1" value="12" />
           <input class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;" placeholder="duration in minutes (default 120)" id="e-duration" type="number" min="30" value="120" />
           <textarea class="pin-input" style="font-size:13px;letter-spacing:0;text-align:left;padding:10px 12px;resize:vertical;min-height:80px;font-family:'DM Mono',monospace;" placeholder="description (optional)" id="e-desc"></textarea>
           <button type="submit" class="pin-btn" style="padding:10px;">Add Event</button>
         </form>
+
+        <div class="section-label">Bookings</div>
+        <div style="margin-bottom:12px;">
+          ${bookings.length === 0 ? '<div class="empty">No bookings yet.</div>' : bookings.map(b => {
+            const ev = events.find(e => e.id === b.event_id);
+            return `
+            <div class="order-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+              <div>
+                <div style="font-size:13px;font-family:'DM Mono',monospace;">${b.name}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">${b.email} · ${b.seats} seat${b.seats>1?'s':''} · CA$${(b.total_cents/100).toFixed(0)}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">${ev ? ev.title : 'event #'+b.event_id}</div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+                <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${statusColor(b.status)};">${b.status}</div>
+                ${b.status === 'confirmed' ? `<button onclick="refundBooking(${b.id})" style="background:rgba(220,80,80,0.1);border:1px solid rgba(220,80,80,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;">refund</button>` : ''}
+              </div>
+            </div>
+          `}).join('')}
+        </div>
       `;
 
       document.getElementById('add-instructor-form').addEventListener('submit', async e => {
@@ -1026,11 +1056,11 @@
         const capacity = parseInt(document.getElementById('e-capacity').value) || 12;
         const duration_minutes = parseInt(document.getElementById('e-duration').value) || 120;
         const description = document.getElementById('e-desc').value.trim();
-        if (!instructor_id || !title || !venue_name || !event_date || !price_cents) return alert('Fill in all required fields.');
+        if (!instructor_id || !title || !venue_name || !price_cents) return alert('Fill in required fields.');
         const res = await fetch(`${BASE}/api/table/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
-          body: JSON.stringify({ instructor_id, title, venue_name, venue_address: venue_address || null, event_date, price_cents, capacity, duration_minutes, description: description || null }),
+          body: JSON.stringify({ instructor_id, title, venue_name, venue_address: venue_address || null, event_date: event_date || null, price_cents, capacity, duration_minutes, description: description || null }),
         });
         if (res.ok) renderTableTab();
         else alert('Failed to add event.');
@@ -1048,6 +1078,28 @@
       body: JSON.stringify({ active }),
     });
     renderTableTab();
+  }
+
+  async function confirmEventDate(e, id) {
+    e.preventDefault();
+    const event_date = document.getElementById(`confirm-date-${id}`).value;
+    if (!event_date) return;
+    await fetch(`${BASE}/api/table/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ event_date }),
+    });
+    renderTableTab();
+  }
+
+  async function refundBooking(id) {
+    if (!confirm('Issue full refund for this booking?')) return;
+    const res = await fetch(`${BASE}/api/table/bookings/${id}/refund`, {
+      method: 'POST',
+      headers: { 'X-Admin-PIN': currentPin },
+    });
+    if (res.ok) renderTableTab();
+    else alert('Refund failed.');
   }
 </script>
 </body>
