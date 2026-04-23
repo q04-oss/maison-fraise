@@ -9,7 +9,7 @@ import { sendCreditSMS } from '../lib/twilio';
 import { sendCreditNotification } from '../lib/resend';
 
 const router = Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2025-01-27.acacia' });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2024-06-20' });
 
 // GET /api/credits/balance
 router.get('/balance', requireUser, async (req: any, res: any) => {

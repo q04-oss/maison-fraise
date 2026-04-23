@@ -1037,7 +1037,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
               if (recipient.push_token) {
                 const dollars = (amountCents / 100).toFixed(2);
                 const fromName = sender?.display_name ?? 'Someone';
-                sendPushNotification(recipient.push_token, `CA$${dollars} from ${fromName}`, note ?? 'Added to your platform credit.').catch(() => {});
+                sendPushNotification(recipient.push_token, { title: `CA$${dollars} from ${fromName}`, body: note ?? 'Added to your platform credit.' }).catch(() => {});
               }
             }
             logger.info(`Credit transfer: ${amountCents} cents from user ${fromUserId} to user ${toUserId}`);
@@ -1097,7 +1097,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
                   note: pending.note,
                 });
                 if (existing.push_token) {
-                  sendPushNotification(existing.push_token, `CA$${amountDollars} from ${senderName}`, pending.note ?? 'Added to your platform credit.').catch(() => {});
+                  sendPushNotification(existing.push_token, { title: `CA$${amountDollars} from ${senderName}`, body: pending.note ?? 'Added to your platform credit.' }).catch(() => {});
                 }
                 logger.info(`Credit transfer (contact, existing user): ${pending.amount_cents} cents → user ${existing.id}`);
               }
