@@ -316,6 +316,10 @@ app.get('/join', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/claim.html'));
 });
 
+app.get('/account', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/account.html'));
+});
+
 app.get('/table', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/table.html'));
 });

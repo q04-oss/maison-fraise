@@ -3,7 +3,7 @@ import appleSignin from 'apple-signin-auth';
 import { eq, sql } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { db } from '../db';
-import { users, tableBookings } from '../db/schema';
+import { users, tableBookings, tableEvents } from '../db/schema';
 import { logger } from '../lib/logger';
 import { signToken, requireUser } from '../lib/auth';
 import { autoClaimPendingCredits } from './credits';
@@ -316,6 +316,52 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const token = signToken(user.id);
     res.json({ user_id: user.id, token, table_verified: user.table_verified ?? false });
+  } catch (err) {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// GET /api/auth/me — current user profile + table bookings
+router.get('/me', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        display_name: users.display_name,
+        verified: users.verified,
+        table_verified: users.table_verified,
+        portrait_url: users.portrait_url,
+        created_at: users.created_at,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) { res.status(404).json({ error: 'User not found' }); return; }
+
+    // Fetch their table bookings with event details
+    const bookings = await db
+      .select({
+        id: tableBookings.id,
+        status: tableBookings.status,
+        seats: tableBookings.seats,
+        total_cents: tableBookings.total_cents,
+        created_at: tableBookings.created_at,
+        event_title: tableEvents.title,
+        event_date: tableEvents.event_date,
+        date_tbd: tableEvents.date_tbd,
+        venue_name: tableEvents.venue_name,
+        venue_slug: tableEvents.venue_slug,
+        event_type: tableEvents.event_type,
+      })
+      .from(tableBookings)
+      .innerJoin(tableEvents, eq(tableBookings.event_id, tableEvents.id))
+      .where(eq(tableBookings.email, user.email))
+      .orderBy(tableBookings.created_at);
+
+    res.json({ ...user, bookings });
   } catch (err) {
     res.status(500).json({ error: 'internal' });
   }

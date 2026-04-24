@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>box fraise — account</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --text: #1C1C1E; --muted: #8E8E93;
+      --border: #E5E1DA; --card: #F7F5F2; --input: #F0EDE8;
+    }
+    html { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body { min-height: 100dvh; }
+    main { width: 100%; max-width: 560px; margin-inline: auto; padding-inline: clamp(1.5rem, 6vw, 3rem); padding-block: clamp(3rem, 8vw, 5rem); }
+
+    nav { margin-bottom: 3rem; display: flex; justify-content: space-between; align-items: center; }
+    nav a { font-size: 0.75rem; color: var(--muted); text-decoration: none; letter-spacing: 0.05em; }
+    nav a:hover { color: var(--text); }
+    .signout { background: none; border: none; font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); cursor: pointer; letter-spacing: 0.05em; }
+    .signout:hover { color: var(--text); }
+
+    /* identity block */
+    .identity { margin-bottom: 3rem; padding-bottom: 2rem; border-bottom: 1px solid var(--border); }
+    .identity-name { font-size: 1rem; font-weight: 500; margin-bottom: 0.3rem; }
+    .identity-email { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .badges { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .badge {
+      font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 0.25rem 0.65rem; border-radius: 9999px; border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .badge.verified { border-color: #34c759; color: #34c759; }
+    .badge.table { border-color: #1C1C1E; color: #1C1C1E; }
+
+    /* sections */
+    .section-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+    section { margin-bottom: 2.5rem; }
+
+    /* booking rows */
+    .booking {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.2rem 1rem;
+      padding-block: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .booking:first-child { border-top: 1px solid var(--border); }
+    .booking-title { font-size: 0.88rem; font-weight: 500; }
+    .booking-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; line-height: 1.5; }
+    .booking-right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 0.25rem; }
+    .booking-price { font-size: 0.82rem; font-weight: 500; }
+    .booking-status {
+      font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 0.2rem 0.55rem; border-radius: 9999px;
+    }
+    .booking-status.confirmed { background: rgba(52,199,89,0.1); color: #34c759; }
+    .booking-status.waitlisted { background: rgba(255,159,10,0.1); color: #ff9f0a; }
+    .booking-status.refunded { background: rgba(142,142,147,0.1); color: var(--muted); }
+    .booking-status.pending { background: rgba(142,142,147,0.1); color: var(--muted); }
+
+    .empty { font-size: 0.78rem; color: var(--muted); padding-block: 1.5rem; }
+
+    footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <main id="main" style="display:none;">
+    <nav>
+      <a href="/">← box fraise</a>
+      <button class="signout" id="signout-btn">sign out</button>
+    </nav>
+
+    <div class="identity">
+      <div class="identity-name" id="display-name"></div>
+      <div class="identity-email" id="email"></div>
+      <div class="badges" id="badges"></div>
+    </div>
+
+    <section>
+      <div class="section-label">sessions</div>
+      <div id="bookings-container"><div class="empty">no sessions yet.</div></div>
+    </section>
+
+    <footer>box fraise &nbsp;·&nbsp; fraise.box</footer>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('bf_token');
+    if (!token) window.location.href = '/join';
+
+    function formatDate(iso) {
+      if (!iso) return 'date tbd';
+      const d = new Date(iso);
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      return `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+    }
+
+    function formatPrice(cents) {
+      return `CA$${(cents / 100).toFixed(0)}`;
+    }
+
+    async function load() {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (res.status === 401) { localStorage.removeItem('bf_token'); window.location.href = '/join'; return; }
+        const user = await res.json();
+
+        document.getElementById('display-name').textContent = user.display_name ?? user.email;
+        document.getElementById('email').textContent = user.email;
+
+        const badges = [];
+        if (user.table_verified) badges.push('<span class="badge table">table verified</span>');
+        if (user.verified) badges.push('<span class="badge verified">verified</span>');
+        document.getElementById('badges').innerHTML = badges.join('') || '<span class="badge">member</span>';
+
+        document.title = `${user.display_name ?? 'account'} — box fraise`;
+
+        const container = document.getElementById('bookings-container');
+        if (!user.bookings?.length) {
+          container.innerHTML = '<div class="empty">no sessions yet. <a href="/table" style="color:var(--text);">browse table →</a></div>';
+        } else {
+          container.innerHTML = user.bookings.map(b => `
+            <div class="booking">
+              <div>
+                <div class="booking-title">${b.event_title.toLowerCase()}</div>
+                <div class="booking-meta">
+                  ${b.venue_name.toLowerCase()}
+                  ${b.date_tbd ? ' · date tbd' : ` · ${formatDate(b.event_date)}`}
+                  · ${b.seats} seat${b.seats > 1 ? 's' : ''}
+                </div>
+              </div>
+              <div class="booking-right">
+                <div class="booking-price">${formatPrice(b.total_cents)}</div>
+                <span class="booking-status ${b.status}">${b.status}</span>
+              </div>
+            </div>
+          `).join('');
+        }
+
+        document.getElementById('main').style.display = 'block';
+      } catch {
+        window.location.href = '/join';
+      }
+    }
+
+    document.getElementById('signout-btn').addEventListener('click', () => {
+      localStorage.removeItem('bf_token');
+      window.location.href = '/';
+    });
+
+    load();
+  </script>
+</body>
+</html>

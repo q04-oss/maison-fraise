@@ -138,15 +138,8 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Registration failed');
 
-        document.getElementById('register-form').style.display = 'none';
-        document.getElementById('reg-divider').style.display = 'none';
-        document.getElementById('reg-login-link').style.display = 'none';
-        const success = document.getElementById('reg-success');
-        success.classList.add('visible');
-        document.getElementById('reg-success-title').textContent = data.table_verified ? 'account created. you\'re verified.' : 'account created.';
-        document.getElementById('reg-success-sub').textContent = data.table_verified
-          ? 'your account is verified — tied to a session you attended. welcome to box fraise.'
-          : 'your account is live. download the app or keep using the platform through your browser.';
+        localStorage.setItem('bf_token', data.token);
+        window.location.href = '/account';
       } catch (err) {
         errEl.textContent = err.message ?? 'something went wrong.';
         errEl.classList.add('visible');
@@ -174,12 +167,8 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Sign in failed');
 
-        document.getElementById('login-btn').closest('.form').style.display = 'none';
-        const success = document.getElementById('login-success');
-        success.classList.add('visible');
-        document.getElementById('login-success-sub').textContent = data.table_verified
-          ? 'signed in. your account is verified.'
-          : 'signed in.';
+        localStorage.setItem('bf_token', data.token);
+        window.location.href = '/account';
       } catch (err) {
         errEl.textContent = err.message ?? 'something went wrong.';
         errEl.classList.add('visible');
