@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { tableEvents, tableInstructors, tableBookings } from '../db/schema';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, inArray } from 'drizzle-orm';
 import { stripe } from '../lib/stripe';
 
 function requirePin(req: Request, res: Response, next: NextFunction): void {
@@ -15,11 +15,10 @@ function requirePin(req: Request, res: Response, next: NextFunction): void {
 
 const router = Router();
 
-// Fraise takes 15%, venue takes 20%, instructor takes 65%
 const FRAISE_CUT = 0.15;
 const VENUE_CUT = 0.20;
 
-// GET /api/table/events — all active events with instructor
+// GET /api/table/events — all active events with instructor + waitlist count
 router.get('/events', async (_req, res: any) => {
   try {
     const events = await db
@@ -36,6 +35,7 @@ router.get('/events', async (_req, res: any) => {
         seats_taken: tableEvents.seats_taken,
         description: tableEvents.description,
         active: tableEvents.active,
+        parent_event_id: tableEvents.parent_event_id,
         instructor_name: tableInstructors.name,
         instructor_bio: tableInstructors.bio,
         instructor_photo_url: tableInstructors.photo_url,
@@ -43,7 +43,20 @@ router.get('/events', async (_req, res: any) => {
       .from(tableEvents)
       .innerJoin(tableInstructors, eq(tableEvents.instructor_id, tableInstructors.id))
       .where(eq(tableEvents.active, true));
-    res.json(events);
+
+    // Attach waitlist counts
+    const eventIds = events.map(e => e.id);
+    const waitlistCounts: Record<number, number> = {};
+    if (eventIds.length) {
+      const counts = await db
+        .select({ event_id: tableBookings.event_id, count: sql<number>`count(*)::int` })
+        .from(tableBookings)
+        .where(and(eq(tableBookings.status, 'waitlisted'), inArray(tableBookings.event_id, eventIds)))
+        .groupBy(tableBookings.event_id);
+      for (const row of counts) waitlistCounts[row.event_id] = row.count;
+    }
+
+    res.json(events.map(e => ({ ...e, waitlist_count: waitlistCounts[e.id] ?? 0 })));
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch events' });
   }
@@ -83,7 +96,9 @@ router.get('/events/:id', async (req: any, res: any) => {
   }
 });
 
-// POST /api/table/events/:id/checkout — create Stripe payment intent
+// POST /api/table/events/:id/checkout
+// If seats available → pending (confirms to confirmed + increments seats_taken)
+// If full → pending_waitlist (confirms to waitlisted, no seats increment)
 router.post('/events/:id/checkout', async (req: any, res: any) => {
   const id = parseInt(req.params.id);
   const { name, email, seats = 1 } = req.body;
@@ -99,10 +114,8 @@ router.post('/events/:id/checkout', async (req: any, res: any) => {
       .limit(1);
 
     if (!event) return res.status(404).json({ error: 'Event not found' });
-    if (event.seats_taken + seats > event.capacity) {
-      return res.status(409).json({ error: 'Not enough seats available' });
-    }
 
+    const isFull = event.seats_taken + seats > event.capacity;
     const totalCents = event.price_cents * seats;
     const fraiseCents = Math.round(totalCents * FRAISE_CUT);
 
@@ -116,8 +129,9 @@ router.post('/events/:id/checkout', async (req: any, res: any) => {
         seats: String(seats),
         fraise_cut_cents: String(fraiseCents),
         venue_cut_cents: String(Math.round(totalCents * VENUE_CUT)),
+        waitlist: isFull ? 'true' : 'false',
       },
-      description: `table — ${event.title} · ${name}`,
+      description: `table — ${event.title} · ${name}${isFull ? ' [waitlist]' : ''}`,
     });
 
     await db.insert(tableBookings).values({
@@ -127,48 +141,51 @@ router.post('/events/:id/checkout', async (req: any, res: any) => {
       seats,
       total_cents: totalCents,
       stripe_payment_intent_id: intent.id,
-      status: 'pending',
+      status: isFull ? 'pending_waitlist' : 'pending',
     });
 
-    res.json({ client_secret: intent.client_secret, total_cents: totalCents });
+    res.json({ client_secret: intent.client_secret, total_cents: totalCents, waitlisted: isFull });
   } catch (err) {
     res.status(500).json({ error: 'Checkout failed' });
   }
 });
 
-// POST /api/table/events/:id/refund-request — user requests refund after date confirmed
+// POST /api/table/events/:id/refund-request — user self-service refund (confirmed or waitlisted)
 router.post('/events/:id/refund-request', async (req: any, res: any) => {
   const id = parseInt(req.params.id);
   const { email } = req.body;
   if (!email || isNaN(id)) return res.status(400).json({ error: 'Email and event id required' });
 
   try {
-    const [event] = await db.select().from(tableEvents).where(eq(tableEvents.id, id)).limit(1);
-    if (!event) return res.status(404).json({ error: 'Event not found' });
-    if (event.date_tbd) return res.status(400).json({ error: 'Date not yet confirmed — no refunds needed yet' });
-
     const [booking] = await db
       .select()
       .from(tableBookings)
-      .where(and(eq(tableBookings.event_id, id), eq(tableBookings.email, email), eq(tableBookings.status, 'confirmed')))
+      .where(and(
+        eq(tableBookings.event_id, id),
+        eq(tableBookings.email, email),
+      ))
       .limit(1);
 
-    if (!booking) return res.status(404).json({ error: 'No confirmed booking found for that email' });
+    if (!booking || !['confirmed', 'waitlisted'].includes(booking.status)) {
+      return res.status(404).json({ error: 'No refundable booking found for that email' });
+    }
 
-    const refund = await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id! });
-
+    await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id! });
     await db.update(tableBookings).set({ status: 'refunded' }).where(eq(tableBookings.id, booking.id));
-    await db.update(tableEvents)
-      .set({ seats_taken: sql`${tableEvents.seats_taken} - ${booking.seats}` })
-      .where(eq(tableEvents.id, id));
 
-    res.json({ refunded: true, amount_cents: refund.amount });
+    if (booking.status === 'confirmed') {
+      await db.update(tableEvents)
+        .set({ seats_taken: sql`${tableEvents.seats_taken} - ${booking.seats}` })
+        .where(eq(tableEvents.id, id));
+    }
+
+    res.json({ refunded: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'Refund failed' });
   }
 });
 
-// POST /api/table/webhook — confirm booking on payment success
+// POST /api/table/webhook handler
 export async function handleTablePayment(paymentIntentId: string) {
   const [booking] = await db
     .select()
@@ -176,17 +193,16 @@ export async function handleTablePayment(paymentIntentId: string) {
     .where(eq(tableBookings.stripe_payment_intent_id, paymentIntentId))
     .limit(1);
 
-  if (!booking || booking.status !== 'pending') return;
+  if (!booking) return;
 
-  await db
-    .update(tableBookings)
-    .set({ status: 'confirmed' })
-    .where(eq(tableBookings.id, booking.id));
-
-  await db
-    .update(tableEvents)
-    .set({ seats_taken: sql`${tableEvents.seats_taken} + ${booking.seats}` })
-    .where(eq(tableEvents.id, booking.event_id));
+  if (booking.status === 'pending') {
+    await db.update(tableBookings).set({ status: 'confirmed' }).where(eq(tableBookings.id, booking.id));
+    await db.update(tableEvents)
+      .set({ seats_taken: sql`${tableEvents.seats_taken} + ${booking.seats}` })
+      .where(eq(tableEvents.id, booking.event_id));
+  } else if (booking.status === 'pending_waitlist') {
+    await db.update(tableBookings).set({ status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
+  }
 }
 
 // Admin: GET /api/table/instructors
@@ -242,17 +258,64 @@ router.patch('/events/:id', requirePin, async (req: any, res: any) => {
   res.json(event);
 });
 
-// Admin: GET /api/table/bookings — view all bookings (optionally filter by event)
+// Admin: POST /api/table/events/:id/next-run
+// Creates a new run of an event and rolls all waitlisted bookings into it
+router.post('/events/:id/next-run', requirePin, async (req: any, res: any) => {
+  const parentId = parseInt(req.params.id);
+  if (isNaN(parentId)) return res.status(400).json({ error: 'Invalid id' });
+
+  const { instructor_id, event_date } = req.body;
+  if (!instructor_id) return res.status(400).json({ error: 'instructor_id required' });
+
+  const [parent] = await db.select().from(tableEvents).where(eq(tableEvents.id, parentId)).limit(1);
+  if (!parent) return res.status(404).json({ error: 'Event not found' });
+
+  // Get waitlisted bookings from the parent event
+  const waitlisted = await db
+    .select()
+    .from(tableBookings)
+    .where(and(eq(tableBookings.event_id, parentId), eq(tableBookings.status, 'waitlisted')));
+
+  const rolledSeats = waitlisted.reduce((sum, b) => sum + b.seats, 0);
+
+  // Create next run — capacity starts at at least the waitlisted count
+  const newCapacity = Math.max(parent.capacity, rolledSeats);
+  const [newEvent] = await db.insert(tableEvents).values({
+    instructor_id,
+    title: parent.title,
+    venue_name: parent.venue_name,
+    venue_address: parent.venue_address,
+    event_date: event_date ? new Date(event_date) : null,
+    date_tbd: !event_date,
+    duration_minutes: parent.duration_minutes,
+    price_cents: parent.price_cents,
+    capacity: newCapacity,
+    seats_taken: rolledSeats,
+    description: parent.description,
+    parent_event_id: parentId,
+  }).returning();
+
+  // Roll waitlisted bookings into the new event as confirmed
+  if (waitlisted.length) {
+    const ids = waitlisted.map(b => b.id);
+    await db.update(tableBookings)
+      .set({ event_id: newEvent.id, status: 'confirmed' })
+      .where(inArray(tableBookings.id, ids));
+  }
+
+  res.json({ event: newEvent, rolled_over: waitlisted.length });
+});
+
+// Admin: GET /api/table/bookings
 router.get('/bookings', requirePin, async (req: any, res: any) => {
   const event_id = req.query.event_id ? parseInt(req.query.event_id) : undefined;
-  const query = db.select().from(tableBookings).orderBy(tableBookings.created_at);
   const bookings = event_id
     ? await db.select().from(tableBookings).where(eq(tableBookings.event_id, event_id)).orderBy(tableBookings.created_at)
     : await db.select().from(tableBookings).orderBy(tableBookings.created_at);
   res.json(bookings);
 });
 
-// Admin: POST /api/table/bookings/:id/refund — issue refund manually
+// Admin: POST /api/table/bookings/:id/refund
 router.post('/bookings/:id/refund', requirePin, async (req: any, res: any) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
@@ -265,9 +328,11 @@ router.post('/bookings/:id/refund', requirePin, async (req: any, res: any) => {
   try {
     await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id });
     await db.update(tableBookings).set({ status: 'refunded' }).where(eq(tableBookings.id, booking.id));
-    await db.update(tableEvents)
-      .set({ seats_taken: sql`${tableEvents.seats_taken} - ${booking.seats}` })
-      .where(eq(tableEvents.id, booking.event_id));
+    if (booking.status === 'confirmed') {
+      await db.update(tableEvents)
+        .set({ seats_taken: sql`${tableEvents.seats_taken} - ${booking.seats}` })
+        .where(eq(tableEvents.id, booking.event_id));
+    }
     res.json({ refunded: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'Refund failed' });

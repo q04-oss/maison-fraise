@@ -1732,6 +1732,7 @@ export const tableEvents = pgTable('table_events', {
   description: text('description'),
   stripe_price_id: text('stripe_price_id'),
   active: boolean('active').notNull().default(true),
+  parent_event_id: integer('parent_event_id'),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 

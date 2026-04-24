@@ -393,7 +393,7 @@
     <!-- Refund panel — only shows if there are confirmed-date events -->
     <div class="refund-panel" id="refund-panel" style="display:none">
       <h2>can't make it?</h2>
-      <p>if the date doesn't work for you, enter your email below and we'll refund your spot.</p>
+      <p>on the waitlist and changed your mind, or the confirmed date doesn't work? enter your email and we'll refund your spot.</p>
       <div class="refund-form">
         <div>
           <label for="refund-event">event</label>
@@ -518,6 +518,9 @@
         const seatsLeft = e.capacity - e.seats_taken;
         const soldOut = seatsLeft <= 0;
         const dateStr = e.date_tbd ? 'date tbd' : formatDate(e.event_date);
+        const seatsLabel = soldOut
+          ? (e.waitlist_count > 0 ? `+${e.waitlist_count} waitlisted` : 'full')
+          : `${seatsLeft} left`;
         return `
           <div class="event" data-id="${e.id}" onclick="openEvent(${e.id})">
             <div>
@@ -526,9 +529,7 @@
             </div>
             <div class="event-right">
               <div class="event-price">${formatPrice(e.price_cents)}</div>
-              ${soldOut
-                ? '<div class="event-seats sold-out">sold out</div>'
-                : `<div class="event-seats">${seatsLeft} left</div>`}
+              <div class="event-seats${soldOut ? ' sold-out' : ''}">${seatsLabel}</div>
               <div class="event-date-tbd">${dateStr}</div>
             </div>
           </div>
@@ -537,14 +538,13 @@
     }
 
     function setupRefundPanel(events) {
-      const confirmed = events.filter(e => !e.date_tbd);
-      if (!confirmed.length) return;
-
+      // Show refund panel for any event that has confirmed or waitlisted bookings possible
+      if (!events.length) return;
       const panel = document.getElementById('refund-panel');
       const select = document.getElementById('refund-event');
       panel.style.display = 'block';
-      select.innerHTML = confirmed.map(e =>
-        `<option value="${e.id}">${e.title.toLowerCase()} · ${formatDate(e.event_date)}</option>`
+      select.innerHTML = events.map(e =>
+        `<option value="${e.id}">${e.title.toLowerCase()} · ${e.date_tbd ? 'date tbd' : formatDate(e.event_date)}</option>`
       ).join('');
     }
 
@@ -592,13 +592,26 @@
       document.getElementById('form-error').classList.remove('visible');
       document.getElementById('booking-form').style.display = 'flex';
       document.getElementById('confirmation').classList.remove('visible');
-      document.getElementById('btn-book').disabled = false;
-      document.getElementById('btn-book').textContent = 'reserve seat';
 
       const seatsLeft = event.capacity - event.seats_taken;
-      if (seatsLeft <= 0) {
-        document.getElementById('btn-book').disabled = true;
-        document.getElementById('btn-book').textContent = 'sold out';
+      const isFull = seatsLeft <= 0;
+      const btn = document.getElementById('btn-book');
+      btn.disabled = false;
+      btn.textContent = isFull ? 'join waitlist' : 'reserve seat';
+
+      // Show waitlist notice if full
+      let waitlistNotice = document.getElementById('waitlist-notice');
+      if (!waitlistNotice) {
+        waitlistNotice = document.createElement('div');
+        waitlistNotice.id = 'waitlist-notice';
+        waitlistNotice.className = 'date-tbd-notice';
+        document.getElementById('booking-form').prepend(waitlistNotice);
+      }
+      if (isFull) {
+        waitlistNotice.style.display = 'block';
+        waitlistNotice.textContent = `this run is full — pay now and you'll be first confirmed for the next one at the same venue.`;
+      } else {
+        waitlistNotice.style.display = 'none';
       }
 
       document.getElementById('overlay').classList.add('open');
@@ -663,9 +676,15 @@
         document.getElementById('booking-form').style.display = 'none';
         const conf = document.getElementById('confirmation');
         conf.classList.add('visible');
-        document.getElementById('confirmation-sub').textContent = event.date_tbd
-          ? `${currentEvent.title.toLowerCase()} · ${currentEvent.venue_name.toLowerCase()}. we'll email ${email} when the date is confirmed.`
-          : `${currentEvent.title.toLowerCase()} · ${formatDate(currentEvent.event_date)} · ${currentEvent.venue_name.toLowerCase()}. confirmation sent to ${email}.`;
+        let confMsg;
+        if (data.waitlisted) {
+          confMsg = `you're on the waitlist for ${currentEvent.title.toLowerCase()} · ${currentEvent.venue_name.toLowerCase()}. you'll be automatically confirmed for the next run. if you can't wait, use the refund option below.`;
+        } else if (currentEvent.date_tbd) {
+          confMsg = `${currentEvent.title.toLowerCase()} · ${currentEvent.venue_name.toLowerCase()}. we'll email ${email} when the date is confirmed.`;
+        } else {
+          confMsg = `${currentEvent.title.toLowerCase()} · ${formatDate(currentEvent.event_date)} · ${currentEvent.venue_name.toLowerCase()}. confirmation sent to ${email}.`;
+        }
+        document.getElementById('confirmation-sub').textContent = confMsg;
 
       } catch (err) {
         errEl.textContent = err.message ?? 'something went wrong.';

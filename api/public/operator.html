@@ -933,7 +933,7 @@
     body.innerHTML = '<div class="empty">loading —</div>';
     try {
       const [eventsRes, instructorsRes, bookingsRes] = await Promise.all([
-        fetch(`${BASE}/api/table/events`, { headers: { 'X-Admin-PIN': currentPin } }),
+        fetch(`${BASE}/api/table/events`),
         fetch(`${BASE}/api/table/instructors`, { headers: { 'X-Admin-PIN': currentPin } }),
         fetch(`${BASE}/api/table/bookings`, { headers: { 'X-Admin-PIN': currentPin } }),
       ]);
@@ -978,12 +978,24 @@
               <div style="flex:1;min-width:0;">
                 <div style="font-size:13px;font-family:'DM Mono',monospace;">${e.title}</div>
                 <div style="font-size:11px;color:var(--muted);margin-top:2px;">${formatDate(e.event_date)} · ${e.venue_name} · ${e.instructor_name}</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:1px;">CA$${(e.price_cents/100).toFixed(0)} · ${e.seats_taken}/${e.capacity} seats</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:1px;">CA$${(e.price_cents/100).toFixed(0)} · ${e.seats_taken}/${e.capacity} seats${e.waitlist_count > 0 ? ` · <span style="color:var(--yellow,#f0a500)">${e.waitlist_count} waitlisted</span>` : ''}</div>
                 ${e.date_tbd ? `
                   <form onsubmit="confirmEventDate(event, ${e.id})" style="display:flex;gap:6px;margin-top:8px;">
                     <input type="datetime-local" id="confirm-date-${e.id}" class="pin-input" style="font-size:11px;letter-spacing:0;text-align:left;padding:6px 8px;flex:1;" required />
                     <button type="submit" class="pin-btn" style="padding:6px 12px;font-size:11px;">Set date</button>
                   </form>
+                ` : ''}
+                ${e.waitlist_count > 0 ? `
+                  <div id="next-run-form-wrap-${e.id}" style="margin-top:8px;display:none;">
+                    <form onsubmit="createNextRun(event, ${e.id})" style="display:flex;flex-direction:column;gap:6px;">
+                      <select id="next-run-instructor-${e.id}" class="pin-input" style="font-size:11px;letter-spacing:0;text-align:left;padding:6px 8px;">
+                        ${instructors.map(i => `<option value="${i.id}"${i.name === e.instructor_name ? ' selected' : ''}>${i.name}</option>`).join('')}
+                      </select>
+                      <input type="datetime-local" id="next-run-date-${e.id}" class="pin-input" style="font-size:11px;letter-spacing:0;text-align:left;padding:6px 8px;" placeholder="date (optional)" />
+                      <button type="submit" class="pin-btn" style="padding:6px 12px;font-size:11px;">Create & roll over ${e.waitlist_count} waitlisted</button>
+                    </form>
+                  </div>
+                  <button onclick="document.getElementById('next-run-form-wrap-${e.id}').style.display = document.getElementById('next-run-form-wrap-${e.id}').style.display === 'none' ? 'block' : 'none'" style="background:rgba(240,165,0,0.1);border:1px solid rgba(240,165,0,0.3);color:var(--yellow,#f0a500);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;margin-top:6px;">next run ↓</button>
                 ` : ''}
               </div>
               <button onclick="toggleEvent(${e.id}, ${!e.active})" style="background:${e.active ? 'rgba(80,200,120,0.15)' : 'rgba(220,80,80,0.15)'};border:1px solid ${e.active ? 'rgba(80,200,120,0.4)' : 'rgba(220,80,80,0.4)'};color:${e.active ? 'var(--green)' : 'var(--red)'};font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:6px 12px;border-radius:20px;cursor:pointer;white-space:nowrap;">
@@ -1023,7 +1035,7 @@
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
                 <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${statusColor(b.status)};">${b.status}</div>
-                ${b.status === 'confirmed' ? `<button onclick="refundBooking(${b.id})" style="background:rgba(220,80,80,0.1);border:1px solid rgba(220,80,80,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;">refund</button>` : ''}
+                ${['confirmed','waitlisted'].includes(b.status) ? `<button onclick="refundBooking(${b.id})" style="background:rgba(220,80,80,0.1);border:1px solid rgba(220,80,80,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;">refund</button>` : ''}
               </div>
             </div>
           `}).join('')}
@@ -1090,6 +1102,24 @@
       body: JSON.stringify({ event_date }),
     });
     renderTableTab();
+  }
+
+  async function createNextRun(e, parentId) {
+    e.preventDefault();
+    const instructor_id = parseInt(document.getElementById(`next-run-instructor-${parentId}`).value);
+    const event_date = document.getElementById(`next-run-date-${parentId}`).value;
+    const res = await fetch(`${BASE}/api/table/events/${parentId}/next-run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': currentPin },
+      body: JSON.stringify({ instructor_id, event_date: event_date || null }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      alert(`Next run created. ${data.rolled_over} waitlisted booking${data.rolled_over !== 1 ? 's' : ''} confirmed.`);
+      renderTableTab();
+    } else {
+      alert('Failed to create next run.');
+    }
   }
 
   async function refundBooking(id) {
