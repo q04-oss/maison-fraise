@@ -1059,7 +1059,8 @@
               </div>
               <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
                 <div style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:${statusColor(b.status)};">${b.status}</div>
-                ${['confirmed','waitlisted'].includes(b.status) ? `<button onclick="refundBooking(${b.id})" style="background:rgba(220,80,80,0.1);border:1px solid rgba(220,80,80,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;">refund</button>` : ''}
+                ${b.status === 'confirmed' ? `<button onclick="sendClaimEmail(${b.id})" style="background:rgba(80,200,120,0.1);border:1px solid rgba(80,200,120,0.3);color:var(--green);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;margin-bottom:4px;">invite</button>` : ''}
+              ${['confirmed','waitlisted'].includes(b.status) ? `<button onclick="refundBooking(${b.id})" style="background:rgba(220,80,80,0.1);border:1px solid rgba(220,80,80,0.3);color:var(--red);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:20px;cursor:pointer;">refund</button>` : ''}
               </div>
             </div>
           `}).join('')}
@@ -1145,6 +1146,15 @@
     } else {
       alert('Failed to create next run.');
     }
+  }
+
+  async function sendClaimEmail(id) {
+    const res = await fetch(`${BASE}/api/table/bookings/${id}/claim-email`, {
+      method: 'POST',
+      headers: { 'X-Admin-PIN': currentPin },
+    });
+    if (res.ok) alert('Claim email sent.');
+    else alert('Failed to send email.');
   }
 
   async function refundBooking(id) {

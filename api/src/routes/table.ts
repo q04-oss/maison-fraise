@@ -3,6 +3,7 @@ import { db } from '../db';
 import { tableEvents, tableInstructors, tableBookings } from '../db/schema';
 import { eq, and, sql, inArray } from 'drizzle-orm';
 import { stripe } from '../lib/stripe';
+import { sendTableBookingConfirmation, sendTableClaimEmail } from '../lib/resend';
 
 function requirePin(req: Request, res: Response, next: NextFunction): void {
   const pin = req.headers['x-admin-pin'];
@@ -215,6 +216,35 @@ export async function handleTablePayment(paymentIntentId: string) {
   } else if (booking.status === 'pending_waitlist') {
     await db.update(tableBookings).set({ status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
   }
+
+  // Send confirmation email
+  const [event] = await db
+    .select({
+      title: tableEvents.title,
+      venue_name: tableEvents.venue_name,
+      event_date: tableEvents.event_date,
+      date_tbd: tableEvents.date_tbd,
+      instructor_name: tableInstructors.name,
+    })
+    .from(tableEvents)
+    .innerJoin(tableInstructors, eq(tableEvents.instructor_id, tableInstructors.id))
+    .where(eq(tableEvents.id, booking.event_id))
+    .limit(1);
+
+  if (event) {
+    sendTableBookingConfirmation({
+      to: booking.email,
+      name: booking.name,
+      eventTitle: event.title,
+      venueName: event.venue_name,
+      instructorName: event.instructor_name,
+      eventDate: event.event_date,
+      dateTbd: event.date_tbd,
+      seats: booking.seats,
+      totalCents: booking.total_cents,
+      waitlisted: booking.status === 'pending_waitlist',
+    }).catch(() => {}); // fire and forget
+  }
 }
 
 // Admin: GET /api/table/instructors
@@ -322,6 +352,35 @@ router.post('/events/:id/next-run', requirePin, async (req: any, res: any) => {
   }
 
   res.json({ event: newEvent, rolled_over: waitlisted.length });
+});
+
+// Admin: POST /api/table/bookings/:id/claim-email — send post-session claim email
+router.post('/bookings/:id/claim-email', requirePin, async (req: any, res: any) => {
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+
+  const [booking] = await db.select().from(tableBookings).where(eq(tableBookings.id, id)).limit(1);
+  if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+  const [event] = await db
+    .select({ title: tableEvents.title, venue_name: tableEvents.venue_name })
+    .from(tableEvents)
+    .where(eq(tableEvents.id, booking.event_id))
+    .limit(1);
+
+  if (!event) return res.status(404).json({ error: 'Event not found' });
+
+  try {
+    await sendTableClaimEmail({
+      to: booking.email,
+      name: booking.name,
+      eventTitle: event.title,
+      venueName: event.venue_name,
+    });
+    res.json({ sent: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'Failed to send email' });
+  }
 });
 
 // Admin: GET /api/table/bookings

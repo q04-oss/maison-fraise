@@ -723,3 +723,130 @@ export async function sendBusinessDonationNotification(params: {
     html: baseTemplate(content, 'Someone supports you.'),
   });
 }
+
+// ── Table emails (light theme) ──────────────────────────────────────────────
+
+function tableTemplate(content: string, heading: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>box fraise</title>
+</head>
+<body style="margin:0;padding:0;background:#F7F5F2;font-family:'Courier New',Courier,monospace;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F7F5F2;padding:48px 0;">
+    <tr>
+      <td align="center" style="padding:0 16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+          <tr>
+            <td style="background:#FFFFFF;padding:32px 36px 28px;border-radius:14px 14px 0 0;border-bottom:1px solid #E5E1DA;">
+              <p style="margin:0 0 8px;color:#8E8E93;font-size:10px;letter-spacing:3px;text-transform:uppercase;">box fraise · table</p>
+              <p style="margin:0;color:#1C1C1E;font-size:22px;font-weight:500;line-height:1.3;">${heading}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#FFFFFF;padding:32px 36px 36px;border-radius:0 0 14px 14px;">
+              ${content}
+              <p style="margin:28px 0 0;font-size:11px;color:#8E8E93;letter-spacing:0.3px;border-top:1px solid #E5E1DA;padding-top:20px;">
+                box fraise &nbsp;·&nbsp; edmonton &nbsp;·&nbsp; <a href="https://fraise.box" style="color:#1C1C1E;text-decoration:none;">fraise.box</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+function tableP(text: string): string {
+  return `<p style="margin:0 0 20px;font-size:14px;color:#1C1C1E;line-height:1.75;">${text}</p>`;
+}
+
+function tableMuted(text: string): string {
+  return `<p style="margin:0 0 20px;font-size:12px;color:#8E8E93;line-height:1.75;">${text}</p>`;
+}
+
+function tableRow(label: string, value: string): string {
+  return `
+    <tr>
+      <td style="font-size:11px;color:#8E8E93;letter-spacing:0.08em;text-transform:uppercase;padding:8px 0;border-bottom:1px solid #E5E1DA;width:40%;">${label}</td>
+      <td style="font-size:13px;color:#1C1C1E;padding:8px 0 8px 16px;border-bottom:1px solid #E5E1DA;">${value}</td>
+    </tr>`;
+}
+
+export async function sendTableBookingConfirmation(params: {
+  to: string;
+  name: string;
+  eventTitle: string;
+  venueName: string;
+  instructorName: string;
+  eventDate: Date | null;
+  dateTbd: boolean;
+  seats: number;
+  totalCents: number;
+  waitlisted: boolean;
+}) {
+  const { to, name, eventTitle, venueName, instructorName, eventDate, dateTbd, seats, totalCents, waitlisted } = params;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const fmtDate = (d: Date) => `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()} · ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const fmtPrice = (c: number) => `CA$${(c / 100).toFixed(0)}`;
+
+  const dateStr = dateTbd ? 'to be confirmed' : (eventDate ? fmtDate(eventDate) : 'to be confirmed');
+
+  const heading = waitlisted ? "you're on the waitlist." : "you're in.";
+
+  const intro = waitlisted
+    ? tableP(`hi ${name} — you're on the waitlist for <strong>${eventTitle.toLowerCase()}</strong> at ${venueName.toLowerCase()}. once seats open up you'll be automatically confirmed for the next run. no action needed.`)
+    : tableP(`hi ${name} — your spot at <strong>${eventTitle.toLowerCase()}</strong> is confirmed.`);
+
+  const details = `
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+      ${tableRow('event', eventTitle.toLowerCase())}
+      ${tableRow('venue', venueName.toLowerCase())}
+      ${tableRow('with', instructorName.toLowerCase())}
+      ${tableRow('date', dateStr)}
+      ${tableRow('seats', String(seats))}
+      ${tableRow('total', fmtPrice(totalCents))}
+    </table>
+  `;
+
+  const footer = dateTbd
+    ? tableMuted("we'll email you as soon as the date is confirmed. if it doesn't work for you, visit fraise.box/table for a full refund.")
+    : tableMuted("if you can't make it, visit fraise.box/table for a full refund.");
+
+  const content = intro + details + footer;
+
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: REPLY_TO,
+    subject: waitlisted ? `waitlist confirmed — ${eventTitle.toLowerCase()}` : `confirmed — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, heading),
+  });
+}
+
+export async function sendTableClaimEmail(params: {
+  to: string;
+  name: string;
+  eventTitle: string;
+  venueName: string;
+}) {
+  const { to, name, eventTitle, venueName } = params;
+
+  const content =
+    tableP(`hi ${name} — thanks for coming to <strong>${eventTitle.toLowerCase()}</strong> at ${venueName.toLowerCase()}.`) +
+    tableP(`you now have a box fraise account waiting for you. sign up at <a href="https://fraise.box" style="color:#1C1C1E;">fraise.box</a> using this email address and your account will be verified — no extra steps.`) +
+    tableMuted('verified accounts on box fraise reflect real presence. yours is tied to a session you actually attended.');
+
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: REPLY_TO,
+    subject: `your box fraise account — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, 'welcome to box fraise.'),
+  });
+}
