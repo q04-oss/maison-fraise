@@ -117,6 +117,46 @@
       line-height: 1.7;
     }
 
+    /* ── Table event cards ── */
+    .table-events {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 2rem;
+    }
+    .table-event-card {
+      background: var(--card);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      text-decoration: none;
+      color: var(--text);
+      display: block;
+      transition: background 0.1s;
+    }
+    .table-event-card:hover { background: var(--border); }
+    .table-event-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+    .table-event-title {
+      font-size: 0.88rem;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+    }
+    .table-event-meta {
+      font-size: 0.7rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .table-event-price {
+      font-size: 0.75rem;
+      font-weight: 500;
+      margin-top: 0.4rem;
+    }
+
     .status {
       font-size: 0.75rem;
       color: var(--muted);
@@ -192,18 +232,45 @@
         const res = await fetch('/api/brave?q=' + encodeURIComponent(q));
         const data = await res.json();
 
-        if (!res.ok || !data.results?.length) {
+        if (!res.ok || (!data.results?.length && !data.table_events?.length)) {
           document.getElementById('results-container').innerHTML = '<div class="status">no results.</div>';
           return;
         }
 
+        const formatPrice = cents => `CA$${(cents / 100).toFixed(0)}`;
+        const formatDate = iso => {
+          if (!iso) return 'date tbd';
+          const d = new Date(iso);
+          const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return `${months[d.getMonth()]} ${d.getDate()}`;
+        };
+
+        const tableEventsHtml = data.table_events?.length ? `
+          <div class="table-events">
+            ${data.table_events.map(e => {
+              const seatsLeft = e.capacity - e.seats_taken;
+              const slug = e.venue_slug ?? '';
+              return `
+                <a class="table-event-card" href="/table/${slug}">
+                  <div class="table-event-label">table · box fraise</div>
+                  <div class="table-event-title">${escHtml(e.title.toLowerCase())}</div>
+                  <div class="table-event-meta">${escHtml(e.instructor_name.toLowerCase())} · ${escHtml(e.venue_name.toLowerCase())} · ${e.event_type === 'private' ? 'private' : 'group'}</div>
+                  <div class="table-event-meta">${formatDate(e.event_date)} · ${seatsLeft > 0 ? seatsLeft + ' seats left' : 'waitlist open'}</div>
+                  <div class="table-event-price">${formatPrice(e.price_cents)}</div>
+                </a>
+              `;
+            }).join('')}
+          </div>
+        ` : '';
+
         document.getElementById('results-container').innerHTML = `
-          <div class="query-line">${data.results.length} results for "${q}"</div>
+          <div class="query-line">${data.results.length} results for "${escHtml(q)}"</div>
+          ${tableEventsHtml}
           <div class="results">
             ${data.results.map(r => `
               <div class="result">
                 <div class="result-display-url">${escHtml(r.display_url)}</div>
-                <div class="result-title"><a href="${escHtml(r.url)}" target="_blank" rel="noopener noreferrer">${escHtml(r.title)}</a></div>
+                <div class="result-title"><a href="/go?url=${encodeURIComponent(r.url)}" rel="noopener noreferrer">${escHtml(r.title)}</a></div>
                 ${r.description ? `<div class="result-description">${escHtml(r.description)}</div>` : ''}
               </div>
             `).join('')}
