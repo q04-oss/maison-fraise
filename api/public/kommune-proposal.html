@@ -482,7 +482,6 @@
       document.body.classList.remove('menu-open');
       document.getElementById('menu-btn').textContent = 'menu →';
       document.body.classList.add('searching');
-      renderShortcuts(SHORTCUTS);
       document.getElementById('search-input').focus();
     }
 
@@ -514,13 +513,13 @@
 
     document.getElementById('search-input').addEventListener('input', function() {
       const val = this.value;
-      if (!val || val === '/') {
-        renderShortcuts(SHORTCUTS);
+      const canvas = document.getElementById('results-canvas');
+      if (!val) {
+        canvas.innerHTML = '';
       } else if (val.startsWith('/')) {
         const q = val.slice(1).toLowerCase();
-        renderShortcuts(SHORTCUTS.filter(s => s.cmd.startsWith(q)));
+        renderShortcuts(q ? SHORTCUTS.filter(s => s.cmd.startsWith(q)) : SHORTCUTS);
       }
-      // non-slash input: leave canvas as-is until form submit
     });
 
     async function doSearch(e) {
