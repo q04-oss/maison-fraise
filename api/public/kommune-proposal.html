@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kommune</title>
+  <meta name="description" content="Kommune — Snack Bar. 11931 Jasper Ave NW, Edmonton." />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #F9F7F4;
+      --text: #1A1A18;
+      --muted: #8A8880;
+      --border: #E2DDD6;
+      --panel: #F2EFE9;
+    }
+    html {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      min-height: 100dvh;
+      padding: 5rem 1.5rem 6rem;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .eyebrow {
+      font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-size: 2rem; font-weight: 500; letter-spacing: -0.01em;
+      color: var(--text); margin-bottom: 0.4rem;
+    }
+    .address {
+      font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 3rem;
+    }
+
+    /* Description */
+    p {
+      font-size: 0.82rem; line-height: 1.9; color: var(--text); margin-bottom: 1rem;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* Hours */
+    .row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0.75rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+    }
+    .row:first-of-type { border-top: 1px solid var(--border); }
+    .row-label { color: var(--muted); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; }
+    .row-value { color: var(--text); }
+
+    /* Events */
+    .section-label {
+      font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 1rem;
+    }
+    .event {
+      padding: 1.1rem 0; border-bottom: 1px solid var(--border);
+    }
+    .event:first-of-type { border-top: 1px solid var(--border); }
+    .event-date {
+      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 0.3rem;
+    }
+    .event-title {
+      font-size: 0.88rem; font-weight: 500; color: var(--text); margin-bottom: 0.2rem;
+    }
+    .event-desc {
+      font-size: 0.72rem; color: var(--muted); line-height: 1.6; margin-bottom: 0.75rem;
+    }
+    .ticket-btn {
+      display: inline-block;
+      padding: 0.45rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      text-decoration: none;
+      background: var(--bg);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .ticket-btn:hover { border-color: var(--text); background: var(--panel); }
+
+    .no-events {
+      font-size: 0.78rem; color: var(--muted);
+      padding: 1.2rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* Links */
+    .links {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 2.5rem;
+    }
+    .link-pill {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.7rem;
+      letter-spacing: 0.05em;
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .link-pill:hover { border-color: var(--text); }
+
+    /* Footer */
+    footer {
+      margin-top: 4rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      line-height: 1.9;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="eyebrow">Snack Bar · Edmonton</div>
+    <h1>Kommune</h1>
+    <p class="address">11931 Jasper Ave NW &nbsp;·&nbsp; daily from 10am &nbsp;·&nbsp; reservations encouraged</p>
+
+    <p>
+      Elevated plates, a serious bar program — full NA options alongside — bakes, matcha, and live music. Walk-ins welcome.
+    </p>
+
+    <hr class="divider" />
+
+    <div class="row">
+      <span class="row-label">hours</span>
+      <span class="row-value">daily from 10am</span>
+    </div>
+    <div class="row">
+      <span class="row-label">reservations</span>
+      <span class="row-value"><a href="mailto:hello@kommunesnackbar.ca" style="color:inherit;text-decoration:none;">hello@kommunesnackbar.ca</a></span>
+    </div>
+    <div class="row">
+      <span class="row-label">phone</span>
+      <span class="row-value"><a href="tel:+17802443594" style="color:inherit;text-decoration:none;">+1 780 244 3594</a></span>
+    </div>
+
+    <hr class="divider" />
+
+    <div class="section-label">upcoming events</div>
+
+    <!--
+      Event template:
+      <div class="event">
+        <div class="event-date">fri, may 9 · doors 8pm</div>
+        <div class="event-title">Artist / Event Name</div>
+        <div class="event-desc">Short description. $12 · limited seats.</div>
+        <a href="#" class="ticket-btn">get tickets →</a>
+      </div>
+    -->
+
+    <div class="no-events">no events scheduled — check back soon</div>
+
+    <hr class="divider" />
+
+    <div class="section-label">menu</div>
+    <p style="font-size:0.78rem; color:var(--muted);">
+      Matcha · Bakes · Plates · Cocktails · NA · Wine
+    </p>
+    <a href="/menu" class="link-pill" style="margin-top:1rem; display:inline-block;">view menu →</a>
+
+    <div class="links" style="margin-top:2.5rem;">
+      <a href="https://open.spotify.com" class="link-pill" target="_blank" rel="noopener">Spotify →</a>
+      <a href="https://instagram.com/kommunesnackbar" class="link-pill" target="_blank" rel="noopener">Instagram →</a>
+      <a href="mailto:hello@kommunesnackbar.ca" class="link-pill">hello@kommunesnackbar.ca →</a>
+    </div>
+
+    <footer>
+      Kommune operates on Treaty 6 Territory in Wîhkwêntôwin (Edmonton, Alberta),<br />
+      on the traditional lands of the Cree, Blackfoot, Métis, and Nakoda Sioux peoples.
+    </footer>
+
+  </div>
+</body>
+</html>
