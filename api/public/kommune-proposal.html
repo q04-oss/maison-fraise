@@ -494,6 +494,7 @@
 
     function renderShortcuts(matches) {
       const canvas = document.getElementById('results-canvas');
+      canvas.dataset.mode = 'shortcuts';
       if (!matches.length) {
         canvas.innerHTML = '<div class="result-state">no shortcuts match</div>';
         return;
@@ -611,7 +612,8 @@
         } else if (document.body.classList.contains('searching')) {
           const input = document.getElementById('search-input');
           const canvas = document.getElementById('results-canvas');
-          if (!input.value && !canvas.innerHTML.trim()) closeSearch();
+          const atRoot = !input.value && canvas.dataset.mode === 'shortcuts';
+          if (!input.value && (!canvas.innerHTML.trim() || atRoot)) closeSearch();
           else returnToSearch();
         }
       }
