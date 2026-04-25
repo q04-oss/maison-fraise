@@ -463,7 +463,6 @@
     const SHORTCUTS = [
       { cmd: 'menu',      hint: 'browse the full menu',         action() { closeSearch(); openMenu(); } },
       { cmd: 'wifi',      hint: 'Kommune@1 — copy to clipboard', action() { navigator.clipboard?.writeText('Kommune@1'); closeSearch(); } },
-      { cmd: 'map',       hint: '11931 Jasper Ave NW',           action() { closeSearch(); window.open('https://maps.google.com/?q=11931+Jasper+Ave+NW,+Edmonton,+AB', '_blank'); } },
       { cmd: 'reserve',   hint: 'hello@kommunesnackbar.ca',      action() { closeSearch(); window.location.href = 'mailto:hello@kommunesnackbar.ca'; } },
       { cmd: 'feedback',  hint: 'leave a note for the owner',   action() { showFeedbackForm(); } },
       { cmd: 'apply',     hint: 'work at Kommune',              action() { showApplyForm(); } },
