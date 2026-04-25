@@ -718,6 +718,16 @@
       closeSearch();
     });
 
+    // Keyboard 1–5 fires the active rate-picker
+    document.addEventListener('keydown', e => {
+      const picker = document.querySelector('.rate-picker');
+      if (!picker) return;
+      if (e.key >= '1' && e.key <= '5') {
+        const btn = picker.querySelector(`.rate-btn[data-n="${e.key}"]`);
+        if (btn) btn.click();
+      }
+    });
+
     // ── Item ratings ──
     let ratingsCache = {};
 
