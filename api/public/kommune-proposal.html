@@ -388,6 +388,7 @@
         <div class="rec-actions">
           <button type="submit" class="rec-btn">recommend →</button>
           <button type="button" class="rec-btn" onclick="closeRecommendPanel()">close</button>
+          <button type="button" class="rec-btn" id="rec-again-btn" onclick="resetRecommend()" style="display:none;">again</button>
         </div>
       </form>
       <div class="rec-result" id="recommend-result" style="display:none;"></div>
@@ -1032,6 +1033,7 @@
       const result = document.getElementById('recommend-result');
       result.style.display = 'block';
       result.textContent = 'thinking…';
+      document.getElementById('rec-again-btn').style.display = 'none';
       try {
         const res = await fetch('/api/kommune/recommend', {
           method: 'POST',
@@ -1039,14 +1041,16 @@
           body: JSON.stringify({ people, mood }),
         });
         const data = await res.json();
-        result.innerHTML = esc(data.recommendation ?? 'unavailable right now') + '<br/><br/><button class="rec-btn" onclick="resetRecommend()">again</button>';
+        result.innerHTML = esc(data.recommendation ?? 'unavailable right now');
       } catch {
-        result.innerHTML = 'unavailable right now <button class="rec-btn" onclick="resetRecommend()">again</button>';
+        result.textContent = 'unavailable right now';
       }
+      document.getElementById('rec-again-btn').style.display = '';
     }
 
     function resetRecommend() {
       document.getElementById('recommend-result').style.display = 'none';
+      document.getElementById('rec-again-btn').style.display = 'none';
       document.getElementById('rec-people').value = '';
       document.getElementById('rec-mood').value = '';
       document.getElementById('rec-people').focus();
