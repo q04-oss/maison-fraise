@@ -595,8 +595,9 @@
         e.preventDefault();
         openSearch();
       }
-      if (e.key === 'Escape' && document.body.classList.contains('searching')) {
-        closeSearch();
+      if (e.key === 'Escape') {
+        if (document.body.classList.contains('searching')) closeSearch();
+        else if (document.body.classList.contains('menu-open')) toggleMenu();
       }
     });
 
