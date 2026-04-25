@@ -120,9 +120,8 @@
     }
     .section { margin-bottom: 2rem; }
     .section-title {
-      font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--muted); margin-bottom: 0.65rem; padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--border);
+      font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.6rem;
     }
 
     @media (min-width: 768px) {
@@ -133,12 +132,13 @@
     }
     .item {
       display: flex; justify-content: space-between; align-items: baseline;
-      padding: 0.6rem 0; border-bottom: 1px solid var(--border); gap: 1rem;
+      padding: 0.45rem 0; border-bottom: 1px solid var(--border); gap: 1rem;
     }
+    .item:first-of-type { border-top: 1px solid var(--border); }
     .item-left { flex: 1; }
-    .item-name { font-size: 0.8rem; color: var(--text); line-height: 1.4; }
-    .item-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.15rem; line-height: 1.5; }
-    .item-price { font-size: 0.75rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .item-name { font-size: 0.78rem; color: var(--text); }
+    .item-desc { font-size: 0.65rem; color: var(--muted); margin-top: 0.1rem; line-height: 1.5; }
+    .item-price { font-size: 0.78rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
     .prices-note {
       font-size: 0.65rem; color: var(--muted);
       letter-spacing: 0.03em; margin-top: 0.5rem; line-height: 1.8;
