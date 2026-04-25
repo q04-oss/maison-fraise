@@ -336,6 +336,8 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  await run('kommune_press_applications.user_id', sql`ALTER TABLE kommune_press_applications ADD COLUMN IF NOT EXISTS user_id integer REFERENCES users(id)`);
+
   // ── Kommune press assignments ────────────────────────────────────────────────
   await run('kommune_assignments', sql`CREATE TABLE IF NOT EXISTS kommune_assignments (
     id SERIAL PRIMARY KEY,

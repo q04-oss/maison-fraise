@@ -394,12 +394,12 @@ app.post('/api/kommune/press/apply', async (req: any, res: any) => {
 });
 
 app.post('/api/kommune/press/verify', async (req: any, res: any) => {
-  const code = String(req.body?.code ?? '').trim();
+  const code = String(req.body?.code ?? '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'code required' });
-  const rows = await db.execute(sql`SELECT id, name FROM kommune_press_applications WHERE personal_code = ${code} AND status = 'approved' LIMIT 1`);
+  const rows = await db.execute(sql`SELECT id, display_name FROM users WHERE user_code = ${code} AND verified_by = 'kommune' LIMIT 1`);
   const row = (((rows as any).rows ?? rows)[0] as any);
   if (!row) return res.status(401).json({ error: 'invalid code' });
-  res.json({ ok: true, name: row.name });
+  res.json({ ok: true, name: row.display_name });
 });
 
 app.get('/api/kommune/press/applications', async (req: any, res: any) => {
@@ -414,19 +414,43 @@ app.post('/api/kommune/press/applications/:id/approve', async (req: any, res: an
   if (password !== process.env.KOMMUNE_OWNER_PASSWORD) return res.status(401).json({ error: 'unauthorized' });
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: 'invalid id' });
-  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
-  await db.execute(sql`UPDATE kommune_press_applications SET status = 'approved', personal_code = ${code} WHERE id = ${id}`);
-  const rows = await db.execute(sql`SELECT name, email FROM kommune_press_applications WHERE id = ${id} LIMIT 1`);
-  const row = (((rows as any).rows ?? rows)[0] as any);
-  if (row?.email) {
-    const { resend } = await import('./lib/resend');
-    await resend.emails.send({
-      from: 'cold.press <orders@fraise.chat>',
-      to: row.email,
-      subject: 'you\'re in — cold.press',
-      text: `Hi ${row.name},\n\nYou've been approved as a cold.press reviewer.\n\nCome by Kommune (11931 Jasper Ave NW) and introduce yourself to whoever is working. They'll hand you your code.\n\n— Kommune`,
-    });
+
+  const appRows = await db.execute(sql`SELECT name, email FROM kommune_press_applications WHERE id = ${id} LIMIT 1`);
+  const app = (((appRows as any).rows ?? appRows)[0] as any);
+  if (!app) return res.status(404).json({ error: 'not found' });
+
+  // Generate a unique user_code using the same alphabet as the platform
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+
+  // Create or update the Box Fraise user
+  const existingRows = await db.execute(sql`SELECT id FROM users WHERE email = ${app.email} LIMIT 1`);
+  const existing = (((existingRows as any).rows ?? existingRows)[0] as any);
+  let userId: number;
+
+  if (existing) {
+    await db.execute(sql`UPDATE users SET user_code = ${code}, verified = true, verified_by = 'kommune', verified_at = now() WHERE id = ${existing.id}`);
+    userId = existing.id;
+  } else {
+    const newRows = await db.execute(sql`
+      INSERT INTO users (email, display_name, user_code, verified, verified_by, verified_at)
+      VALUES (${app.email}, ${app.name}, ${code}, true, 'kommune', now())
+      RETURNING id
+    `);
+    userId = (((newRows as any).rows ?? newRows)[0] as any).id;
   }
+
+  await db.execute(sql`UPDATE kommune_press_applications SET status = 'approved', personal_code = ${code}, user_id = ${userId} WHERE id = ${id}`);
+
+  const { resend } = await import('./lib/resend');
+  await resend.emails.send({
+    from: 'cold.press <orders@fraise.chat>',
+    to: app.email,
+    subject: 'you\'re in — cold.press',
+    text: `Hi ${app.name},\n\nYou've been approved as a cold.press reviewer.\n\nCome by Kommune (11931 Jasper Ave NW) and introduce yourself to whoever is working. They'll hand you your code.\n\n— Kommune`,
+  });
+
   res.json({ ok: true, code });
 });
 
