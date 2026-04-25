@@ -184,6 +184,38 @@
     .foot-name span { font-weight: 400; color: var(--muted); }
     .foot-treaty { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.04em; }
 
+    /* ── WiFi search ── */
+    .wifi-btn {
+      font-family: 'DM Mono', monospace; font-size: inherit;
+      color: var(--text); background: none; border: none; cursor: pointer;
+      padding: 0; letter-spacing: inherit;
+      text-decoration: underline; text-underline-offset: 3px;
+      transition: color 0.15s;
+    }
+    .wifi-btn:hover { color: var(--muted); }
+    .wifi-search {
+      display: none;
+      align-items: center; gap: 0.5rem;
+      margin-top: 0.85rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .wifi-search.open { display: flex; }
+    .wifi-search input {
+      flex: 1; font-family: 'DM Mono', monospace;
+      font-size: 0.78rem; color: var(--text);
+      background: none; border: none; outline: none;
+      min-width: 0;
+    }
+    .wifi-search input::placeholder { color: var(--muted); }
+    .wifi-search button {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); background: none; border: none;
+      cursor: pointer; padding: 0; letter-spacing: 0.04em;
+      flex-shrink: 0; transition: color 0.15s;
+    }
+    .wifi-search button:hover { color: var(--text); }
+
     @media (max-width: 480px) {
       .header-top { flex-direction: column; gap: 0.3rem; }
       .foot-name { font-size: 1.2rem; }
@@ -196,13 +228,18 @@
     <div class="header-top">
       <div class="header-meta">
         11931 Jasper Ave NW · Edmonton<br />
-        daily from 10am · WiFi: Kommune@1
+        daily from 10am · WiFi: <button class="wifi-btn" onclick="toggleWifi()">Kommune@1</button>
       </div>
       <div class="header-links">
         <a href="mailto:hello@kommunesnackbar.ca">reserve →</a>
         <button class="menu-btn" id="menu-btn" onclick="toggleMenu()">menu →</button>
       </div>
     </div>
+
+    <form class="wifi-search" id="wifi-search" onsubmit="doSearch(event)">
+      <input id="wifi-input" type="text" placeholder="search from Kommune" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <button type="submit">search →</button>
+    </form>
 
     <div class="header-content">
       <div class="label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener">Whisked</a></div>
@@ -357,6 +394,20 @@
     function toggleMenu() {
       const open = document.body.classList.toggle('menu-open');
       document.getElementById('menu-btn').textContent = open ? '← close' : 'menu →';
+    }
+
+    function toggleWifi() {
+      const form = document.getElementById('wifi-search');
+      const opening = !form.classList.contains('open');
+      form.classList.toggle('open');
+      if (opening) document.getElementById('wifi-input').focus();
+    }
+
+    function doSearch(e) {
+      e.preventDefault();
+      const q = document.getElementById('wifi-input').value.trim();
+      if (!q) return;
+      window.open('/search?q=' + encodeURIComponent(q), '_blank');
     }
   </script>
 
