@@ -1,9 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { db } from '../db';
-import { tableEvents, tableInstructors, tableBookings, users } from '../db/schema';
+import { tableEvents, tableInstructors, tableBookings, tableBookingTokens, users } from '../db/schema';
 import { eq, and, sql, inArray } from 'drizzle-orm';
+import crypto from 'crypto';
 import { stripe } from '../lib/stripe';
-import { sendTableBookingConfirmation, sendTableClaimEmail, sendTableDateConfirmed } from '../lib/resend';
+import { sendTableBookingConfirmation, sendTableClaimEmail, sendTableDateAnnouncedWithConfirm } from '../lib/resend';
 import { requireUser } from '../lib/auth';
 
 function requirePin(req: Request, res: Response, next: NextFunction): void {
@@ -50,6 +51,7 @@ router.get('/events', async (req: any, res: any) => {
         active: tableEvents.active,
         event_type: tableEvents.event_type,
         parent_event_id: tableEvents.parent_event_id,
+        threshold: tableEvents.threshold,
         instructor_name: tableInstructors.name,
         instructor_bio: tableInstructors.bio,
         instructor_photo_url: tableInstructors.photo_url,
@@ -215,7 +217,45 @@ export async function handleTablePayment(paymentIntentId: string) {
       .set({ seats_taken: sql`${tableEvents.seats_taken} + ${booking.seats}` })
       .where(eq(tableEvents.id, booking.event_id));
   } else if (booking.status === 'pending_waitlist') {
-    await db.update(tableBookings).set({ status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
+    // Check for an existing next-run to absorb this booking
+    const [existingNextRun] = await db
+      .select({ id: tableEvents.id, seats_taken: tableEvents.seats_taken, capacity: tableEvents.capacity })
+      .from(tableEvents)
+      .where(and(eq(tableEvents.parent_event_id, booking.event_id), eq(tableEvents.active, true)))
+      .limit(1);
+
+    if (existingNextRun) {
+      // Roll into existing next run
+      await db.update(tableBookings).set({ event_id: existingNextRun.id, status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
+      await db.update(tableEvents)
+        .set({ seats_taken: sql`${tableEvents.seats_taken} + ${booking.seats}` })
+        .where(eq(tableEvents.id, existingNextRun.id));
+    } else {
+      // Auto-create a new next run
+      const [parent] = await db.select().from(tableEvents).where(eq(tableEvents.id, booking.event_id)).limit(1);
+      if (parent) {
+        const [nextRun] = await db.insert(tableEvents).values({
+          instructor_id: parent.instructor_id,
+          title: parent.title,
+          venue_name: parent.venue_name,
+          venue_address: parent.venue_address,
+          venue_slug: parent.venue_slug,
+          event_date: null,
+          date_tbd: true,
+          duration_minutes: parent.duration_minutes,
+          price_cents: parent.price_cents,
+          capacity: parent.capacity,
+          threshold: parent.threshold,
+          seats_taken: booking.seats,
+          description: parent.description,
+          event_type: parent.event_type as any,
+          parent_event_id: parent.id,
+        }).returning();
+        await db.update(tableBookings).set({ event_id: nextRun.id, status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
+      } else {
+        await db.update(tableBookings).set({ status: 'waitlisted' }).where(eq(tableBookings.id, booking.id));
+      }
+    }
   }
 
   // Send confirmation email
@@ -288,6 +328,55 @@ router.post('/bookings/:id/cancel', requireUser, async (req: any, res: any) => {
   }
 });
 
+// Public: GET /api/table/respond/:token — email link handler
+function respondPage(heading: string, body: string): string {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>box fraise · table</title><link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'DM Mono',monospace;background:#F7F5F2;display:flex;min-height:100dvh;align-items:center;justify-content:center;padding:2rem}main{max-width:400px;width:100%}.eyebrow{font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8E8E93;margin-bottom:0.75rem}h1{font-size:1.1rem;font-weight:500;color:#1C1C1E;margin-bottom:0.5rem}p{font-size:0.78rem;color:#8E8E93;line-height:1.7;margin-bottom:1.5rem}a{font-size:0.7rem;color:#1C1C1E;text-decoration:underline;text-underline-offset:2px}</style></head><body><main><div class="eyebrow">box fraise · table</div><h1>${heading}</h1><p>${body}</p><a href="/table">← table</a></main></body></html>`;
+}
+
+router.get('/respond/:token', async (req: any, res: any) => {
+  const { token } = req.params;
+  try {
+    const [tokenRow] = await db.select().from(tableBookingTokens).where(eq(tableBookingTokens.token, token)).limit(1);
+    if (!tokenRow) return res.send(respondPage('link not found.', 'this link is invalid or has already been used.'));
+    if (tokenRow.used) {
+      return res.send(respondPage(
+        tokenRow.action === 'confirm' ? "you're confirmed." : 'already processed.',
+        tokenRow.action === 'confirm' ? 'your spot is locked in.' : 'your refund was already processed.',
+      ));
+    }
+
+    const [booking] = await db.select().from(tableBookings).where(eq(tableBookings.id, tokenRow.booking_id)).limit(1);
+    if (!booking) return res.send(respondPage('not found.', 'booking not found.'));
+
+    if (tokenRow.action === 'confirm') {
+      await db.update(tableBookingTokens).set({ used: true }).where(eq(tableBookingTokens.token, token));
+      return res.send(respondPage("you're in.", "your spot is confirmed. see you there."));
+    }
+
+    if (tokenRow.action === 'refund') {
+      if (booking.status === 'refunded') {
+        return res.send(respondPage('already refunded.', 'your payment has already been returned.'));
+      }
+      if (!booking.stripe_payment_intent_id) {
+        return res.send(respondPage('nothing to refund.', 'no payment found for this booking.'));
+      }
+      await stripe.refunds.create({ payment_intent: booking.stripe_payment_intent_id });
+      await db.update(tableBookings).set({ status: 'refunded' }).where(eq(tableBookings.id, booking.id));
+      if (booking.status === 'confirmed') {
+        await db.update(tableEvents)
+          .set({ seats_taken: sql`${tableEvents.seats_taken} - ${booking.seats}` })
+          .where(eq(tableEvents.id, booking.event_id));
+      }
+      await db.update(tableBookingTokens).set({ used: true }).where(eq(tableBookingTokens.token, token));
+      return res.send(respondPage('refund processed.', 'your spot has been released and your payment returned.'));
+    }
+
+    res.send(respondPage('unknown action.', 'something went wrong. contact table@fraise.box.'));
+  } catch {
+    res.send(respondPage('something went wrong.', 'please contact table@fraise.box for help.'));
+  }
+});
+
 // Admin: GET /api/table/instructors
 router.get('/instructors', requirePin, async (_req: any, res: any) => {
   const instructors = await db.select().from(tableInstructors).orderBy(tableInstructors.id);
@@ -304,13 +393,11 @@ router.post('/instructors', requirePin, async (req: any, res: any) => {
 
 // Admin: POST /api/table/events
 router.post('/events', requirePin, async (req: any, res: any) => {
-  const { instructor_id, title, venue_name, venue_address, event_date, duration_minutes, price_cents, capacity, description, event_type } = req.body;
+  const { instructor_id, title, venue_name, venue_address, event_date, duration_minutes, price_cents, capacity, threshold, description, event_type } = req.body;
   if (!instructor_id || !title || !venue_name || !price_cents) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   const type = event_type === 'private' ? 'private' : 'group';
-  // group: max 4 seats (2 per employee, up to 2 employees)
-  // private: exactly 2 seats (couple + 1 employee)
   const defaultCapacity = type === 'private' ? 2 : 4;
   const [event] = await db.insert(tableEvents).values({
     instructor_id,
@@ -323,6 +410,7 @@ router.post('/events', requirePin, async (req: any, res: any) => {
     duration_minutes: duration_minutes ?? 90,
     price_cents,
     capacity: capacity ?? defaultCapacity,
+    threshold: threshold ?? null,
     description,
     event_type: type,
   }).returning();
@@ -333,33 +421,44 @@ router.post('/events', requirePin, async (req: any, res: any) => {
 router.patch('/events/:id', requirePin, async (req: any, res: any) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
-  const { active, capacity, price_cents, description, event_date } = req.body;
+  const { active, capacity, price_cents, description, event_date, threshold } = req.body;
   const updates: any = {};
   if (active !== undefined) updates.active = active;
   if (capacity !== undefined) updates.capacity = capacity;
   if (price_cents !== undefined) updates.price_cents = price_cents;
   if (description !== undefined) updates.description = description;
+  if (threshold !== undefined) updates.threshold = threshold;
   if (event_date !== undefined) {
     updates.event_date = new Date(event_date);
     updates.date_tbd = false;
   }
   const [event] = await db.update(tableEvents).set(updates).where(eq(tableEvents.id, id)).returning();
 
-  // If this update just confirmed a TBD date, notify all confirmed bookings
+  // If this update just confirmed a TBD date, email all confirmed+waitlisted with token links
   if (updates.event_date && updates.date_tbd === false) {
     const bookings = await db
-      .select({ id: tableBookings.id, name: tableBookings.name, email: tableBookings.email, seats: tableBookings.seats })
+      .select()
       .from(tableBookings)
-      .where(and(eq(tableBookings.event_id, id), eq(tableBookings.status, 'confirmed')));
+      .where(and(eq(tableBookings.event_id, id), inArray(tableBookings.status, ['confirmed', 'waitlisted'])));
+
+    const baseUrl = process.env.BASE_URL ?? 'https://fraise.box';
 
     for (const booking of bookings) {
-      sendTableDateConfirmed({
+      const confirmToken = crypto.randomBytes(16).toString('hex');
+      const refundToken = crypto.randomBytes(16).toString('hex');
+      await db.insert(tableBookingTokens).values([
+        { token: confirmToken, booking_id: booking.id, action: 'confirm' },
+        { token: refundToken, booking_id: booking.id, action: 'refund' },
+      ]);
+      sendTableDateAnnouncedWithConfirm({
         to: booking.email,
         name: booking.name,
         eventTitle: event.title,
         venueName: event.venue_name,
         eventDate: updates.event_date,
         seats: booking.seats,
+        confirmUrl: `${baseUrl}/api/table/respond/${confirmToken}`,
+        refundUrl: `${baseUrl}/api/table/respond/${refundToken}`,
       }).catch(() => {});
     }
   }

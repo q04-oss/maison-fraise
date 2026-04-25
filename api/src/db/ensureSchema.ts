@@ -374,5 +374,18 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  await run('table_events.threshold', sql`
+    ALTER TABLE table_events ADD COLUMN IF NOT EXISTS threshold INTEGER
+  `);
+
+  await run('table_booking_tokens', sql`CREATE TABLE IF NOT EXISTS table_booking_tokens (
+    id SERIAL PRIMARY KEY,
+    token TEXT UNIQUE NOT NULL,
+    booking_id INTEGER NOT NULL REFERENCES table_bookings(id),
+    action TEXT NOT NULL CHECK (action IN ('confirm', 'refund')),
+    used BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   logger.info('ensureSchema complete');
 }

@@ -884,6 +884,53 @@ export async function sendTableDateConfirmed(params: {
   });
 }
 
+export async function sendTableDateAnnouncedWithConfirm(params: {
+  to: string;
+  name: string;
+  eventTitle: string;
+  venueName: string;
+  eventDate: Date;
+  seats: number;
+  confirmUrl: string;
+  refundUrl: string;
+}) {
+  const { to, name, eventTitle, venueName, eventDate, seats, confirmUrl, refundUrl } = params;
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dateStr = `${days[eventDate.getDay()]}, ${months[eventDate.getMonth()]} ${eventDate.getDate()}`;
+  const timeStr = `${eventDate.getHours()}:${String(eventDate.getMinutes()).padStart(2,'0')}`;
+
+  const content =
+    tableP(`hi ${name} — <strong>${eventTitle.toLowerCase()}</strong> has a date.`) +
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      ${tableRow('event', eventTitle.toLowerCase())}
+      ${tableRow('venue', venueName.toLowerCase())}
+      ${tableRow('date', dateStr)}
+      ${tableRow('time', timeStr)}
+      ${tableRow('seats', String(seats))}
+    </table>` +
+    tableP('can you make it?') +
+    `<table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td style="padding-right:12px;">
+          <a href="${confirmUrl}" style="display:inline-block;background:#1C1C1E;color:#FFFFFF;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;padding:10px 22px;border-radius:9999px;text-decoration:none;">i'm in</a>
+        </td>
+        <td>
+          <a href="${refundUrl}" style="display:inline-block;color:#8E8E93;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:10px 22px;border-radius:9999px;text-decoration:none;border:1px solid #E5E1DA;">can't make it</a>
+        </td>
+      </tr>
+    </table>` +
+    tableMuted('replying "can\'t make it" will release your spot and trigger a full refund.');
+
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `${eventTitle.toLowerCase()} — ${dateStr}`,
+    html: tableTemplate(content, 'date confirmed.'),
+  });
+}
+
 export async function sendPasswordReset(params: { to: string; resetUrl: string }) {
   const { to, resetUrl } = params;
   const content =

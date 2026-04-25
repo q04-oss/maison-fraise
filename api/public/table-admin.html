@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>table — admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --card: #F7F5F2; --input: #F0EDE8;
+      --text: #1C1C1E; --muted: #8E8E93; --border: #E5E1DA;
+      --red: #C0392B; --green: #27AE60;
+    }
+    html { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body { min-height: 100dvh; }
+    main { max-width: 720px; margin-inline: auto; padding: clamp(2rem, 6vw, 4rem) clamp(1.5rem, 4vw, 3rem); }
+
+    nav { margin-bottom: 2.5rem; }
+    nav a { font-size: 0.72rem; color: var(--muted); text-decoration: none; letter-spacing: 0.04em; }
+    nav a:hover { color: var(--text); }
+
+    .eyebrow { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+    h1 { font-size: 1rem; font-weight: 500; margin-bottom: 2rem; }
+
+    /* Auth */
+    .auth { max-width: 320px; }
+    .auth label { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.4rem; }
+    .auth input { width: 100%; font-family: 'DM Mono', monospace; font-size: 0.85rem; background: var(--input); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.85rem; color: var(--text); outline: none; margin-bottom: 0.75rem; }
+    .auth input:focus { border-color: var(--text); background: var(--bg); }
+    .btn { font-family: 'DM Mono', monospace; font-size: 0.72rem; letter-spacing: 0.06em; background: var(--text); color: var(--bg); border: none; border-radius: 9999px; padding: 0.55rem 1.25rem; cursor: pointer; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.8; }
+    .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text); opacity: 1; }
+    .err { font-size: 0.7rem; color: var(--red); margin-top: 0.5rem; display: none; }
+    .err.on { display: block; }
+
+    /* Events */
+    .events { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .event-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .event-header {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 1rem 1.25rem; gap: 1rem; background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    .event-title { font-size: 0.9rem; font-weight: 500; }
+    .event-sub { font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; letter-spacing: 0.03em; }
+    .event-badges { display: flex; gap: 0.5rem; flex-shrink: 0; align-items: flex-start; flex-wrap: wrap; justify-content: flex-end; }
+    .badge {
+      font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase;
+      padding: 0.25rem 0.6rem; border-radius: 9999px; border: 1px solid var(--border);
+      color: var(--muted); white-space: nowrap;
+    }
+    .badge.ready { border-color: var(--green); color: var(--green); }
+    .badge.tbd { border-color: var(--muted); }
+    .badge.dated { border-color: var(--text); color: var(--text); }
+
+    /* Threshold bar */
+    .threshold-row { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg); }
+    .threshold-label { font-size: 0.62rem; color: var(--muted); margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
+    .threshold-bar { height: 4px; background: var(--border); border-radius: 9999px; overflow: hidden; }
+    .threshold-fill { height: 100%; background: var(--text); border-radius: 9999px; transition: width 0.3s; }
+    .threshold-fill.ready { background: var(--green); }
+
+    /* Set date form */
+    .set-date-form { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); background: var(--bg); display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+    .set-date-form label { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .set-date-form input { font-family: 'DM Mono', monospace; font-size: 0.78rem; background: var(--input); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.7rem; color: var(--text); outline: none; }
+    .set-date-form input:focus { border-color: var(--text); background: var(--bg); }
+
+    /* Bookings */
+    .bookings-toggle { padding: 0.65rem 1.25rem; font-size: 0.65rem; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+    .bookings-toggle:hover { color: var(--text); }
+    .bookings-list { display: none; }
+    .bookings-list.open { display: block; }
+    .booking-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0.55rem 1.25rem; border-top: 1px solid var(--border);
+      font-size: 0.72rem; gap: 1rem;
+    }
+    .booking-row:hover { background: var(--card); }
+    .booking-name { color: var(--text); }
+    .booking-email { font-size: 0.62rem; color: var(--muted); }
+    .booking-right { display: flex; gap: 1rem; align-items: baseline; flex-shrink: 0; }
+    .booking-seats { font-size: 0.65rem; color: var(--muted); }
+    .booking-status { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .booking-status.confirmed { color: var(--green); }
+    .booking-status.waitlisted { color: var(--text); }
+    .booking-status.refunded { color: var(--red); }
+    .booking-refund-btn { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 2px; }
+    .booking-refund-btn:hover { color: var(--red); }
+
+    .no-bookings { padding: 0.75rem 1.25rem; font-size: 0.65rem; color: var(--muted); border-top: 1px solid var(--border); }
+
+    .section-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }
+    .add-event-section { margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--border); }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .form-full { grid-column: 1 / -1; }
+    .form-field label { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .form-field input, .form-field select, .form-field textarea {
+      width: 100%; font-family: 'DM Mono', monospace; font-size: 0.8rem;
+      background: var(--input); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.55rem 0.8rem; color: var(--text); outline: none;
+    }
+    .form-field input:focus, .form-field select:focus, .form-field textarea:focus { border-color: var(--text); background: var(--bg); }
+    .form-actions { margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; }
+    .form-msg { font-size: 0.68rem; color: var(--muted); }
+    .form-msg.ok { color: var(--green); }
+    .form-msg.err { color: var(--red); }
+  </style>
+</head>
+<body>
+<main>
+  <nav><a href="/table">← table</a></nav>
+  <div class="eyebrow">box fraise</div>
+  <h1>table admin</h1>
+
+  <div id="auth-section">
+    <div class="auth">
+      <label for="pin-input">admin pin</label>
+      <input type="password" id="pin-input" placeholder="••••••" autocomplete="off" />
+      <button class="btn" onclick="doAuth()">enter →</button>
+      <div class="err" id="auth-err">incorrect pin</div>
+    </div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <div class="section-label" style="margin-bottom:1.5rem;">events</div>
+    <div class="events" id="events-list"></div>
+    <div class="add-event-section">
+      <div class="section-label">add event</div>
+      <div class="form-grid" id="add-event-form">
+        <div class="form-field form-full">
+          <label>title</label>
+          <input type="text" id="ae-title" placeholder="e.g. espresso class" />
+        </div>
+        <div class="form-field">
+          <label>venue name</label>
+          <input type="text" id="ae-venue" placeholder="e.g. Kommune" />
+        </div>
+        <div class="form-field">
+          <label>venue address</label>
+          <input type="text" id="ae-address" placeholder="11931 Jasper Ave NW" />
+        </div>
+        <div class="form-field">
+          <label>instructor id</label>
+          <input type="number" id="ae-instructor" placeholder="1" />
+        </div>
+        <div class="form-field">
+          <label>price (CAD)</label>
+          <input type="number" id="ae-price" placeholder="85" />
+        </div>
+        <div class="form-field">
+          <label>capacity</label>
+          <input type="number" id="ae-capacity" placeholder="12" />
+        </div>
+        <div class="form-field">
+          <label>threshold (min signups)</label>
+          <input type="number" id="ae-threshold" placeholder="8" />
+        </div>
+        <div class="form-field">
+          <label>duration (min)</label>
+          <input type="number" id="ae-duration" placeholder="90" />
+        </div>
+        <div class="form-field form-full">
+          <label>description</label>
+          <textarea id="ae-desc" rows="2" placeholder="what happens at this event"></textarea>
+        </div>
+        <div class="form-actions form-full">
+          <button class="btn" onclick="addEvent()">create event →</button>
+          <span class="form-msg" id="add-event-msg"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  let pin = '';
+
+  document.getElementById('pin-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doAuth();
+  });
+
+  async function doAuth() {
+    const val = document.getElementById('pin-input').value.trim();
+    if (!val) return;
+    // Test pin by fetching events
+    const res = await fetch('/api/table/events', { headers: { 'X-Admin-PIN': val } });
+    if (!res.ok && res.status === 401) {
+      document.getElementById('auth-err').classList.add('on');
+      return;
+    }
+    pin = val;
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadDashboard();
+  }
+
+  async function loadDashboard() {
+    const [eventsRes, bookingsRes] = await Promise.all([
+      fetch('/api/table/events', { headers: { 'X-Admin-PIN': pin } }),
+      fetch('/api/table/bookings', { headers: { 'X-Admin-PIN': pin } }),
+    ]);
+    const events = await eventsRes.json();
+    const bookings = await bookingsRes.json();
+    renderEvents(events, bookings);
+  }
+
+  function fmtPrice(cents) {
+    return `CA$${(cents / 100).toFixed(0)}`;
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }) +
+           ' · ' + d.getHours() + ':' + String(d.getMinutes()).padStart(2, '0');
+  }
+
+  function renderEvents(events, bookings) {
+    const container = document.getElementById('events-list');
+    if (!events.length) {
+      container.innerHTML = '<div style="font-size:0.72rem;color:var(--muted);">no events yet.</div>';
+      return;
+    }
+
+    container.innerHTML = events.map(ev => {
+      const evBookings = bookings.filter(b => b.event_id === ev.id);
+      const confirmedCount = evBookings.filter(b => b.status === 'confirmed').length;
+      const waitlistedCount = evBookings.filter(b => b.status === 'waitlisted').length;
+      const refundedCount = evBookings.filter(b => b.status === 'refunded').length;
+      const totalSeats = evBookings.filter(b => ['confirmed','waitlisted'].includes(b.status)).reduce((s, b) => s + b.seats, 0);
+      const threshold = ev.threshold ?? ev.capacity;
+      const pct = Math.min(100, Math.round((totalSeats / threshold) * 100));
+      const ready = totalSeats >= threshold;
+      const dated = !ev.date_tbd && ev.event_date;
+
+      return `
+        <div class="event-card" id="card-${ev.id}">
+          <div class="event-header">
+            <div>
+              <div class="event-title">${ev.title.toLowerCase()}</div>
+              <div class="event-sub">${ev.venue_name.toLowerCase()} · ${fmtPrice(ev.price_cents)} · ${ev.duration_minutes}min</div>
+              <div class="event-sub" style="margin-top:0.15rem;">${totalSeats} signed up · ${ev.capacity} capacity${ev.threshold ? ' · ' + ev.threshold + ' threshold' : ''}</div>
+            </div>
+            <div class="event-badges">
+              ${dated ? `<span class="badge dated">${fmtDate(ev.event_date)}</span>` : ''}
+              ${ready && !dated ? '<span class="badge ready">threshold reached</span>' : ''}
+              ${!dated ? '<span class="badge tbd">date tbd</span>' : ''}
+            </div>
+          </div>
+
+          ${ev.threshold ? `
+          <div class="threshold-row">
+            <div class="threshold-label">
+              <span>signups vs threshold</span>
+              <span>${totalSeats} / ${threshold}</span>
+            </div>
+            <div class="threshold-bar">
+              <div class="threshold-fill ${ready ? 'ready' : ''}" style="width:${pct}%;"></div>
+            </div>
+          </div>
+          ` : ''}
+
+          ${!dated ? `
+          <div class="set-date-form">
+            <div>
+              <label>date</label>
+              <input type="date" id="sd-date-${ev.id}" />
+            </div>
+            <div>
+              <label>time</label>
+              <input type="time" id="sd-time-${ev.id}" />
+            </div>
+            <button class="btn ${ready ? '' : 'btn-ghost'}" onclick="setDate(${ev.id})">set date + notify →</button>
+          </div>
+          ` : ''}
+
+          <div class="bookings-toggle" onclick="toggleBookings(${ev.id})">
+            <span>${evBookings.filter(b => ['confirmed','waitlisted'].includes(b.status)).length} active · ${refundedCount} refunded</span>
+            <span id="toggle-label-${ev.id}">show ↓</span>
+          </div>
+          <div class="bookings-list" id="bookings-${ev.id}">
+            ${evBookings.length ? evBookings.map(b => `
+              <div class="booking-row">
+                <div>
+                  <div class="booking-name">${esc(b.name)}</div>
+                  <div class="booking-email">${esc(b.email)}</div>
+                </div>
+                <div class="booking-right">
+                  <span class="booking-seats">${b.seats} seat${b.seats !== 1 ? 's' : ''}</span>
+                  <span class="booking-status ${b.status}">${b.status}</span>
+                  ${['confirmed','waitlisted'].includes(b.status) ? `<button class="booking-refund-btn" onclick="refundBooking(${b.id}, this)">refund</button>` : ''}
+                </div>
+              </div>
+            `).join('') : '<div class="no-bookings">no bookings yet.</div>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function toggleBookings(id) {
+    const list = document.getElementById('bookings-' + id);
+    const label = document.getElementById('toggle-label-' + id);
+    const open = list.classList.toggle('open');
+    label.textContent = open ? 'hide ↑' : 'show ↓';
+  }
+
+  async function setDate(id) {
+    const date = document.getElementById('sd-date-' + id).value;
+    const time = document.getElementById('sd-time-' + id).value;
+    if (!date || !time) return;
+    const event_date = new Date(date + 'T' + time).toISOString();
+    const res = await fetch('/api/table/events/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      body: JSON.stringify({ event_date }),
+    });
+    if (res.ok) loadDashboard();
+  }
+
+  async function refundBooking(id, btn) {
+    if (!confirm('refund this booking?')) return;
+    btn.textContent = '…';
+    const res = await fetch('/api/table/bookings/' + id + '/refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+    });
+    if (res.ok) loadDashboard();
+    else btn.textContent = 'error';
+  }
+
+  async function addEvent() {
+    const msg = document.getElementById('add-event-msg');
+    const title = document.getElementById('ae-title').value.trim();
+    const venue_name = document.getElementById('ae-venue').value.trim();
+    const venue_address = document.getElementById('ae-address').value.trim();
+    const instructor_id = parseInt(document.getElementById('ae-instructor').value);
+    const price_cents = Math.round(parseFloat(document.getElementById('ae-price').value) * 100);
+    const capacity = parseInt(document.getElementById('ae-capacity').value) || 12;
+    const threshold = parseInt(document.getElementById('ae-threshold').value) || null;
+    const duration_minutes = parseInt(document.getElementById('ae-duration').value) || 90;
+    const description = document.getElementById('ae-desc').value.trim();
+
+    if (!title || !venue_name || !instructor_id || !price_cents) {
+      msg.textContent = 'title, venue, instructor, and price are required.';
+      msg.className = 'form-msg err';
+      return;
+    }
+
+    const res = await fetch('/api/table/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      body: JSON.stringify({ title, venue_name, venue_address, instructor_id, price_cents, capacity, threshold, duration_minutes, description }),
+    });
+
+    if (res.ok) {
+      msg.textContent = 'event created.';
+      msg.className = 'form-msg ok';
+      ['ae-title','ae-venue','ae-address','ae-instructor','ae-price','ae-capacity','ae-threshold','ae-duration','ae-desc']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+      loadDashboard();
+    } else {
+      msg.textContent = 'failed to create event.';
+      msg.className = 'form-msg err';
+    }
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

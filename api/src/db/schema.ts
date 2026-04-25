@@ -1731,6 +1731,7 @@ export const tableEvents = pgTable('table_events', {
   price_cents: integer('price_cents').notNull(),
   capacity: integer('capacity').notNull().default(12),
   seats_taken: integer('seats_taken').notNull().default(0),
+  threshold: integer('threshold'),
   description: text('description'),
   venue_slug: text('venue_slug'),
   event_type: text('event_type').notNull().default('group'), // 'group' | 'private'
@@ -1748,7 +1749,16 @@ export const tableBookings = pgTable('table_bookings', {
   seats: integer('seats').notNull().default(1),
   total_cents: integer('total_cents').notNull(),
   stripe_payment_intent_id: text('stripe_payment_intent_id').unique(),
-  status: text('status').notNull().default('pending'), // 'pending' | 'confirmed' | 'cancelled'
+  status: text('status').notNull().default('pending'), // 'pending' | 'pending_waitlist' | 'confirmed' | 'waitlisted' | 'refunded'
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const tableBookingTokens = pgTable('table_booking_tokens', {
+  id: serial('id').primaryKey(),
+  token: text('token').unique().notNull(),
+  booking_id: integer('booking_id').notNull().references(() => tableBookings.id),
+  action: text('action').notNull(), // 'confirm' | 'refund'
+  used: boolean('used').notNull().default(false),
   created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
