@@ -382,7 +382,8 @@ app.get('/api/kommune/ratings', async (_req: any, res: any) => {
       FROM kommune_ratings
       GROUP BY item_name
     `);
-    res.json({ ratings: rows.rows });
+    const data = ((rows as any).rows ?? rows) as any[];
+    res.json({ ratings: data });
   } catch (err) {
     res.status(500).json({ error: 'failed' });
   }
@@ -399,7 +400,8 @@ app.post('/api/kommune/rate', async (req: any, res: any) => {
     SELECT ROUND(AVG(rating)::numeric, 1)::float AS avg_rating, COUNT(*)::int AS total
     FROM kommune_ratings WHERE item_name = ${item_name}
   `);
-  res.json({ ok: true, ...(rows.rows[0] ?? {}) });
+  const row = (((rows as any).rows ?? rows)[0] as any) ?? {};
+  res.json({ ok: true, avg_rating: row.avg_rating, total: row.total });
 });
 
 app.get('/table', (_req, res) => {
