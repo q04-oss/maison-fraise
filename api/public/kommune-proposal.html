@@ -54,6 +54,23 @@
       margin-bottom: 2.5rem;
     }
 
+    .chips {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .chip {
+      padding: 0.4rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .chip:hover { border-color: var(--text); }
+
     .links {
       display: flex;
       flex-direction: column;
@@ -86,12 +103,17 @@
     <div class="meta">
       Snack Bar · 11931 Jasper Ave NW<br />
       daily from 10am · reservations welcome<br />
-      kitchen by Whisked
+      matcha by Whisked
     </div>
 
     <p class="desc">
       Elevated plates, a serious bar program, live music. Full NA options throughout.
     </p>
+
+    <div class="chips">
+      <a href="/menu" class="chip">menu</a>
+      <a href="/events" class="chip">events</a>
+    </div>
 
     <div class="links">
       <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify →</a>
