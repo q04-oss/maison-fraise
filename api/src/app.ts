@@ -342,8 +342,6 @@ app.get('/account', (_req, res) => {
 app.get('/kommune', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/kommune-proposal.html'));
 });
-app.get('/kommune/menu', (_req, res) => res.redirect(301, '/kommune'));
-app.get('/kommune/events', (_req, res) => res.redirect(301, '/kommune'));
 
 app.get('/table', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/table.html'));
