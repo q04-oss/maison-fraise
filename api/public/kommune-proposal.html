@@ -468,9 +468,7 @@
       { cmd: 'feedback',  hint: 'leave a note for the owner',   action() { showFeedbackForm(); } },
       { cmd: 'apply',     hint: 'work at Kommune',              action() { showApplyForm(); } },
       { cmd: 'playlist',  hint: 'the room\'s playlist',         action() { closeSearch(); window.open('https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO', '_blank'); } },
-      { cmd: 'gift',      hint: 'coming soon',                  action() { document.getElementById('results-canvas').innerHTML = '<div class="result-state">coming soon.</div>'; } },
       { cmd: 'btw',        hint: 'ask anything',                 action() { showBtwForm(); } },
-      { cmd: 'fraise.box', hint: 'search, privately',            action() { closeSearch(); window.open('https://fraise.box', '_blank'); } },
       { cmd: 'why',       hint: 'what is your why?',            action() { document.getElementById('results-canvas').innerHTML = '<div class="result-state">$0 oat milk.</div>'; } },
     ];
 
