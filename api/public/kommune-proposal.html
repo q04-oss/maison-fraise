@@ -253,7 +253,7 @@
     .shortcut:hover .shortcut-cmd { color: var(--text); }
 
     /* ── Item ratings ── */
-    .item-rating { font-size: 0.6rem; color: var(--muted); opacity: 0.6; margin-left: 0.3rem; }
+    .item-rating { font-size: 0.78rem; color: var(--muted); margin-left: 0.5rem; }
     .rate-picker { display: flex; gap: 0.6rem; margin-top: 0.35rem; }
     .rate-btn {
       font-family: 'DM Mono', monospace; font-size: 0.65rem;
@@ -751,7 +751,7 @@
         if (!priceEl.dataset.price) priceEl.dataset.price = priceEl.textContent.trim();
         const r = ratingsCache[name];
         if (r && r.total >= 1) {
-          priceEl.innerHTML = esc(priceEl.dataset.price) + `\u2009<span class="item-rating">${r.avg_rating}</span>`;
+          priceEl.innerHTML = esc(priceEl.dataset.price) + `<span class="item-rating">&nbsp;·&nbsp;${r.avg_rating}</span>`;
         } else {
           priceEl.textContent = priceEl.dataset.price;
         }
