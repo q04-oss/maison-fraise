@@ -15,7 +15,8 @@
       --border: #E2DDD6;
     }
     html, body {
-      height: 100%; background: var(--bg); color: var(--text);
+      height: 100%;
+      background: var(--bg); color: var(--text);
       font-family: 'DM Mono', monospace; font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
@@ -43,7 +44,7 @@
     }
     .hero-meta a { color: inherit; text-decoration: none; }
     .hero-links {
-      display: flex; gap: 1rem; flex-shrink: 0;
+      display: flex; gap: 1rem; flex-shrink: 0; align-items: baseline;
     }
     .hero-links a {
       font-size: 0.65rem; color: var(--muted);
@@ -51,7 +52,19 @@
       transition: color 0.15s; white-space: nowrap;
     }
     .hero-links a:hover { color: var(--text); }
-    .hero-links a.highlight { color: var(--text); }
+    .menu-btn {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem; color: var(--text);
+      background: none; border: none; cursor: pointer;
+      letter-spacing: 0.04em; padding: 0;
+      transition: color 0.15s; white-space: nowrap;
+    }
+    .menu-btn:hover { color: var(--muted); }
+
+    /* hero-main hides when menu is open */
+    .hero-main { }
+    body.menu-open .hero-main { display: none; }
+    body.menu-open .hero { border-bottom: 1px solid var(--border); padding-bottom: 1.25rem; }
 
     .label {
       font-size: 0.6rem; letter-spacing: 0.14em;
@@ -59,7 +72,6 @@
       margin-bottom: 0.6rem;
     }
     .label a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
-
     .row {
       display: flex; justify-content: space-between;
       padding: 0.45rem 0; border-bottom: 1px solid var(--border);
@@ -68,21 +80,67 @@
     .row:first-of-type { border-top: 1px solid var(--border); }
     .row-name { color: var(--text); }
     .row-price { color: var(--muted); }
-
-    .events {
-      margin-top: 1.25rem;
-    }
+    .events { margin-top: 1.25rem; }
     .events-label {
       font-size: 0.6rem; letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--muted);
-      margin-bottom: 0.4rem;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem;
     }
-    .events-none {
-      font-size: 0.72rem; color: var(--muted);
+    .events-none { font-size: 0.72rem; color: var(--muted); }
+
+    /* ── Menu panel ── */
+    .menu-panel {
+      display: none;
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    body.menu-open .menu-panel { display: flex; flex-direction: column; }
+
+    .menu-nav {
+      position: sticky; top: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0.65rem 1.5rem;
+      display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem;
+      z-index: 5;
+    }
+    .menu-nav a {
+      font-size: 0.65rem; color: var(--muted); text-decoration: none;
+      letter-spacing: 0.04em; transition: color 0.15s; white-space: nowrap;
+    }
+    .menu-nav a:hover { color: var(--text); }
+
+    .menu-content {
+      padding: 1.25rem 1.5rem;
+      max-width: 480px;
+      width: 100%;
+    }
+    .menu-note {
+      font-size: 0.65rem; color: var(--muted);
+      letter-spacing: 0.03em; margin-bottom: 1.75rem;
+    }
+    .section { margin-bottom: 2rem; }
+    .section-title {
+      font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.65rem; padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .item {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border); gap: 1rem;
+    }
+    .item-left { flex: 1; }
+    .item-name { font-size: 0.8rem; color: var(--text); line-height: 1.4; }
+    .item-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.15rem; line-height: 1.5; }
+    .item-price { font-size: 0.75rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .prices-note {
+      font-size: 0.65rem; color: var(--muted);
+      letter-spacing: 0.03em; margin-top: 0.5rem; line-height: 1.8;
     }
 
-    /* ── Middle (empty canvas) ── */
+    /* ── Spacer (home only) ── */
     .spacer { flex: 1; }
+    body.menu-open .spacer { display: none; }
 
     /* ── Footer ── */
     .foot {
@@ -90,33 +148,28 @@
       padding: 1.25rem 1.5rem;
     }
     .social-row {
-      display: flex; gap: 0.75rem;
-      margin-bottom: 1rem;
+      display: flex; gap: 0.75rem; margin-bottom: 1rem;
     }
     .social-row a {
       font-size: 0.65rem; color: var(--muted);
-      text-decoration: none; letter-spacing: 0.04em;
-      transition: color 0.15s;
+      text-decoration: none; letter-spacing: 0.04em; transition: color 0.15s;
     }
     .social-row a:hover { color: var(--text); }
-
     .policy {
       font-size: 0.62rem; color: var(--muted);
       line-height: 1.9; margin-bottom: 1rem;
     }
+    /* hide policy + social when menu open */
+    body.menu-open .foot-secondary { display: none; }
 
     .foot-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
+      display: flex; justify-content: space-between; align-items: baseline;
     }
     .foot-name {
       font-size: 1.5rem; font-weight: 500; color: var(--text);
     }
     .foot-name span { font-weight: 400; color: var(--muted); }
-    .foot-treaty {
-      font-size: 0.6rem; color: var(--muted); letter-spacing: 0.04em;
-    }
+    .foot-treaty { font-size: 0.6rem; color: var(--muted); letter-spacing: 0.04em; }
 
     @media (max-width: 480px) {
       .hero-top { flex-direction: column; gap: 0.3rem; }
@@ -134,40 +187,166 @@
       </div>
       <div class="hero-links">
         <a href="mailto:hello@kommunesnackbar.ca">reserve →</a>
-        <a href="/kommune/menu" class="highlight">menu →</a>
+        <button class="menu-btn" id="menu-btn" onclick="toggleMenu()">menu →</button>
       </div>
     </div>
 
-    <div class="label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener">Whisked</a></div>
-    <div class="row"><span class="row-name">Regular</span><span class="row-price">$7</span></div>
-    <div class="row"><span class="row-name">Premium</span><span class="row-price">$10</span></div>
-    <div class="row"><span class="row-name">Maple Sea Salt</span><span class="row-price">$8</span></div>
-    <div class="row"><span class="row-name">Apple Cinnamon</span><span class="row-price">$8</span></div>
-    <div class="row"><span class="row-name">Pumpkin Spice</span><span class="row-price">$8</span></div>
-    <div class="row"><span class="row-name">Earl Grey</span><span class="row-price">$8</span></div>
-    <div class="row"><span class="row-name">Hojicha</span><span class="row-price">$7</span></div>
+    <div class="hero-main">
+      <div class="label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener">Whisked</a></div>
+      <div class="row"><span class="row-name">Regular</span><span class="row-price">$7</span></div>
+      <div class="row"><span class="row-name">Premium</span><span class="row-price">$10</span></div>
+      <div class="row"><span class="row-name">Maple Sea Salt</span><span class="row-price">$8</span></div>
+      <div class="row"><span class="row-name">Apple Cinnamon</span><span class="row-price">$8</span></div>
+      <div class="row"><span class="row-name">Pumpkin Spice</span><span class="row-price">$8</span></div>
+      <div class="row"><span class="row-name">Earl Grey</span><span class="row-price">$8</span></div>
+      <div class="row"><span class="row-name">Hojicha</span><span class="row-price">$7</span></div>
+      <div class="events">
+        <div class="events-label">events</div>
+        <div class="events-none">nothing scheduled — check back</div>
+      </div>
+    </div>
+  </div>
 
-    <div class="events">
-      <div class="events-label">events</div>
-      <div class="events-none">nothing scheduled — check back</div>
+  <!-- Menu panel (inline, shown on toggle) -->
+  <div class="menu-panel">
+    <div class="menu-nav">
+      <a href="#plates">plates</a>
+      <a href="#bakes">bakes</a>
+      <a href="#snacks">snacks</a>
+      <a href="#sweets">sweets</a>
+      <a href="#coffee">coffee</a>
+      <a href="#fog">fog</a>
+      <a href="#na">na</a>
+      <a href="#cocktails">cocktails</a>
+      <a href="#beer">beer</a>
+      <a href="#wine">wine</a>
+    </div>
+    <div class="menu-content">
+      <p class="menu-note">GF · V · VG options available throughout</p>
+
+      <div class="section" id="plates">
+        <div class="section-title">plates</div>
+        <div class="item"><div class="item-left"><div class="item-name">Crispy Potato Cake</div><div class="item-desc">potato, gouda sauce, chives</div></div><div class="item-price">$16</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Berlin Mustard Eggs</div><div class="item-desc">smoked egg yolk, potato, horseradish</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Smoked Schnitzel</div><div class="item-desc">breaded smoked meat, lettuce, dijon</div></div><div class="item-price">$25</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Seitan Vegan Cheeses</div><div class="item-desc">chili, dill, gorgonzola, rye chips</div></div><div class="item-price">$18</div></div>
+      </div>
+
+      <div class="section" id="bakes">
+        <div class="section-title">bakes & morning</div>
+        <div class="item"><div class="item-left"><div class="item-name">The Tony</div><div class="item-desc">mortadella, provolone, dijon, brioche</div></div><div class="item-price">$14</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">The Bea</div><div class="item-desc">eggs, bacon, spicy ketchup, aioli, brioche</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Avocado Toast</div><div class="item-desc">sourdough, tomatoes, gouda, pea shoots · +$2 egg</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Almond French Toast</div><div class="item-desc">sourdough, almond butter, banana, strawberries</div></div><div class="item-price">$12.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Yogurt Bowl</div><div class="item-desc">granola, berries, honey</div></div><div class="item-price">$10</div></div>
+      </div>
+
+      <div class="section" id="snacks">
+        <div class="section-title">snacks</div>
+        <div class="item"><div class="item-left"><div class="item-name">Beet Hummus</div><div class="item-desc">roasted beets, oil, dill, rye chips</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Marinated Goat Feta</div><div class="item-desc">herbed feta, rye chips</div></div><div class="item-price">$8</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Brio Rye Bread</div><div class="item-desc">rosemary oil, pomegranate vinegar</div></div><div class="item-price">$7</div></div>
+      </div>
+
+      <div class="section" id="sweets">
+        <div class="section-title">sweets</div>
+        <div class="item"><div class="item-left"><div class="item-name">Flourless Chocolate Cake</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Affogato</div><div class="item-desc">espresso, matcha, or hojicha</div></div><div class="item-price">$7</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Affogato Flight</div></div><div class="item-price">$12</div></div>
+      </div>
+
+      <div class="section" id="coffee">
+        <div class="section-title">coffee</div>
+        <div class="item"><div class="item-left"><div class="item-name">Americano</div></div><div class="item-price">$4.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Latte</div></div><div class="item-price">$6.25</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Vanilla Latte</div></div><div class="item-price">$7</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Flat White</div></div><div class="item-price">$5</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Espresso</div></div><div class="item-price">$3.75</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Tonic</div></div><div class="item-price">$6</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Cappuccino</div></div><div class="item-price">$5.75</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Cortado</div></div><div class="item-price">$5.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Macchiato</div></div><div class="item-price">$4.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Rotating Syrups</div></div><div class="item-price">$0.75</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Oat or Reg Milk</div></div><div class="item-price">$0</div></div>
+      </div>
+
+      <div class="section" id="fog">
+        <div class="section-title">fog</div>
+        <div class="item"><div class="item-left"><div class="item-name">London</div></div><div class="item-price">$6.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Peppermint</div></div><div class="item-price">$6.50</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Tea</div></div><div class="item-price">$4</div></div>
+      </div>
+
+      <div class="section" id="na">
+        <div class="section-title">na cocktails — same price as the rest</div>
+        <div class="item"><div class="item-left"><div class="item-name">Dhos & Tonic</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Kasu Yuzu & Soda</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Coco-No-Lo</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Coriander Crush</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Pathfinder & Root Beer</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">The Moose is Loose</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Not Mint to Be</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Cheeky Boilermaker · Phony Negroni</div><div class="item-desc">na industry favourites</div></div><div class="item-price">$14</div></div>
+      </div>
+
+      <div class="section" id="cocktails">
+        <div class="section-title">cocktails</div>
+        <div class="item"><div class="item-left"><div class="item-name">Gin & Tonic</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Kasu Vodka Yuzu & Soda</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Sherry Colada Lowball</div></div><div class="item-price">$13</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Coriander Spritz</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Root of All Evil</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Old Fashioned</div></div><div class="item-price">$14</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Mint to Be</div></div><div class="item-price">$11</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Arandasi Picante</div></div><div class="item-price">$12</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Boilermaker · Negroni</div><div class="item-desc">industry favourites</div></div><div class="item-price">$14</div></div>
+      </div>
+
+      <div class="section" id="beer">
+        <div class="section-title">beer</div>
+        <div class="item"><div class="item-left"><div class="item-name">Guinness Stout</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Bent Stick Brewing</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Establishment Afternoon Delight</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Last Best Tokyo Drift</div></div><div class="item-price">$9</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Rotating</div></div><div class="item-price">$9</div></div>
+      </div>
+
+      <div class="section" id="wine">
+        <div class="section-title">wine</div>
+        <div class="item"><div class="item-left"><div class="item-name">Sparkling</div></div><div class="item-price">$10–17 · $52–85</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">White</div></div><div class="item-price">$16 · $75–80</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Skin Contact · Rosé · Rotating</div></div><div class="item-price">ask</div></div>
+        <div class="item"><div class="item-left"><div class="item-name">Red</div></div><div class="item-price">$14–15 · $60–75</div></div>
+      </div>
+
+      <p class="prices-note">prices in CAD · menu subject to change</p>
     </div>
   </div>
 
   <div class="spacer"></div>
 
   <div class="foot">
-    <div class="social-row">
-      <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">Spotify</a>
-      <a href="https://instagram.com/kommune.whisked" target="_blank" rel="noopener">Instagram</a>
-    </div>
-    <div class="policy">
-      The $0 oat milk policy: every drink at Kommune comes with your choice of milk at no extra charge. Minor Figures oat, on the house.
+    <div class="foot-secondary">
+      <div class="social-row">
+        <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">Spotify</a>
+        <a href="https://instagram.com/kommune.whisked" target="_blank" rel="noopener">Instagram</a>
+      </div>
+      <div class="policy">
+        The $0 oat milk policy: every drink at Kommune comes with your choice of milk at no extra charge. Minor Figures oat, on the house.
+      </div>
     </div>
     <div class="foot-bottom">
       <div class="foot-name">Kommune <span>($0 oat milk.)</span></div>
       <div class="foot-treaty">Treaty 6 · Wîhkwêntôwin</div>
     </div>
   </div>
+
+  <script>
+    function toggleMenu() {
+      const open = document.body.classList.toggle('menu-open');
+      document.getElementById('menu-btn').textContent = open ? '← close' : 'menu →';
+    }
+  </script>
 
 </body>
 </html>
