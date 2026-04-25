@@ -586,9 +586,8 @@
 
     function openSearch() {
       document.body.classList.remove('menu-open');
-      document.getElementById('menu-btn').textContent = 'menu →';
+      document.getElementById('menu-btn').textContent = 'menu';
       document.body.classList.add('searching');
-      document.getElementById('search-input').focus();
     }
 
     function closeSearch() {
@@ -736,16 +735,19 @@
 
     function submitReserveStep1(e) {
       e.preventDefault();
-      const name = document.getElementById('res-name').value.trim();
-      const size = parseInt(document.getElementById('res-size').value) || 0;
-      const date = document.getElementById('res-date').value;
-      const time = document.getElementById('res-time').value;
-      const note = document.getElementById('res-note').value.trim();
-      if (!name || !size || !date || !time) {
-        const missing = document.querySelector('#res-name,#res-size,#res-date,#res-time');
-        missing?.focus(); return;
-      }
-      reserveData = { name, size, date, time, note };
+      const nameEl = document.getElementById('res-name');
+      const sizeEl = document.getElementById('res-size');
+      const dateEl = document.getElementById('res-date');
+      const timeEl = document.getElementById('res-time');
+      const noteEl = document.getElementById('res-note');
+      const name = nameEl.value.trim();
+      const size = parseInt(sizeEl.value) || 0;
+      const date = dateEl.value;
+      const time = timeEl.value;
+      const note = noteEl.value.trim();
+      const firstEmpty = (!name && nameEl) || (!size && sizeEl) || (!date && dateEl) || (!time && timeEl);
+      if (firstEmpty) { firstEmpty.focus(); return; }
+      reserveData = { ...reserveData, name, size, date, time, note };
       renderReserveStep2(document.getElementById('results-canvas'));
     }
 
