@@ -9,10 +9,11 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg: #F9F7F4;
-      --text: #1A1A18;
-      --muted: #8A8880;
-      --border: #E2DDD6;
+      --bg:     #0E0E0C;
+      --text:   #E8E2D8;
+      --muted:  #6A6560;
+      --birch:  #C4B49A;
+      --border: #242220;
     }
     html {
       background: var(--bg);
@@ -33,6 +34,7 @@
       max-width: 400px;
     }
 
+    /* Header */
     h1 {
       font-size: 1.5rem;
       font-weight: 500;
@@ -40,20 +42,76 @@
       margin-bottom: 0.3rem;
     }
     .meta {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       color: var(--muted);
-      letter-spacing: 0.03em;
-      line-height: 1.8;
+      letter-spacing: 0.04em;
+      line-height: 1.9;
       margin-bottom: 2.5rem;
     }
 
+    /* Description */
     .desc {
       font-size: 0.82rem;
       line-height: 1.9;
-      color: var(--text);
-      margin-bottom: 2.5rem;
+      color: var(--birch);
+      margin-bottom: 3rem;
     }
 
+    /* Sections */
+    .section {
+      margin-bottom: 2.5rem;
+    }
+    .section-label {
+      font-size: 0.6rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* Events */
+    .event {
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .event:first-of-type { border-top: 1px solid var(--border); }
+    .event-date {
+      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 0.3rem;
+    }
+    .event-name {
+      font-size: 0.85rem; font-weight: 500; color: var(--text); margin-bottom: 0.75rem;
+    }
+    .ticket-link {
+      font-size: 0.72rem; color: var(--birch); text-decoration: none;
+      transition: color 0.15s;
+    }
+    .ticket-link:hover { color: var(--text); }
+
+    .no-events {
+      font-size: 0.72rem; color: var(--muted);
+    }
+
+    /* Whisked */
+    .whisked-block {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+    }
+    .whisked-block p {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.8;
+      margin-bottom: 0.4rem;
+    }
+    .whisked-block a {
+      font-size: 0.72rem;
+      color: var(--birch);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .whisked-block a:hover { color: var(--text); }
+
+    /* Links */
     .links {
       display: flex;
       flex-direction: column;
@@ -69,10 +127,11 @@
     }
     .links a:hover { color: var(--text); }
 
+    /* Footer */
     footer {
-      font-size: 0.62rem;
+      font-size: 0.6rem;
       color: var(--muted);
-      letter-spacing: 0.03em;
+      letter-spacing: 0.04em;
       line-height: 1.8;
       border-top: 1px solid var(--border);
       padding-top: 1.5rem;
@@ -84,19 +143,49 @@
 
     <h1>Kommune</h1>
     <div class="meta">
-      Snack Bar · 11931 Jasper Ave NW<br />
-      daily from 10am · reservations welcome<br />
-      <a href="https://visitwhisked.ca" target="_blank" rel="noopener" style="color:inherit;text-decoration:none;">Whisked</a> matcha bar in residence
+      11931 Jasper Ave NW · Edmonton<br />
+      daily from 10am · reservations welcome
     </div>
 
     <p class="desc">
-      Elevated plates, a serious bar program, live music. Full NA options throughout.
+      A bar for slow hours. European plates, live music, a serious drink program — full NA throughout.
     </p>
 
-    <div class="links">
+    <!-- Events -->
+    <div class="section">
+      <div class="section-label">events</div>
+      <div class="no-events">nothing scheduled — check back</div>
+
+      <!--
+        <div class="event">
+          <div class="event-date">fri, may 9 · doors 8pm</div>
+          <div class="event-name">Artist or Event Name</div>
+          <a href="#" class="ticket-link">get tickets →</a>
+        </div>
+      -->
+    </div>
+
+    <!-- Whisked -->
+    <div class="section">
+      <div class="section-label">in residence</div>
+      <div class="whisked-block">
+        <p>Whisked is a ceremonial matcha bar operating inside the space.</p>
+        <a href="https://visitwhisked.ca" target="_blank" rel="noopener">visitwhisked.ca →</a>
+      </div>
+    </div>
+
+    <!-- Sound -->
+    <div class="section">
+      <div class="section-label">the sound of the room</div>
+      <div class="links" style="margin-bottom:0;">
+        <a href="https://open.spotify.com" target="_blank" rel="noopener">listen on Spotify →</a>
+      </div>
+    </div>
+
+    <!-- Links -->
+    <div class="links" style="margin-top:2.5rem;">
       <a href="/kommune/menu">menu →</a>
       <a href="/kommune/events">events →</a>
-      <a href="https://open.spotify.com" target="_blank" rel="noopener">Spotify →</a>
       <a href="https://instagram.com/kommunesnackbar" target="_blank" rel="noopener">Instagram →</a>
       <a href="mailto:hello@kommunesnackbar.ca">hello@kommunesnackbar.ca →</a>
     </div>
