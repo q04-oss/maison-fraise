@@ -15,82 +15,46 @@
       --border: #E2DDD6;
     }
     html {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'DM Mono', monospace;
-      font-size: 14px;
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
-    body { padding: 4rem 1.5rem 6rem; }
-    .wrap { width: 100%; max-width: 400px; margin: 0 auto; }
+    body {
+      min-height: 100dvh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 1.5rem;
+    }
+    .wrap { width: 100%; max-width: 400px; }
 
-    /* Header */
     h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.3rem; }
+    h1 span { font-weight: 400; color: var(--muted); }
+
     .meta {
       font-size: 0.68rem; color: var(--muted);
-      letter-spacing: 0.04em; line-height: 1.9;
-      margin-bottom: 3rem;
+      letter-spacing: 0.04em; line-height: 2;
+      margin-bottom: 2.5rem;
     }
+    .meta a { color: inherit; text-decoration: none; }
 
-    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
 
-    /* $0 statement */
-    .oat-headline {
-      font-size: 1.5rem; font-weight: 500;
-      line-height: 1.3; color: var(--text);
-      margin-bottom: 0.5rem;
-    }
-    .oat-sub {
-      font-size: 0.72rem; color: var(--muted);
-      letter-spacing: 0.03em; margin-bottom: 2rem;
-    }
-    .desc {
-      font-size: 0.82rem; line-height: 1.9;
-      color: var(--text); margin-bottom: 0;
-    }
-
-    /* Sections */
-    .section { margin-bottom: 2.5rem; }
-    .section-label {
+    .label {
       font-size: 0.6rem; letter-spacing: 0.14em;
       text-transform: uppercase; color: var(--muted);
-      margin-bottom: 0.75rem;
+      margin-bottom: 0.7rem;
     }
+    .label a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 
-    /* Events */
-    .event { padding: 1rem 0; border-bottom: 1px solid var(--border); }
-    .event:first-of-type { border-top: 1px solid var(--border); }
-    .event-date { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 0.3rem; }
-    .event-name { font-size: 0.85rem; font-weight: 500; color: var(--text); margin-bottom: 0.75rem; }
-    .ticket-link { font-size: 0.72rem; color: var(--text); text-decoration: none; transition: color 0.15s; }
-    .ticket-link:hover { color: var(--muted); }
-    .no-events { font-size: 0.72rem; color: var(--muted); }
-
-    /* In residence */
-    .residence-block {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 0;
+    .row {
+      display: flex; justify-content: space-between;
+      padding: 0.55rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
     }
-    .residence-block p { font-size: 0.75rem; color: var(--muted); line-height: 1.8; margin-bottom: 0.4rem; }
-    .residence-block a { font-size: 0.72rem; color: var(--text); text-decoration: none; transition: color 0.15s; }
-    .residence-block a:hover { color: var(--muted); }
+    .row:first-of-type { border-top: 1px solid var(--border); }
+    .row-name { color: var(--text); }
+    .row-price { color: var(--muted); }
 
-    /* Menu link */
-    .menu-link {
-      display: inline-block;
-      font-size: 0.78rem; font-weight: 500;
-      color: var(--text); text-decoration: none;
-      padding: 0.6rem 0; letter-spacing: 0.03em;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      width: 100%; margin-bottom: 2rem;
-      transition: color 0.15s;
-    }
-    .menu-link:hover { color: var(--muted); }
-
-    /* Links */
-    .links { display: flex; flex-direction: column; gap: 0.1rem; }
+    .links { display: flex; flex-direction: column; }
     .links a {
       font-size: 0.78rem; color: var(--muted);
       text-decoration: none; padding: 0.3rem 0;
@@ -98,98 +62,67 @@
     }
     .links a:hover { color: var(--text); }
 
-    /* Matcha items */
-    .matcha-item {
-      display: flex; justify-content: space-between; align-items: baseline;
-      padding: 0.55rem 0; border-bottom: 1px solid var(--border);
-      font-size: 0.78rem;
-    }
-    .matcha-item:first-of-type { border-top: 1px solid var(--border); }
-    .matcha-name { color: var(--text); }
-    .matcha-price { color: var(--muted); }
-
-    /* Policy */
     .policy {
-      font-size: 0.65rem; color: var(--muted);
-      line-height: 1.9; letter-spacing: 0.02em;
-      border-top: 1px solid var(--border);
-      padding-top: 1.5rem; margin-top: 3rem;
+      font-size: 0.62rem; color: var(--muted);
+      line-height: 1.9; border-top: 1px solid var(--border);
+      padding-top: 1.5rem; margin-top: 2rem;
     }
 
     footer {
       font-size: 0.6rem; color: var(--muted);
-      letter-spacing: 0.04em; line-height: 1.8;
-      margin-top: 1.5rem;
+      letter-spacing: 0.04em; margin-top: 1rem;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
 
-    <!-- Header -->
-    <h1>Kommune <span style="font-weight:400;color:var(--muted);">($0 oat milk.)</span></h1>
+    <h1>Kommune <span>($0 oat milk.)</span></h1>
     <div class="meta">
       11931 Jasper Ave NW · Edmonton<br />
       daily from 10am · reservations welcome<br />
-      <a href="mailto:hello@kommunesnackbar.ca" style="color:inherit;text-decoration:none;">hello@kommunesnackbar.ca</a> · WiFi · Kommune@1 · <a href="/kommune/menu" style="color:inherit;text-decoration:none;">menu →</a>
+      <a href="mailto:hello@kommunesnackbar.ca">hello@kommunesnackbar.ca</a> · WiFi · Kommune@1 · <a href="/kommune/menu">menu →</a>
     </div>
 
-    <hr class="divider" />
+    <hr />
 
-    <!-- In residence — Whisked -->
-    <div class="section">
-      <div class="section-label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">Whisked</a></div>
-      <div class="matcha-item"><span class="matcha-name">Regular</span><span class="matcha-price">$7</span></div>
-      <div class="matcha-item"><span class="matcha-name">Premium</span><span class="matcha-price">$10</span></div>
-      <div class="matcha-item"><span class="matcha-name">Maple Sea Salt</span><span class="matcha-price">$8</span></div>
-      <div class="matcha-item"><span class="matcha-name">Apple Cinnamon</span><span class="matcha-price">$8</span></div>
-      <div class="matcha-item"><span class="matcha-name">Pumpkin Spice</span><span class="matcha-price">$8</span></div>
-      <div class="matcha-item"><span class="matcha-name">Earl Grey</span><span class="matcha-price">$8</span></div>
-      <div class="matcha-item"><span class="matcha-name">Hojicha</span><span class="matcha-price">$7</span></div>
-    </div>
+    <div class="label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener">Whisked</a></div>
+    <div class="row"><span class="row-name">Regular</span><span class="row-price">$7</span></div>
+    <div class="row"><span class="row-name">Premium</span><span class="row-price">$10</span></div>
+    <div class="row"><span class="row-name">Maple Sea Salt</span><span class="row-price">$8</span></div>
+    <div class="row"><span class="row-name">Apple Cinnamon</span><span class="row-price">$8</span></div>
+    <div class="row"><span class="row-name">Pumpkin Spice</span><span class="row-price">$8</span></div>
+    <div class="row"><span class="row-name">Earl Grey</span><span class="row-price">$8</span></div>
+    <div class="row"><span class="row-name">Hojicha</span><span class="row-price">$7</span></div>
 
-    <hr class="divider" />
+    <hr />
 
-    <p class="desc">
-      A bar for slow hours. European plates, live music, a serious drink program. We don't charge extra for oat milk. NA drinks are priced the same as the rest. Dietary needs aren't a luxury here.
-    </p>
-
-    <hr class="divider" />
-
-    <!-- Events -->
-    <div class="section">
-      <div class="section-label">events</div>
-      <div class="no-events">nothing scheduled — check back</div>
+    <div style="margin-bottom:2rem;">
+      <div class="label">events</div>
+      <span style="font-size:0.72rem;color:var(--muted);">nothing scheduled — check back</span>
       <!--
-        <div class="event">
-          <div class="event-date">fri, may 9 · doors 8pm</div>
-          <div class="event-name">Artist or Event Name</div>
-          <a href="#" class="ticket-link">get tickets →</a>
+        <div class="row" style="display:block;padding:0.8rem 0;">
+          <div style="font-size:0.65rem;color:var(--muted);margin-bottom:0.2rem;">fri, may 9 · doors 8pm</div>
+          <div style="font-size:0.85rem;font-weight:500;margin-bottom:0.5rem;">Artist or Event Name</div>
+          <a href="#" style="font-size:0.72rem;color:var(--text);text-decoration:none;">get tickets →</a>
         </div>
       -->
     </div>
 
-    <!-- Sound -->
-    <div class="section">
-      <div class="section-label">the sound of the room</div>
-      <div class="links">
-        <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">listen on Spotify →</a>
-      </div>
+    <div class="label">the sound of the room</div>
+    <div class="links" style="margin-bottom:2rem;">
+      <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">listen on Spotify →</a>
     </div>
 
-    <!-- Links -->
-    <div class="links" style="margin-bottom:0;">
+    <div class="links">
       <a href="https://instagram.com/kommune.whisked" target="_blank" rel="noopener">Instagram →</a>
     </div>
 
-    <!-- Policy -->
     <div class="policy">
-      The $0 oat milk policy: every coffee drink at Kommune comes with your choice of milk at no extra charge. Minor Figures oat, on the house.
+      The $0 oat milk policy: every drink at Kommune comes with your choice of milk at no extra charge. Minor Figures oat, on the house.
     </div>
 
-    <footer>
-      Treaty 6 Territory · Wîhkwêntôwin
-    </footer>
+    <footer>Treaty 6 Territory · Wîhkwêntôwin</footer>
 
   </div>
 </body>
