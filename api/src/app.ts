@@ -377,6 +377,68 @@ Keep answers short — one or two sentences. If you don't know something specifi
   res.json({ answer });
 });
 
+app.post('/api/kommune/press/apply', async (req: any, res: any) => {
+  const name = String(req.body?.name ?? '').trim().slice(0, 200);
+  const email = String(req.body?.email ?? '').trim().slice(0, 200);
+  const note = String(req.body?.note ?? '').trim().slice(0, 500);
+  if (!name || !email) return res.status(400).json({ error: 'name and email required' });
+  await db.execute(sql`INSERT INTO kommune_press_applications (name, email, note) VALUES (${name}, ${email}, ${note || null})`);
+  const { resend } = await import('./lib/resend');
+  await resend.emails.send({
+    from: 'cold.press <orders@fraise.chat>',
+    to: 'hello@kommunesnackbar.ca',
+    subject: `cold.press application — ${name}`,
+    text: `Name: ${name}\nEmail: ${email}\n\n${note}\n\nApprove at /owner.`,
+  });
+  res.json({ ok: true });
+});
+
+app.post('/api/kommune/press/verify', async (req: any, res: any) => {
+  const code = String(req.body?.code ?? '').trim();
+  if (!code) return res.status(400).json({ error: 'code required' });
+  const rows = await db.execute(sql`SELECT id, name FROM kommune_press_applications WHERE personal_code = ${code} AND status = 'approved' LIMIT 1`);
+  const row = (((rows as any).rows ?? rows)[0] as any);
+  if (!row) return res.status(401).json({ error: 'invalid code' });
+  res.json({ ok: true, name: row.name });
+});
+
+app.get('/api/kommune/press/applications', async (req: any, res: any) => {
+  const password = String(req.query?.password ?? '');
+  if (password !== process.env.KOMMUNE_OWNER_PASSWORD) return res.status(401).json({ error: 'unauthorized' });
+  const rows = await db.execute(sql`SELECT id, name, email, note, status, personal_code, created_at FROM kommune_press_applications ORDER BY created_at DESC`);
+  res.json({ applications: ((rows as any).rows ?? rows) });
+});
+
+app.post('/api/kommune/press/applications/:id/approve', async (req: any, res: any) => {
+  const password = String(req.body?.password ?? '');
+  if (password !== process.env.KOMMUNE_OWNER_PASSWORD) return res.status(401).json({ error: 'unauthorized' });
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+  await db.execute(sql`UPDATE kommune_press_applications SET status = 'approved', personal_code = ${code} WHERE id = ${id}`);
+  const rows = await db.execute(sql`SELECT name, email FROM kommune_press_applications WHERE id = ${id} LIMIT 1`);
+  const row = (((rows as any).rows ?? rows)[0] as any);
+  if (row?.email) {
+    const { resend } = await import('./lib/resend');
+    await resend.emails.send({
+      from: 'cold.press <orders@fraise.chat>',
+      to: row.email,
+      subject: 'you\'re in — cold.press',
+      text: `Hi ${row.name},\n\nYou've been approved as a cold.press reviewer.\n\nCome by Kommune (11931 Jasper Ave NW) and introduce yourself to whoever is working. They'll hand you your code.\n\n— Kommune`,
+    });
+  }
+  res.json({ ok: true, code });
+});
+
+app.post('/api/kommune/press/applications/:id/reject', async (req: any, res: any) => {
+  const password = String(req.body?.password ?? '');
+  if (password !== process.env.KOMMUNE_OWNER_PASSWORD) return res.status(401).json({ error: 'unauthorized' });
+  const id = parseInt(req.params.id);
+  if (isNaN(id)) return res.status(400).json({ error: 'invalid id' });
+  await db.execute(sql`UPDATE kommune_press_applications SET status = 'rejected' WHERE id = ${id}`);
+  res.json({ ok: true });
+});
+
 app.get('/api/kommune/assignments', async (_req: any, res: any) => {
   try {
     const rows = await db.execute(sql`SELECT id, name, neighbourhood, note FROM kommune_assignments WHERE active = true ORDER BY created_at DESC`);

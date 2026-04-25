@@ -619,60 +619,78 @@
       }
     }
 
-    const PRESS_CODE = 'coldpress'; // owner shares this in person with verified reviewers
-
     function showPressFlow() {
       const canvas = document.getElementById('results-canvas');
       canvas.dataset.mode = 'press';
-
-      // Check if already verified
-      const code = localStorage.getItem('press_code');
-      if (code === PRESS_CODE) {
-        showAssignmentBoard(canvas);
-        return;
-      }
-
-      // Step 1 — enter code if you have one, or apply
+      const code = localStorage.getItem('press_personal_code');
+      if (code) { showAssignmentBoard(canvas); return; }
       canvas.innerHTML = `
         <div class="result-state" style="margin-bottom:1.25rem;line-height:1.8;">
           cold.press reviews Edmonton food &amp; drink.<br/>
           Reviewers are verified in person at Kommune.
         </div>
-        <form class="apply-form" onsubmit="submitPressCode(event)" style="margin-bottom:1.5rem;">
-          <div class="apply-field"><input type="text" id="press-code-input" placeholder="enter your code" autocomplete="off" autocorrect="off" autocapitalize="off" /></div>
+        <form class="apply-form" onsubmit="submitPressCode(event)" style="margin-bottom:1.75rem;">
+          <div class="apply-field"><input type="text" id="press-code-input" placeholder="enter your code" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" /></div>
           <button type="submit" class="apply-submit">unlock →</button>
         </form>
-        <div class="result-state" style="font-size:0.62rem;margin-bottom:0.75rem;">don't have a code? apply below.</div>
+        <div class="result-state" style="font-size:0.62rem;margin-bottom:0.75rem;line-height:1.8;">no code yet? apply — the owner will reach out.</div>
         <form class="apply-form" onsubmit="submitPressApply(event)">
-          <div class="apply-field"><input type="text" id="press-name" placeholder="your name" autocomplete="name" /></div>
-          <div class="apply-field"><textarea id="press-note" placeholder="why you'd make a good reviewer" rows="3"></textarea></div>
+          <div class="apply-field"><input type="text" id="press-name" placeholder="name" autocomplete="name" /></div>
+          <div class="apply-field"><input type="email" id="press-email" placeholder="email" autocomplete="email" /></div>
+          <div class="apply-field"><textarea id="press-note" placeholder="a line about yourself" rows="2"></textarea></div>
           <button type="submit" class="apply-submit">apply →</button>
         </form>
       `;
       setTimeout(() => document.getElementById('press-code-input')?.focus(), 50);
     }
 
-    function submitPressCode(e) {
+    async function submitPressCode(e) {
       e.preventDefault();
-      const val = document.getElementById('press-code-input').value.trim().toLowerCase();
-      if (val === PRESS_CODE) {
-        localStorage.setItem('press_code', PRESS_CODE);
-        showAssignmentBoard(document.getElementById('results-canvas'));
-      } else {
-        document.getElementById('press-code-input').value = '';
-        document.getElementById('press-code-input').placeholder = 'incorrect — try again';
+      const input = document.getElementById('press-code-input');
+      const code = input.value.trim().toUpperCase();
+      if (!code) return;
+      input.disabled = true;
+      try {
+        const res = await fetch('/api/kommune/press/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        if (res.ok) {
+          localStorage.setItem('press_personal_code', code);
+          showAssignmentBoard(document.getElementById('results-canvas'));
+        } else {
+          input.disabled = false;
+          input.value = '';
+          input.placeholder = 'incorrect — try again';
+        }
+      } catch {
+        input.disabled = false;
       }
     }
 
-    function submitPressApply(e) {
+    async function submitPressApply(e) {
       e.preventDefault();
       const name = document.getElementById('press-name').value.trim();
+      const email = document.getElementById('press-email').value.trim();
       const note = document.getElementById('press-note').value.trim();
-      if (!name) return;
-      const subject = encodeURIComponent('cold.press application — ' + name);
-      const body = encodeURIComponent('Name: ' + name + '\n\n' + note);
-      window.location.href = 'mailto:hello@kommunesnackbar.ca?subject=' + subject + '&body=' + body;
-      closeSearch();
+      if (!name || !email) return;
+      const canvas = document.getElementById('results-canvas');
+      canvas.innerHTML = '<div class="result-state">sending…</div>';
+      try {
+        const res = await fetch('/api/kommune/press/apply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, note }),
+        });
+        if (res.ok) {
+          canvas.innerHTML = '<div class="result-state" style="line-height:1.8;">application sent.<br/>if approved, you\'ll hear from the owner directly.</div>';
+        } else {
+          canvas.innerHTML = '<div class="result-state">something went wrong — try again</div>';
+        }
+      } catch {
+        canvas.innerHTML = '<div class="result-state">something went wrong — try again</div>';
+      }
     }
 
     async function showAssignmentBoard(canvas) {
@@ -727,31 +745,84 @@
     async function renderOwnerBoard(canvas) {
       canvas.innerHTML = '<div class="result-state">loading…</div>';
       try {
-        const res = await fetch('/api/kommune/assignments');
-        const data = await res.json();
-        const list = data.assignments ?? [];
+        const [assignRes, appRes] = await Promise.all([
+          fetch('/api/kommune/assignments'),
+          fetch('/api/kommune/press/applications?password=' + encodeURIComponent(ownerPassword)),
+        ]);
+        const assignments = (await assignRes.json()).assignments ?? [];
+        const applications = (await appRes.json()).applications ?? [];
+        const pending = applications.filter(a => a.status === 'pending');
+        const approved = applications.filter(a => a.status === 'approved');
+
         canvas.innerHTML = `
-          <form class="apply-form" onsubmit="ownerAddAssignment(event)" style="margin-bottom:1.5rem;">
+          ${pending.length ? `
+            <div class="result-state" style="font-size:0.62rem;margin-bottom:0.5rem;">applications — ${pending.length} pending</div>
+            ${pending.map(a => `
+              <div class="result" style="display:flex;justify-content:space-between;align-items:baseline;gap:1rem;">
+                <div>
+                  <div class="result-title">${esc(a.name)}</div>
+                  <div class="result-url">${esc(a.email)}</div>
+                  ${a.note ? `<div class="result-desc">${esc(a.note)}</div>` : ''}
+                </div>
+                <div style="display:flex;gap:0.75rem;flex-shrink:0;">
+                  <button class="apply-submit" type="button" onclick="ownerApprove(${a.id}, this)">approve</button>
+                  <button class="apply-submit" type="button" onclick="ownerReject(${a.id}, this)" style="color:var(--muted);">reject</button>
+                </div>
+              </div>
+            `).join('')}
+          ` : ''}
+          ${approved.length ? `
+            <div class="result-state" style="font-size:0.62rem;margin-top:1rem;margin-bottom:0.5rem;">approved reviewers</div>
+            ${approved.map(a => `
+              <div class="result" style="display:flex;justify-content:space-between;align-items:baseline;">
+                <div class="result-title">${esc(a.name)}</div>
+                <div class="result-url" style="letter-spacing:0.1em;">${esc(a.personal_code)}</div>
+              </div>
+            `).join('')}
+          ` : ''}
+          <div class="result-state" style="font-size:0.62rem;margin-top:1.5rem;margin-bottom:0.5rem;">assignments</div>
+          <form class="apply-form" onsubmit="ownerAddAssignment(event)" style="margin-bottom:1rem;">
             <div class="apply-field"><input type="text" id="oa-name" placeholder="business name" autocomplete="off" /></div>
             <div class="apply-field"><input type="text" id="oa-neighbourhood" placeholder="neighbourhood" autocomplete="off" /></div>
             <div class="apply-field"><input type="text" id="oa-note" placeholder="note for reviewer (optional)" autocomplete="off" /></div>
             <button type="submit" class="apply-submit">add →</button>
           </form>
-          ${!list.length ? '<div class="result-state" style="font-size:0.65rem;">no assignments yet</div>' : ''}
-          ${list.map(a => `
+          ${!assignments.length ? '<div class="result-state" style="font-size:0.65rem;">no assignments yet</div>' : ''}
+          ${assignments.map(a => `
             <div class="result" style="display:flex;justify-content:space-between;align-items:baseline;">
               <div>
                 <div class="result-title">${esc(a.name)}</div>
                 <div class="result-url">${esc(a.neighbourhood)}${a.note ? ' · ' + esc(a.note) : ''}</div>
               </div>
-              <button class="apply-submit" type="button" onclick="ownerRemoveAssignment(${a.id}, this)" style="flex-shrink:0;margin-left:1rem;">remove</button>
+              <button class="apply-submit" type="button" onclick="ownerRemoveAssignment(${a.id}, this)" style="flex-shrink:0;margin-left:1rem;color:var(--muted);">remove</button>
             </div>
           `).join('')}
         `;
-        setTimeout(() => document.getElementById('oa-name')?.focus(), 50);
       } catch {
         canvas.innerHTML = '<div class="result-state">unavailable right now</div>';
       }
+    }
+
+    async function ownerApprove(id, btn) {
+      btn.textContent = '…';
+      const res = await fetch('/api/kommune/press/applications/' + id + '/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: ownerPassword }),
+      });
+      if (res.status === 401) { ownerPassword = null; showOwnerPanel(); return; }
+      renderOwnerBoard(document.getElementById('results-canvas'));
+    }
+
+    async function ownerReject(id, btn) {
+      btn.textContent = '…';
+      const res = await fetch('/api/kommune/press/applications/' + id + '/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: ownerPassword }),
+      });
+      if (res.status === 401) { ownerPassword = null; showOwnerPanel(); return; }
+      renderOwnerBoard(document.getElementById('results-canvas'));
     }
 
     async function ownerAddAssignment(e) {

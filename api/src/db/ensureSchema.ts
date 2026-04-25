@@ -325,6 +325,17 @@ export async function ensureSchema(): Promise<void> {
     ON nfc_connections (LEAST(user_a, user_b), GREATEST(user_a, user_b))
   `);
 
+  // ── Kommune press applications ───────────────────────────────────────────────
+  await run('kommune_press_applications', sql`CREATE TABLE IF NOT EXISTS kommune_press_applications (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    note TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    personal_code TEXT UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Kommune press assignments ────────────────────────────────────────────────
   await run('kommune_assignments', sql`CREATE TABLE IF NOT EXISTS kommune_assignments (
     id SERIAL PRIMARY KEY,
