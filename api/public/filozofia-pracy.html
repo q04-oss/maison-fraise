@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filozofia Pracy</title>
+  <meta name="description" content="Filozofia Pracy — conversations on the philosophy of work." />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --text: #1C1C1E; --muted: #8E8E93; --border: #E5E1DA; --panel: #F7F5F2;
+    }
+    html {
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Mono', monospace; font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body { min-height: 100dvh; padding: 4rem 1.5rem 6rem; }
+    .wrap { width: 100%; max-width: 540px; margin: 0 auto; }
+
+    .eyebrow {
+      font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.6rem;
+    }
+    h1 { font-size: 1.15rem; font-weight: 500; margin-bottom: 0.35rem; }
+    .subtitle {
+      font-size: 0.75rem; color: var(--muted); letter-spacing: 0.04em; margin-bottom: 2.5rem;
+    }
+
+    p {
+      font-size: 0.82rem; line-height: 1.9; color: var(--text); margin-bottom: 1rem;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* Listen buttons */
+    .listen {
+      display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 2.5rem;
+    }
+    .listen a {
+      display: inline-block;
+      padding: 0.55rem 1.1rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.7rem;
+      letter-spacing: 0.06em;
+      color: var(--text);
+      text-decoration: none;
+      transition: border-color 0.15s;
+    }
+    .listen a:hover { border-color: var(--text); }
+
+    /* Episode list */
+    .section-label {
+      font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 1rem;
+    }
+    .episode {
+      padding: 1.1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .episode:first-of-type { border-top: 1px solid var(--border); }
+    .episode-meta {
+      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 0.35rem;
+    }
+    .episode-title {
+      font-size: 0.85rem; font-weight: 500; line-height: 1.5; color: var(--text);
+    }
+    .episode-title a { text-decoration: none; color: inherit; }
+    .episode-title a:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .episode-guest {
+      font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem;
+    }
+    .no-episodes {
+      font-size: 0.78rem; color: var(--muted); padding: 1.5rem 0;
+      border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+
+    /* Guest interest */
+    .guest-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem 1.4rem;
+      margin-top: 2.5rem;
+    }
+    .guest-section p {
+      margin-bottom: 0.7rem;
+    }
+    .guest-section p:last-of-type { margin-bottom: 0; }
+    .guest-link {
+      font-size: 0.75rem; color: var(--text); text-decoration: none; letter-spacing: 0.03em;
+    }
+    .guest-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    /* Contact + footer */
+    .contact {
+      margin-top: 2.5rem; font-size: 0.72rem; color: var(--muted); line-height: 1.8;
+    }
+    .contact a { color: var(--text); text-decoration: none; }
+    .contact a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+    footer {
+      margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);
+      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; line-height: 1.9;
+    }
+    footer a { color: inherit; text-decoration: none; }
+    footer a:hover { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <div class="eyebrow">podcast</div>
+    <h1>Filozofia Pracy</h1>
+    <p class="subtitle">conversations on the philosophy of work</p>
+
+    <p>
+      A monthly long-form conversation podcast on labour, recognition, building, and the architectures that surround them. The title is Stanisław Brzozowski's — from his 1910 collection <em>Idee</em>, the first sustained philosophy of work in the Polish tradition. The conversations draw on that lineage and on the bodies of thought adjacent to it: feminist labour economics, post-Holocaust memory architecture, the ethics of solidarity.
+    </p>
+    <p>
+      The guests are people who have spent serious time on these questions. The format is slow and direct. The cadence is monthly.
+    </p>
+
+    <hr class="divider" />
+
+    <div class="listen">
+      <a href="#" aria-label="Listen on Spotify">Spotify →</a>
+      <a href="#" aria-label="Listen on Apple Podcasts">Apple Podcasts →</a>
+      <a href="#" aria-label="RSS feed">RSS →</a>
+    </div>
+
+    <div class="section-label">episodes</div>
+
+    <div class="no-episodes">
+      episodes forthcoming
+    </div>
+
+    <!--
+      Episode template (uncomment and fill in when episodes are published):
+
+      <div class="episode">
+        <div class="episode-meta">ep. 01 · month year · 74 min</div>
+        <div class="episode-title"><a href="#">Episode Title</a></div>
+        <div class="episode-guest">Guest Name</div>
+      </div>
+    -->
+
+    <div class="guest-section">
+      <div class="section-label">interested in being a guest?</div>
+      <p>
+        The show is looking for guests who have spent serious time thinking about work — its conditions, its recognition, its relationship to place and to memory. That includes philosophers, economists, architects, builders, and people whose lived experience speaks to the subject. Academic credentials are not required. Seriousness is.
+      </p>
+      <p>
+        If that is you or someone you know, write to <a class="guest-link" href="mailto:austin@rajzyngier.co">austin@rajzyngier.co</a> with a short note about who you are and what you've been working on.
+      </p>
+    </div>
+
+    <div class="contact">
+      <a href="mailto:austin@rajzyngier.co">austin@rajzyngier.co</a>
+    </div>
+
+    <footer>
+      Filozofia Pracy is produced in amiskwacîwâskahikan (Edmonton, Alberta), on Treaty 6 Territory and in the Métis homeland.<br />
+      A <a href="https://rajzyngier.co">Rajzyngier Research</a> project. &nbsp;·&nbsp; <a href="https://fraise.box">fraise.box ↗</a>
+    </footer>
+
+  </div>
+</body>
+</html>

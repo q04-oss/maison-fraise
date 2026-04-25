@@ -297,6 +297,10 @@ app.use((req, res, next) => {
     res.sendFile(path.join(__dirname, '../public/rajzyngier.html'));
     return;
   }
+  if (host === 'fraise.land' || host === 'www.fraise.land') {
+    res.sendFile(path.join(__dirname, '../public/filozofia-pracy.html'));
+    return;
+  }
   next();
 });
 
