@@ -98,6 +98,16 @@
     }
     .links a:hover { color: var(--text); }
 
+    /* Matcha items */
+    .matcha-item {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0.55rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+    }
+    .matcha-item:first-of-type { border-top: 1px solid var(--border); }
+    .matcha-name { color: var(--text); }
+    .matcha-price { color: var(--muted); }
+
     /* Policy */
     .policy {
       font-size: 0.65rem; color: var(--muted);
@@ -132,7 +142,22 @@
       A bar for slow hours. European plates, live music, a serious drink program. We don't charge extra for oat milk. NA drinks are priced the same as the rest. Dietary needs aren't a luxury here.
     </p>
 
+    <!-- Menu -->
+    <a href="/kommune/menu" class="menu-link">view the menu →</a>
+
     <hr class="divider" />
+
+    <!-- In residence — Whisked -->
+    <div class="section">
+      <div class="section-label">matcha by <a href="https://visitwhisked.ca" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;text-underline-offset:3px;">Whisked</a></div>
+      <div class="matcha-item"><span class="matcha-name">Regular</span><span class="matcha-price">$7</span></div>
+      <div class="matcha-item"><span class="matcha-name">Premium</span><span class="matcha-price">$10</span></div>
+      <div class="matcha-item"><span class="matcha-name">Maple Sea Salt</span><span class="matcha-price">$8</span></div>
+      <div class="matcha-item"><span class="matcha-name">Apple Cinnamon</span><span class="matcha-price">$8</span></div>
+      <div class="matcha-item"><span class="matcha-name">Pumpkin Spice</span><span class="matcha-price">$8</span></div>
+      <div class="matcha-item"><span class="matcha-name">Earl Grey</span><span class="matcha-price">$8</span></div>
+      <div class="matcha-item"><span class="matcha-name">Hojicha</span><span class="matcha-price">$7</span></div>
+    </div>
 
     <!-- Events -->
     <div class="section">
@@ -147,15 +172,6 @@
       -->
     </div>
 
-    <!-- In residence -->
-    <div class="section">
-      <div class="section-label">in residence</div>
-      <div class="residence-block">
-        <p>Whisked is a ceremonial matcha bar operating inside the space.</p>
-        <a href="https://visitwhisked.ca" target="_blank" rel="noopener">visitwhisked.ca →</a>
-      </div>
-    </div>
-
     <!-- Sound -->
     <div class="section">
       <div class="section-label">the sound of the room</div>
@@ -163,9 +179,6 @@
         <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">listen on Spotify →</a>
       </div>
     </div>
-
-    <!-- Menu -->
-    <a href="/kommune/menu" class="menu-link">view the menu →</a>
 
     <!-- Links -->
     <div class="links" style="margin-bottom:0;">
