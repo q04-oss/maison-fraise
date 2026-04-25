@@ -11,7 +11,6 @@
       --bg:     #F9F7F4;
       --text:   #1A1A18;
       --muted:  #8A8880;
-      --birch:  #8A7A68;
       --border: #E2DDD6;
     }
     html {
@@ -19,20 +18,42 @@
       font-family: 'DM Mono', monospace; font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
-    body { padding: 4rem 1.5rem 6rem; }
-    .wrap { width: 100%; max-width: 480px; margin: 0 auto; }
+    body { min-height: 100dvh; }
 
-    .back {
-      font-size: 0.68rem; color: var(--muted); text-decoration: none;
-      letter-spacing: 0.04em; display: inline-block; margin-bottom: 2.5rem;
+    /* ── Top bar ── */
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      z-index: 10;
+    }
+    .top-nav {
+      display: flex; flex-wrap: wrap; gap: 0.25rem 0.6rem;
+      align-items: center;
+    }
+    .top-nav a {
+      font-size: 0.65rem; color: var(--muted); text-decoration: none;
+      letter-spacing: 0.04em; transition: color 0.15s; white-space: nowrap;
+    }
+    .top-nav a:hover { color: var(--text); }
+    .top-reserve {
+      font-size: 0.65rem; color: var(--text); text-decoration: none;
+      letter-spacing: 0.04em; flex-shrink: 0;
       transition: color 0.15s;
     }
-    .back:hover { color: var(--text); }
+    .top-reserve:hover { color: var(--muted); }
 
-    h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.25rem; }
-    .subtitle {
-      font-size: 0.68rem; color: var(--muted); letter-spacing: 0.04em;
-      margin-bottom: 3rem;
+    /* ── Scrollable content ── */
+    .content {
+      padding: 4.5rem 1.5rem 5.5rem;
+      max-width: 480px;
+      margin: 0 auto;
     }
 
     .section { margin-bottom: 2.5rem; }
@@ -41,7 +62,6 @@
       color: var(--muted); margin-bottom: 0.75rem; padding-bottom: 0.6rem;
       border-bottom: 1px solid var(--border);
     }
-
     .item {
       display: flex; justify-content: space-between; align-items: baseline;
       padding: 0.65rem 0; border-bottom: 1px solid var(--border);
@@ -57,59 +77,44 @@
       font-size: 0.75rem; color: var(--muted); white-space: nowrap; flex-shrink: 0;
     }
 
-    .oat-statement {
-      font-size: 1.5rem; font-weight: 500;
-      color: var(--text); line-height: 1.3;
-      margin-bottom: 0.4rem;
-    }
-    .oat-sub {
-      font-size: 0.68rem; color: var(--muted);
-      letter-spacing: 0.03em; margin-bottom: 3rem;
-    }
     .note {
       font-size: 0.65rem; color: var(--muted); letter-spacing: 0.03em;
-      margin-top: 2rem; line-height: 1.8;
+      margin-top: 0.5rem; line-height: 1.8;
     }
-    .contact-bar {
-      margin-top: 3rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--border);
-      display: flex; flex-direction: column; gap: 0.1rem;
-    }
-    .contact-bar a {
-      font-size: 0.78rem; color: var(--muted);
-      text-decoration: none; padding: 0.3rem 0;
-      transition: color 0.15s;
-    }
-    .contact-bar a:hover { color: var(--text); }
 
-    .nav {
-      position: sticky; top: 0;
+    /* ── Bottom identity ── */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
       background: var(--bg);
-      display: flex; flex-wrap: wrap; gap: 0.3rem 0.6rem;
-      padding: 0.75rem 0;
-      margin-bottom: 2rem;
-      border-bottom: 1px solid var(--border);
+      border-top: 1px solid var(--border);
+      padding: 0.9rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
       z-index: 10;
     }
-    .nav a {
+    .bottom-name {
+      font-size: 1.5rem; font-weight: 500; color: var(--text);
+    }
+    .bottom-back {
       font-size: 0.65rem; color: var(--muted); text-decoration: none;
       letter-spacing: 0.04em; transition: color 0.15s;
     }
-    .nav a:hover { color: var(--text); }
-    .nav a.reserve { color: var(--text); }
+    .bottom-back:hover { color: var(--text); }
+
+    @media (max-width: 480px) {
+      .top-bar { flex-wrap: wrap; gap: 0.4rem; padding: 0.65rem 1.25rem; }
+      .content { padding-top: 6rem; padding-left: 1.25rem; padding-right: 1.25rem; }
+      .bottom-bar { padding: 0.75rem 1.25rem; }
+      .bottom-name { font-size: 1.2rem; }
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
 
-    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:0.25rem;">
-      <h1>Menu</h1>
-      <a href="/kommune" class="back">← Kommune</a>
-    </div>
-    <p class="subtitle">GF · V · VG options available throughout</p>
-
-    <div class="nav">
+  <div class="top-bar">
+    <div class="top-nav">
       <a href="#plates">plates</a>
       <a href="#bakes">bakes</a>
       <a href="#snacks">snacks</a>
@@ -120,8 +125,13 @@
       <a href="#cocktails">cocktails</a>
       <a href="#beer">beer</a>
       <a href="#wine">wine</a>
-      <a href="mailto:hello@kommunesnackbar.ca" class="reserve">reserve →</a>
     </div>
+    <a href="mailto:hello@kommunesnackbar.ca" class="top-reserve">reserve →</a>
+  </div>
+
+  <div class="content">
+
+    <p class="note" style="margin-bottom:2rem;">GF · V · VG options available throughout</p>
 
     <!-- Plates -->
     <div class="section" id="plates">
@@ -230,11 +240,12 @@
 
     <p class="note">prices in CAD · menu subject to change</p>
 
-    <div class="contact-bar">
-      <a href="mailto:hello@kommunesnackbar.ca">reservations · hello@kommunesnackbar.ca →</a>
-      <a href="/kommune">← back to Kommune</a>
-    </div>
-
   </div>
+
+  <div class="bottom-bar">
+    <div class="bottom-name">Menu</div>
+    <a href="/kommune" class="bottom-back">← Kommune</a>
+  </div>
+
 </body>
 </html>
