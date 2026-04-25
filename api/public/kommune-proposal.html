@@ -253,7 +253,37 @@
     .shortcut:hover .shortcut-cmd { color: var(--text); }
 
     /* ── Recommend ── */
-    .rec-input::placeholder { color: var(--muted); }
+    .recommend-panel {
+      display: none;
+      padding: 0.65rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .recommend-panel.open { display: block; }
+    .recommend-panel input {
+      font-family: 'DM Mono', monospace; font-size: 0.72rem;
+      color: var(--text); background: none; border: none; outline: none;
+      width: 100%; padding: 0.3rem 0;
+    }
+    .recommend-panel input::placeholder { color: var(--muted); }
+    .recommend-panel input + input { border-top: 1px solid var(--border); }
+    .rec-actions {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-top: 0.5rem;
+    }
+    .rec-btn {
+      font-family: 'DM Mono', monospace; font-size: 0.62rem;
+      color: var(--muted); background: none; border: none;
+      cursor: pointer; padding: 0; letter-spacing: 0.04em;
+      transition: color 0.15s;
+    }
+    .rec-btn:hover { color: var(--text); }
+    .rec-result {
+      font-size: 0.72rem; color: var(--text);
+      line-height: 1.8; white-space: pre-wrap;
+      padding-top: 0.65rem; border-top: 1px solid var(--border);
+      margin-top: 0.5rem;
+    }
 
     /* ── Item ratings ── */
     .item-rating { font-size: 0.78rem; color: #C0392B; padding-right: 1.25rem; align-self: baseline; flex-shrink: 0; }
@@ -349,7 +379,18 @@
       <a href="#cocktails">cocktails</a>
       <a href="#beer">beer</a>
       <a href="#wine">wine</a>
-      <a href="#recommend" onclick="focusRecommend()">recommend</a>
+      <a href="#" onclick="toggleRecommendPanel(event)">recommend</a>
+    </div>
+    <div class="recommend-panel" id="recommend-panel">
+      <form onsubmit="doRecommendStep(event)">
+        <input id="rec-people" type="number" min="1" max="20" placeholder="how many people?" inputmode="numeric" />
+        <input id="rec-mood" type="text" placeholder="what are you in the mood for?" autocomplete="off" autocorrect="off" />
+        <div class="rec-actions">
+          <button type="submit" class="rec-btn">recommend →</button>
+          <button type="button" class="rec-btn" onclick="closeRecommendPanel()">close</button>
+        </div>
+      </form>
+      <div class="rec-result" id="recommend-result" style="display:none;"></div>
     </div>
 
     <div class="menu-content">
@@ -451,20 +492,6 @@
       </div>
 
       <p class="prices-note">prices in CAD · menu subject to change</p>
-
-      <div class="section" id="recommend" style="margin-top:2rem;">
-        <div class="section-title">recommend</div>
-        <form onsubmit="doRecommendStep(event)" id="rec-step-form">
-          <div class="item" style="cursor:default;">
-            <input id="rec-people" class="rec-input" type="number" min="1" max="20" placeholder="how many people?" style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--text);background:none;border:none;outline:none;width:100%;" />
-          </div>
-          <div class="item" style="cursor:default;">
-            <input id="rec-mood" class="rec-input" type="text" placeholder="what are you in the mood for?" autocomplete="off" autocorrect="off" style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--text);background:none;border:none;outline:none;width:100%;" />
-          </div>
-          <button type="submit" style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0.45rem 0;letter-spacing:0.04em;transition:color 0.15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">recommend →</button>
-        </form>
-        <div id="recommend-result" style="display:none;font-size:0.72rem;color:var(--text);line-height:1.8;padding:0.75rem 0;white-space:pre-wrap;border-top:1px solid var(--border);"></div>
-      </div>
     </div>
   </div>
 
@@ -983,8 +1010,18 @@
     });
 
     // ── Recommend ──
-    function focusRecommend() {
-      setTimeout(() => document.getElementById('rec-people')?.focus(), 100);
+    function toggleRecommendPanel(e) {
+      e.preventDefault();
+      const panel = document.getElementById('recommend-panel');
+      const open = panel.classList.toggle('open');
+      if (open) setTimeout(() => document.getElementById('rec-people')?.focus(), 50);
+    }
+
+    function closeRecommendPanel() {
+      document.getElementById('recommend-panel').classList.remove('open');
+      document.getElementById('recommend-result').style.display = 'none';
+      document.getElementById('rec-people').value = '';
+      document.getElementById('rec-mood').value = '';
     }
 
     async function doRecommendStep(e) {
@@ -1002,9 +1039,9 @@
           body: JSON.stringify({ people, mood }),
         });
         const data = await res.json();
-        result.innerHTML = esc(data.recommendation ?? 'unavailable right now') + '<br/><br/><button style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;letter-spacing:0.04em;" onclick="resetRecommend()">again</button>';
+        result.innerHTML = esc(data.recommendation ?? 'unavailable right now') + '<br/><br/><button class="rec-btn" onclick="resetRecommend()">again</button>';
       } catch {
-        result.innerHTML = 'unavailable right now &nbsp;<button style="font-family:\'DM Mono\',monospace;font-size:0.62rem;color:var(--muted);background:none;border:none;cursor:pointer;padding:0;" onclick="resetRecommend()">again</button>';
+        result.innerHTML = 'unavailable right now <button class="rec-btn" onclick="resetRecommend()">again</button>';
       }
     }
 
