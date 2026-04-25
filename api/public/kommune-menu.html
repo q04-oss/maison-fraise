@@ -82,6 +82,17 @@
       transition: color 0.15s;
     }
     .contact-bar a:hover { color: var(--text); }
+
+    .nav {
+      display: flex; flex-wrap: wrap; gap: 0.3rem 0.6rem;
+      margin-bottom: 2.5rem;
+    }
+    .nav a {
+      font-size: 0.65rem; color: var(--muted); text-decoration: none;
+      letter-spacing: 0.04em; transition: color 0.15s;
+    }
+    .nav a:hover { color: var(--text); }
+    .nav a.reserve { color: var(--text); }
   </style>
 </head>
 <body>
@@ -93,8 +104,22 @@
     </div>
     <p class="subtitle">GF · V · VG options available throughout</p>
 
+    <div class="nav">
+      <a href="#plates">plates</a>
+      <a href="#bakes">bakes</a>
+      <a href="#snacks">snacks</a>
+      <a href="#sweets">sweets</a>
+      <a href="#coffee">coffee</a>
+      <a href="#fog">fog</a>
+      <a href="#na">na</a>
+      <a href="#cocktails">cocktails</a>
+      <a href="#beer">beer</a>
+      <a href="#wine">wine</a>
+      <a href="mailto:hello@kommunesnackbar.ca" class="reserve">reserve →</a>
+    </div>
+
     <!-- Plates -->
-    <div class="section">
+    <div class="section" id="plates">
       <div class="section-title">plates</div>
       <div class="item"><div class="item-left"><div class="item-name">Crispy Potato Cake</div><div class="item-desc">potato, gouda sauce, chives</div></div><div class="item-price">$16</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Berlin Mustard Eggs</div><div class="item-desc">smoked egg yolk, potato, horseradish</div></div><div class="item-price">$12</div></div>
@@ -103,7 +128,7 @@
     </div>
 
     <!-- Bakes & Morning -->
-    <div class="section">
+    <div class="section" id="bakes">
       <div class="section-title">bakes & morning</div>
       <div class="item"><div class="item-left"><div class="item-name">The Tony</div><div class="item-desc">mortadella, provolone, dijon, brioche</div></div><div class="item-price">$14</div></div>
       <div class="item"><div class="item-left"><div class="item-name">The Bea</div><div class="item-desc">eggs, bacon, spicy ketchup, aioli, brioche</div></div><div class="item-price">$12</div></div>
@@ -113,7 +138,7 @@
     </div>
 
     <!-- Snacks -->
-    <div class="section">
+    <div class="section" id="snacks">
       <div class="section-title">snacks</div>
       <div class="item"><div class="item-left"><div class="item-name">Beet Hummus</div><div class="item-desc">roasted beets, oil, dill, rye chips</div></div><div class="item-price">$11</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Marinated Goat Feta</div><div class="item-desc">herbed feta, rye chips</div></div><div class="item-price">$8</div></div>
@@ -121,7 +146,7 @@
     </div>
 
     <!-- Sweets -->
-    <div class="section">
+    <div class="section" id="sweets">
       <div class="section-title">sweets</div>
       <div class="item"><div class="item-left"><div class="item-name">Flourless Chocolate Cake</div></div><div class="item-price">$9</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Affogato</div><div class="item-desc">espresso, matcha, or hojicha</div></div><div class="item-price">$7</div></div>
@@ -129,7 +154,7 @@
     </div>
 
     <!-- Coffee -->
-    <div class="section">
+    <div class="section" id="coffee">
       <div class="section-title">coffee</div>
       <div class="item"><div class="item-left"><div class="item-name">Americano</div></div><div class="item-price">$4.50</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Latte</div></div><div class="item-price">$6.25</div></div>
@@ -145,7 +170,7 @@
     </div>
 
     <!-- Fog -->
-    <div class="section">
+    <div class="section" id="fog">
       <div class="section-title">fog</div>
       <div class="item"><div class="item-left"><div class="item-name">London</div></div><div class="item-price">$6.50</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Peppermint</div></div><div class="item-price">$6.50</div></div>
@@ -153,7 +178,7 @@
     </div>
 
     <!-- NA Cocktails -->
-    <div class="section">
+    <div class="section" id="na">
       <div class="section-title">na cocktails — same price as the rest</div>
       <div class="item"><div class="item-left"><div class="item-name">Dhos & Tonic</div></div><div class="item-price">$9</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Kasu Yuzu & Soda</div></div><div class="item-price">$11</div></div>
@@ -166,7 +191,7 @@
     </div>
 
     <!-- Cocktails -->
-    <div class="section">
+    <div class="section" id="cocktails">
       <div class="section-title">cocktails</div>
       <div class="item"><div class="item-left"><div class="item-name">Gin & Tonic</div></div><div class="item-price">$9</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Kasu Vodka Yuzu & Soda</div></div><div class="item-price">$11</div></div>
@@ -180,7 +205,7 @@
     </div>
 
     <!-- Beer -->
-    <div class="section">
+    <div class="section" id="beer">
       <div class="section-title">beer</div>
       <div class="item"><div class="item-left"><div class="item-name">Guinness Stout</div></div><div class="item-price">$9</div></div>
       <div class="item"><div class="item-left"><div class="item-name">Bent Stick Brewing</div></div><div class="item-price">$9</div></div>
@@ -190,7 +215,7 @@
     </div>
 
     <!-- Wine -->
-    <div class="section">
+    <div class="section" id="wine">
       <div class="section-title">wine</div>
       <div class="item"><div class="item-left"><div class="item-name">Sparkling</div></div><div class="item-price">$10–17 · $52–85</div></div>
       <div class="item"><div class="item-left"><div class="item-name">White</div></div><div class="item-price">$16 · $75–80</div></div>
