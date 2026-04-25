@@ -343,6 +343,10 @@ app.get('/kommune', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/kommune-proposal.html'));
 });
 
+app.get('/kommune/press', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/kommune-press.html'));
+});
+
 app.post('/api/kommune/ask', async (req: any, res: any) => {
   const question = String(req.body?.question ?? '').trim();
   if (!question) return res.status(400).json({ error: 'question required' });
