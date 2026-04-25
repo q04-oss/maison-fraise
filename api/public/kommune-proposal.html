@@ -253,7 +253,7 @@
     .shortcut:hover .shortcut-cmd { color: var(--text); }
 
     /* ── Item ratings ── */
-    .item-rating { font-size: 0.78rem; color: var(--muted); margin-left: 0.5rem; }
+    .item-rating { font-size: 0.78rem; color: #C0392B; padding-right: 1.25rem; align-self: baseline; flex-shrink: 0; }
     .rate-picker { display: flex; gap: 0.6rem; margin-top: 0.35rem; }
     .rate-btn {
       font-family: 'DM Mono', monospace; font-size: 0.65rem;
@@ -746,15 +746,15 @@
         const nameEl = item.querySelector('.item-name');
         if (!nameEl) return;
         const name = nameEl.textContent.trim();
+        item.querySelector('.item-rating')?.remove();
+        const r = ratingsCache[name];
+        if (!r || r.total < 1) return;
         const priceEl = item.querySelector('.item-price');
         if (!priceEl) return;
-        if (!priceEl.dataset.price) priceEl.dataset.price = priceEl.textContent.trim();
-        const r = ratingsCache[name];
-        if (r && r.total >= 1) {
-          priceEl.innerHTML = esc(priceEl.dataset.price) + `<span class="item-rating">&nbsp;·&nbsp;${r.avg_rating}</span>`;
-        } else {
-          priceEl.textContent = priceEl.dataset.price;
-        }
+        const el = document.createElement('div');
+        el.className = 'item-rating';
+        el.textContent = String(r.avg_rating);
+        item.insertBefore(el, priceEl);
       });
     }
 
