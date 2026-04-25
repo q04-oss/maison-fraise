@@ -84,8 +84,13 @@
     .contact-bar a:hover { color: var(--text); }
 
     .nav {
+      position: sticky; top: 0;
+      background: var(--bg);
       display: flex; flex-wrap: wrap; gap: 0.3rem 0.6rem;
-      margin-bottom: 2.5rem;
+      padding: 0.75rem 0;
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+      z-index: 10;
     }
     .nav a {
       font-size: 0.65rem; color: var(--muted); text-decoration: none;
