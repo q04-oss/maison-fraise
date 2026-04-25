@@ -481,6 +481,7 @@
       { cmd: 'apply',     hint: 'work at Kommune',              action() { showApplyForm(); } },
       { cmd: 'playlist',  hint: 'the room\'s playlist',         action() { closeSearch(); window.open('https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO', '_blank'); } },
       { cmd: 'btw',        hint: 'ask anything',                 action() { showBtwForm(); } },
+      { cmd: 'press',     hint: 'cold.press — Edmonton reviewed', action() { closeSearch(); window.location.href = '/kommune/press'; } },
       { cmd: 'why',       hint: 'what is your why?',            action() { document.getElementById('results-canvas').innerHTML = '<div class="result-state">$0 oat milk.</div>'; } },
     ];
 
