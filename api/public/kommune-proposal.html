@@ -252,6 +252,27 @@
     .shortcut-hint { font-size: 0.78rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
     .shortcut:hover .shortcut-cmd { text-decoration: underline; text-underline-offset: 3px; }
 
+    /* ── Apply form ── */
+    .apply-form { padding-top: 0.25rem; }
+    .apply-field {
+      border-bottom: 1px solid var(--border);
+      padding: 0.45rem 0;
+    }
+    .apply-field:first-child { border-top: 1px solid var(--border); }
+    .apply-field input, .apply-field textarea {
+      width: 100%; font-family: 'DM Mono', monospace;
+      font-size: 0.78rem; color: var(--text);
+      background: none; border: none; outline: none; resize: none;
+    }
+    .apply-field input::placeholder, .apply-field textarea::placeholder { color: var(--muted); }
+    .apply-submit {
+      margin-top: 1rem; font-family: 'DM Mono', monospace;
+      font-size: 0.65rem; color: var(--text); background: none;
+      border: none; cursor: pointer; padding: 0; letter-spacing: 0.04em;
+      transition: color 0.15s;
+    }
+    .apply-submit:hover { color: var(--muted); }
+
     @media (max-width: 480px) {
       .header-top { flex-direction: column; gap: 0.3rem; }
       .foot-name { font-size: 1.2rem; }
@@ -443,6 +464,7 @@
       { cmd: 'wifi',      hint: 'Kommune@1 — copy to clipboard', action() { navigator.clipboard?.writeText('Kommune@1'); closeSearch(); } },
       { cmd: 'instagram', hint: '@kommune.whisked',              action() { closeSearch(); window.open('https://instagram.com/kommune.whisked', '_blank'); } },
       { cmd: 'spotify',   hint: 'the room\'s playlist',         action() { closeSearch(); window.open('https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO', '_blank'); } },
+      { cmd: 'apply',     hint: 'work at Kommune',              action() { showApplyForm(); } },
     ];
 
     function openMenu() {
@@ -536,6 +558,31 @@
       } catch {
         canvas.innerHTML = '<div class="result-state">search unavailable</div>';
       }
+    }
+
+    function showApplyForm() {
+      const canvas = document.getElementById('results-canvas');
+      canvas.innerHTML = `
+        <form class="apply-form" onsubmit="submitApply(event)">
+          <div class="apply-field"><input type="text" id="apply-name" placeholder="name" autocomplete="name" /></div>
+          <div class="apply-field"><input type="text" id="apply-role" placeholder="what you do" /></div>
+          <div class="apply-field"><textarea id="apply-note" placeholder="a note" rows="3"></textarea></div>
+          <button type="submit" class="apply-submit">send →</button>
+        </form>
+      `;
+      setTimeout(() => document.getElementById('apply-name')?.focus(), 50);
+    }
+
+    function submitApply(e) {
+      e.preventDefault();
+      const name = document.getElementById('apply-name').value.trim();
+      const role = document.getElementById('apply-role').value.trim();
+      const note = document.getElementById('apply-note').value.trim();
+      if (!name) return;
+      const subject = encodeURIComponent(`Application — ${name}`);
+      const body = encodeURIComponent(`Name: ${name}\nRole: ${role}\n\n${note}`);
+      window.location.href = `mailto:hello@kommunesnackbar.ca?subject=${subject}&body=${body}`;
+      closeSearch();
     }
 
     function esc(s) {
