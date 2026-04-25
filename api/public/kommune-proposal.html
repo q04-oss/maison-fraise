@@ -21,80 +21,146 @@
       font-size: 14px;
       -webkit-font-smoothing: antialiased;
     }
-    body {
-      min-height: 100dvh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 3rem 1.5rem;
-    }
-    .wrap {
-      width: 100%;
-      max-width: 400px;
-    }
+    body { padding: 4rem 1.5rem 6rem; }
+    .wrap { width: 100%; max-width: 400px; margin: 0 auto; }
 
-    .headline {
-      font-size: 2.8rem;
-      font-weight: 500;
-      line-height: 1.15;
-      color: var(--text);
-      margin-bottom: 1.5rem;
-      letter-spacing: -0.02em;
-    }
-
-    .sub {
-      font-size: 0.72rem;
-      color: var(--muted);
-      line-height: 1.9;
-      letter-spacing: 0.03em;
+    /* Header */
+    h1 { font-size: 1.5rem; font-weight: 500; margin-bottom: 0.3rem; }
+    .meta {
+      font-size: 0.68rem; color: var(--muted);
+      letter-spacing: 0.04em; line-height: 1.9;
       margin-bottom: 3rem;
+    }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+
+    /* $0 statement */
+    .oat-headline {
+      font-size: 1.5rem; font-weight: 500;
+      line-height: 1.3; color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+    .oat-sub {
+      font-size: 0.72rem; color: var(--muted);
+      letter-spacing: 0.03em; margin-bottom: 2rem;
+    }
+    .desc {
+      font-size: 0.82rem; line-height: 1.9;
+      color: var(--text); margin-bottom: 0;
+    }
+
+    /* Sections */
+    .section { margin-bottom: 2.5rem; }
+    .section-label {
+      font-size: 0.6rem; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+
+    /* Events */
+    .event { padding: 1rem 0; border-bottom: 1px solid var(--border); }
+    .event:first-of-type { border-top: 1px solid var(--border); }
+    .event-date { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 0.3rem; }
+    .event-name { font-size: 0.85rem; font-weight: 500; color: var(--text); margin-bottom: 0.75rem; }
+    .ticket-link { font-size: 0.72rem; color: var(--text); text-decoration: none; transition: color 0.15s; }
+    .ticket-link:hover { color: var(--muted); }
+    .no-events { font-size: 0.72rem; color: var(--muted); }
+
+    /* In residence */
+    .residence-block {
       border-top: 1px solid var(--border);
-      padding-top: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
     }
+    .residence-block p { font-size: 0.75rem; color: var(--muted); line-height: 1.8; margin-bottom: 0.4rem; }
+    .residence-block a { font-size: 0.72rem; color: var(--text); text-decoration: none; transition: color 0.15s; }
+    .residence-block a:hover { color: var(--muted); }
 
-    .links {
-      display: flex;
-      flex-direction: column;
-      gap: 0.1rem;
-      margin-bottom: 3rem;
-    }
+    /* Links */
+    .links { display: flex; flex-direction: column; gap: 0.1rem; }
     .links a {
-      font-size: 0.78rem;
-      color: var(--muted);
-      text-decoration: none;
-      padding: 0.3rem 0;
+      font-size: 0.78rem; color: var(--muted);
+      text-decoration: none; padding: 0.3rem 0;
       transition: color 0.15s;
     }
     .links a:hover { color: var(--text); }
 
-    footer {
-      font-size: 0.6rem;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-      line-height: 1.8;
+    /* Policy */
+    .policy {
+      font-size: 0.65rem; color: var(--muted);
+      line-height: 1.9; letter-spacing: 0.02em;
       border-top: 1px solid var(--border);
-      padding-top: 1.5rem;
+      padding-top: 1.5rem; margin-top: 3rem;
+    }
+
+    footer {
+      font-size: 0.6rem; color: var(--muted);
+      letter-spacing: 0.04em; line-height: 1.8;
+      margin-top: 1.5rem;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
 
-    <p class="headline">$0 oat milk.<br />Always.</p>
-
-    <div class="sub">
-      Kommune · 11931 Jasper Ave NW · Edmonton<br />
-      daily from 10am · reservations welcome<br />
-      oat milk by Minor Figures · matcha by Whisked<br />
-      WiFi · Kommune@1
+    <!-- Header -->
+    <h1>Kommune</h1>
+    <div class="meta">
+      11931 Jasper Ave NW · Edmonton<br />
+      daily from 10am · reservations welcome
     </div>
 
-    <div class="links">
+    <!-- $0 oat milk -->
+    <p class="oat-headline">$0 oat milk.</p>
+    <p class="oat-sub">Minor Figures, on every drink. Always.</p>
+
+    <p class="desc">
+      A bar for slow hours. European plates, live music, a serious drink program. We don't charge extra for oat milk. NA drinks are priced the same as the rest. Dietary needs aren't a luxury here.
+    </p>
+
+    <hr class="divider" />
+
+    <!-- Events -->
+    <div class="section">
+      <div class="section-label">events</div>
+      <div class="no-events">nothing scheduled — check back</div>
+      <!--
+        <div class="event">
+          <div class="event-date">fri, may 9 · doors 8pm</div>
+          <div class="event-name">Artist or Event Name</div>
+          <a href="#" class="ticket-link">get tickets →</a>
+        </div>
+      -->
+    </div>
+
+    <!-- In residence -->
+    <div class="section">
+      <div class="section-label">in residence</div>
+      <div class="residence-block">
+        <p>Whisked is a ceremonial matcha bar operating inside the space.</p>
+        <a href="https://visitwhisked.ca" target="_blank" rel="noopener">visitwhisked.ca →</a>
+      </div>
+    </div>
+
+    <!-- Sound -->
+    <div class="section">
+      <div class="section-label">the sound of the room</div>
+      <div class="links">
+        <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">listen on Spotify →</a>
+      </div>
+    </div>
+
+    <!-- Links -->
+    <div class="links" style="margin-bottom:0;">
       <a href="/kommune/menu">menu →</a>
       <a href="/kommune/events">events →</a>
-      <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">Spotify →</a>
       <a href="https://instagram.com/kommune.whisked" target="_blank" rel="noopener">Instagram →</a>
       <a href="mailto:hello@kommunesnackbar.ca">hello@kommunesnackbar.ca →</a>
+    </div>
+
+    <!-- Policy -->
+    <div class="policy">
+      The $0 oat milk policy: every coffee drink at Kommune comes with your choice of milk at no extra charge. Minor Figures oat, on the house.
     </div>
 
     <footer>
