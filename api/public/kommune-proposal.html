@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Kommune</title>
-  <meta name="description" content="Kommune — a space held in common. 11931 Jasper Ave NW, Edmonton." />
+  <meta name="description" content="$0 oat milk. Kommune, 11931 Jasper Ave NW, Edmonton." />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,7 +12,6 @@
       --bg:     #F9F7F4;
       --text:   #1A1A18;
       --muted:  #8A8880;
-      --birch:  #8A7A68;
       --border: #E2DDD6;
     }
     html {
@@ -34,85 +33,25 @@
       max-width: 400px;
     }
 
-    /* Header */
-    h1 {
-      font-size: 1.5rem;
+    .headline {
+      font-size: 2.8rem;
       font-weight: 500;
+      line-height: 1.15;
       color: var(--text);
-      margin-bottom: 0.3rem;
-    }
-    .meta {
-      font-size: 0.68rem;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-      line-height: 1.9;
-      margin-bottom: 2.5rem;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.02em;
     }
 
-    /* Description */
-    .desc {
-      font-size: 1.5rem;
-      font-weight: 500;
-      line-height: 1.4;
-      color: var(--text);
-      margin-bottom: 1rem;
-    }
-
-    /* Sections */
-    .section {
-      margin-bottom: 2.5rem;
-    }
-    .section-label {
-      font-size: 0.6rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 0.75rem;
-    }
-
-    /* Events */
-    .event {
-      padding: 1rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .event:first-of-type { border-top: 1px solid var(--border); }
-    .event-date {
-      font-size: 0.65rem; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 0.3rem;
-    }
-    .event-name {
-      font-size: 0.85rem; font-weight: 500; color: var(--text); margin-bottom: 0.75rem;
-    }
-    .ticket-link {
-      font-size: 0.72rem; color: var(--birch); text-decoration: none;
-      transition: color 0.15s;
-    }
-    .ticket-link:hover { color: var(--text); }
-
-    .no-events {
-      font-size: 0.72rem; color: var(--muted);
-    }
-
-    /* Whisked */
-    .whisked-block {
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      padding: 1rem 0;
-    }
-    .whisked-block p {
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.8;
-      margin-bottom: 0.4rem;
-    }
-    .whisked-block a {
+    .sub {
       font-size: 0.72rem;
-      color: var(--birch);
-      text-decoration: none;
-      transition: color 0.15s;
+      color: var(--muted);
+      line-height: 1.9;
+      letter-spacing: 0.03em;
+      margin-bottom: 3rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1.25rem;
     }
-    .whisked-block a:hover { color: var(--text); }
 
-    /* Links */
     .links {
       display: flex;
       flex-direction: column;
@@ -128,7 +67,6 @@
     }
     .links a:hover { color: var(--text); }
 
-    /* Footer */
     footer {
       font-size: 0.6rem;
       color: var(--muted);
@@ -142,53 +80,19 @@
 <body>
   <div class="wrap">
 
-    <h1>Kommune</h1>
-    <div class="meta">
-      11931 Jasper Ave NW · Edmonton<br />
-      daily from 10am · reservations welcome
+    <p class="headline">$0 oat milk.<br />Always.</p>
+
+    <div class="sub">
+      Kommune · 11931 Jasper Ave NW · Edmonton<br />
+      daily from 10am · reservations welcome<br />
+      oat milk by Minor Figures · matcha by Whisked<br />
+      WiFi · Kommune@1
     </div>
 
-    <p class="desc">$0 oat milk.</p>
-
-    <p style="font-size:0.78rem;line-height:1.9;color:var(--muted);margin-bottom:3rem;">
-      A bar for slow hours. European plates, live music, a serious drink program — NA priced the same as the rest. Whisked matcha bar inside. WiFi is Kommune@1.
-    </p>
-
-    <!-- Events -->
-    <div class="section">
-      <div class="section-label">events</div>
-      <div class="no-events">nothing scheduled — check back</div>
-
-      <!--
-        <div class="event">
-          <div class="event-date">fri, may 9 · doors 8pm</div>
-          <div class="event-name">Artist or Event Name</div>
-          <a href="#" class="ticket-link">get tickets →</a>
-        </div>
-      -->
-    </div>
-
-    <!-- Whisked -->
-    <div class="section">
-      <div class="section-label">in residence</div>
-      <div class="whisked-block">
-        <p>Whisked is a ceremonial matcha bar operating inside the space.</p>
-        <a href="https://visitwhisked.ca" target="_blank" rel="noopener">visitwhisked.ca →</a>
-      </div>
-    </div>
-
-    <!-- Sound -->
-    <div class="section">
-      <div class="section-label">the sound of the room</div>
-      <div class="links" style="margin-bottom:0;">
-        <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">listen on Spotify →</a>
-      </div>
-    </div>
-
-    <!-- Links -->
-    <div class="links" style="margin-top:2.5rem;">
+    <div class="links">
       <a href="/kommune/menu">menu →</a>
       <a href="/kommune/events">events →</a>
+      <a href="https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO" target="_blank" rel="noopener">Spotify →</a>
       <a href="https://instagram.com/kommune.whisked" target="_blank" rel="noopener">Instagram →</a>
       <a href="mailto:hello@kommunesnackbar.ca">hello@kommunesnackbar.ca →</a>
     </div>
