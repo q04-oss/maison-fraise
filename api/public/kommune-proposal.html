@@ -14,6 +14,7 @@
   <meta name="twitter:title" content="Kommune" />
   <meta name="twitter:description" content="$0 oat milk. 11931 Jasper Ave NW · Edmonton. Daily from 10am." />
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://js.stripe.com/v3/"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -302,6 +303,27 @@
     }
     .reserve-skip:hover { color: var(--text); }
 
+    /* ── Table event choice ── */
+    .table-choice { display: flex; flex-direction: column; }
+    .table-option {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+      cursor: pointer; gap: 1rem;
+    }
+    .table-option:first-child { border-top: 1px solid var(--border); }
+    .table-option:hover .table-option-name { color: var(--text); }
+    .table-option-name { font-size: 0.8rem; color: var(--text); transition: color 0.15s; }
+    .table-option-right { display: flex; gap: 0.75rem; align-items: baseline; flex-shrink: 0; }
+    .table-option-price { font-size: 0.78rem; color: var(--text); }
+    .table-option-meta { font-size: 0.62rem; color: var(--muted); letter-spacing: 0.03em; }
+    .table-just { font-size: 0.65rem; color: var(--muted); padding: 0.5rem 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .table-just:hover { color: var(--text); }
+    /* Stripe card inside canvas */
+    .table-card-wrap {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 0.55rem 0.6rem; margin-bottom: 0;
+    }
+
     /* ── Item ratings ── */
     .item-rating { font-size: 0.78rem; color: #C0392B; padding-right: 1.25rem; align-self: baseline; flex-shrink: 0; }
     .rate-picker { display: flex; gap: 0.6rem; margin-top: 0.35rem; }
@@ -561,7 +583,7 @@
     const SHORTCUTS = [
       { cmd: 'menu',      hint: 'browse the full menu',         action() { closeSearch(); openMenu(); } },
       { cmd: 'wifi',      hint: 'Kommune@1 — copy to clipboard', action() { navigator.clipboard?.writeText('Kommune@1'); closeSearch(); } },
-      { cmd: 'table',     hint: 'book a table + pre-order',       action() { closeSearch(); showReserveFlow(); } },
+      { cmd: 'table',     hint: 'reserve a table or join an event', action() { closeSearch(); showReserveFlow(); } },
       { cmd: 'feedback',  hint: 'leave a note for the owner',   action() { showFeedbackForm(); } },
       { cmd: 'apply',     hint: 'work at Kommune',              action() { showApplyForm(); } },
       { cmd: 'playlist',  hint: 'the room\'s playlist',         action() { closeSearch(); window.open('https://open.spotify.com/playlist/3EQfi5R0ziWSpFWLqpowmO', '_blank'); } },
@@ -704,15 +726,124 @@
       }
     }
 
-    // ── Reservation flow ──
+    // ── Reservation / table flow ──
     let reserveData = {};
+    let tableStripe = null;
+    let tableCardEl = null;
+    let currentTableEvent = null;
 
-    function showReserveFlow(prefill = {}) {
+    function fmtTablePrice(cents) { return `CA$${(cents / 100).toFixed(0)}`; }
+    function fmtTableDate(iso) {
+      const d = new Date(iso);
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${days[d.getDay()]} ${months[d.getMonth()]} ${d.getDate()}`;
+    }
+
+    async function showReserveFlow(prefill = {}) {
       openSearch();
       const canvas = document.getElementById('results-canvas');
       canvas.dataset.mode = 'reserve';
       reserveData = { _prefillSize: prefill.size || null, _prefillPreorder: prefill.preorder || null };
+      canvas.innerHTML = '<div class="result-state">—</div>';
+      try {
+        const res = await fetch('/api/table/events?slug=kommune');
+        const events = await res.json();
+        const active = (events ?? []).filter(e => e.active);
+        if (active.length) { renderTableChoice(canvas, active); return; }
+      } catch {}
       renderReserveStep1(canvas);
+    }
+
+    function renderTableChoice(canvas, events) {
+      canvas.innerHTML = `
+        <div class="table-choice">
+          ${events.map(e => {
+            const seatsLeft = e.capacity - e.seats_taken;
+            const meta = e.date_tbd
+              ? (seatsLeft > 0 ? `${seatsLeft} left · date tbd` : `waitlist · date tbd`)
+              : `${fmtTableDate(e.event_date)} · ${seatsLeft > 0 ? seatsLeft + ' left' : 'waitlist'}`;
+            return `<div class="table-option" onclick="selectTableEvent(${JSON.stringify(esc(JSON.stringify(e)))})">
+              <span class="table-option-name">${esc(e.title.toLowerCase())}</span>
+              <div class="table-option-right">
+                <span class="table-option-price">${fmtTablePrice(e.price_cents)}</span>
+                <span class="table-option-meta">${meta}</span>
+              </div>
+            </div>`;
+          }).join('')}
+          <button class="table-just" onclick="renderReserveStep1(document.getElementById('results-canvas'))">just a table →</button>
+        </div>
+      `;
+    }
+
+    function selectTableEvent(escapedJson) {
+      const event = JSON.parse(unesc(escapedJson));
+      currentTableEvent = event;
+      const canvas = document.getElementById('results-canvas');
+      const seatsLeft = event.capacity - event.seats_taken;
+      const isFull = seatsLeft <= 0;
+      canvas.innerHTML = `
+        <div class="reserve-step">${esc(event.title.toLowerCase())} · ${fmtTablePrice(event.price_cents)}</div>
+        <form class="apply-form" id="table-event-form" onsubmit="submitTableEvent(event)">
+          <div class="apply-field"><input type="text" id="te-name" placeholder="name" autocomplete="name" /></div>
+          <div class="apply-field"><input type="email" id="te-email" placeholder="email" autocomplete="email" /></div>
+          <div class="apply-field"><input type="number" id="te-seats" value="1" min="1" max="4" placeholder="seats" inputmode="numeric" /></div>
+          <div class="apply-field"><div class="table-card-wrap" id="table-card-element"></div></div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;padding:0.35rem 0;font-size:0.72rem;">
+            <span style="color:var(--muted);">total</span>
+            <span id="te-total">${fmtTablePrice(event.price_cents)}</span>
+          </div>
+          <div id="te-error" style="font-size:0.65rem;color:#C0392B;display:none;margin-bottom:0.25rem;"></div>
+          <button type="submit" class="apply-submit" id="te-btn">${isFull ? 'join waitlist →' : 'pay + reserve →'}</button>
+        </form>
+        <button class="reserve-skip" style="margin-top:0.5rem;" onclick="showReserveFlow()">← back</button>
+      `;
+      // Lazily init Stripe
+      if (!tableStripe) tableStripe = Stripe('pk_live_51R3UWEGkzAbVnPaCoqp8w7a6zxOiXUBhJiuBKMGG7v96W7LBGIlLLhJHNWP3qcllZBLH4oLjJFm1YrqdFBJv63qy00LmQSbJxq');
+      const elements = tableStripe.elements();
+      tableCardEl = elements.create('card', {
+        style: { base: { fontFamily: "'DM Mono', monospace", fontSize: '13px', color: '#1A1A18', '::placeholder': { color: '#8A8880' } } }
+      });
+      tableCardEl.mount('#table-card-element');
+      document.getElementById('te-seats').addEventListener('input', () => {
+        const seats = parseInt(document.getElementById('te-seats').value) || 1;
+        document.getElementById('te-total').textContent = fmtTablePrice(currentTableEvent.price_cents * seats);
+      });
+      setTimeout(() => document.getElementById('te-name')?.focus(), 50);
+    }
+
+    async function submitTableEvent(e) {
+      e.preventDefault();
+      const name = document.getElementById('te-name').value.trim();
+      const email = document.getElementById('te-email').value.trim();
+      const seats = parseInt(document.getElementById('te-seats').value) || 1;
+      const errEl = document.getElementById('te-error');
+      const btn = document.getElementById('te-btn');
+      if (!name || !email) { errEl.textContent = 'name and email required.'; errEl.style.display = 'block'; return; }
+      errEl.style.display = 'none';
+      btn.disabled = true; btn.textContent = '—';
+      try {
+        const res = await fetch(`/api/table/events/${currentTableEvent.id}/checkout`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, seats }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'checkout failed');
+        const result = await tableStripe.confirmCardPayment(data.client_secret, {
+          payment_method: { card: tableCardEl, billing_details: { name, email } }
+        });
+        if (result.error) throw new Error(result.error.message);
+        const canvas = document.getElementById('results-canvas');
+        canvas.innerHTML = `<div class="result-state">${data.waitlisted ? "you're on the waitlist." : "you're in."}<br/><span style="font-size:0.65rem;color:var(--muted);margin-top:0.3rem;display:block;">${data.waitlisted ? "you'll be confirmed for the next run." : "confirmation sent to " + esc(email) + "."}</span></div>`;
+      } catch (err) {
+        btn.disabled = false; btn.textContent = currentTableEvent.capacity - currentTableEvent.seats_taken <= 0 ? 'join waitlist →' : 'pay + reserve →';
+        errEl.textContent = err.message ?? 'payment failed.'; errEl.style.display = 'block';
+      }
+    }
+
+    function unesc(s) {
+      return s.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"');
     }
 
     function renderReserveStep1(canvas) {
