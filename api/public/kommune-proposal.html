@@ -252,6 +252,18 @@
     .shortcut-hint { font-size: 0.72rem; color: var(--muted); white-space: nowrap; flex-shrink: 0; opacity: 0.6; }
     .shortcut:hover .shortcut-cmd { color: var(--text); }
 
+    /* ── Item ratings ── */
+    .item-rating { font-size: 0.6rem; color: var(--muted); opacity: 0.6; margin-left: 0.3rem; }
+    .rate-picker { display: flex; gap: 0.6rem; margin-top: 0.35rem; }
+    .rate-btn {
+      font-family: 'DM Mono', monospace; font-size: 0.65rem;
+      color: var(--muted); background: none; border: none;
+      cursor: pointer; padding: 0; transition: color 0.15s;
+    }
+    .rate-btn:hover { color: var(--text); }
+    .rate-sent { font-size: 0.65rem; color: var(--muted); }
+    .item { cursor: pointer; }
+
     /* ── Apply form ── */
     .apply-form { padding-top: 0.25rem; }
     .apply-field {
@@ -474,12 +486,14 @@
     function openMenu() {
       document.body.classList.add('menu-open');
       document.getElementById('menu-btn').textContent = '← close';
+      loadRatings();
     }
 
     function toggleMenu() {
       closeSearch();
       const open = document.body.classList.toggle('menu-open');
       document.getElementById('menu-btn').textContent = open ? '← close' : 'menu →';
+      if (open) loadRatings();
     }
 
     function openSearch() {
@@ -702,6 +716,76 @@
       if (!document.body.classList.contains('searching')) return;
       if (e.target.closest('.header') || e.target.closest('.results-canvas')) return;
       closeSearch();
+    });
+
+    // ── Item ratings ──
+    let ratingsCache = {};
+
+    async function loadRatings() {
+      try {
+        const res = await fetch('/api/kommune/ratings');
+        const data = await res.json();
+        ratingsCache = {};
+        for (const r of (data.ratings ?? [])) ratingsCache[r.item_name] = r;
+        renderRatings();
+      } catch {}
+    }
+
+    function renderRatings() {
+      document.querySelectorAll('.item').forEach(item => {
+        const nameEl = item.querySelector('.item-name');
+        if (!nameEl) return;
+        const name = nameEl.textContent.trim();
+        const priceEl = item.querySelector('.item-price');
+        if (!priceEl) return;
+        if (!priceEl.dataset.price) priceEl.dataset.price = priceEl.textContent.trim();
+        const r = ratingsCache[name];
+        if (r && r.total >= 1) {
+          priceEl.innerHTML = esc(priceEl.dataset.price) + `\u2009<span class="item-rating">${r.avg_rating}</span>`;
+        } else {
+          priceEl.textContent = priceEl.dataset.price;
+        }
+      });
+    }
+
+    document.querySelector('.menu-content').addEventListener('click', function(e) {
+      const item = e.target.closest('.item');
+      if (!item) return;
+      if (e.target.closest('.rate-picker')) return;
+
+      document.querySelectorAll('.rate-picker').forEach(p => p.remove());
+
+      const name = item.querySelector('.item-name')?.textContent?.trim();
+      if (!name) return;
+
+      const left = item.querySelector('.item-left');
+      const picker = document.createElement('div');
+      picker.className = 'rate-picker';
+      picker.innerHTML = [1,2,3,4,5].map(n =>
+        `<button class="rate-btn" type="button" data-n="${n}">${n}</button>`
+      ).join('');
+      left.appendChild(picker);
+
+      picker.querySelectorAll('.rate-btn').forEach(btn => {
+        btn.addEventListener('click', async ev => {
+          ev.stopPropagation();
+          const rating = parseInt(btn.dataset.n);
+          picker.innerHTML = '<span class="rate-sent">—</span>';
+          try {
+            const res = await fetch('/api/kommune/rate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ item_name: name, rating }),
+            });
+            const data = await res.json();
+            if (data.ok) {
+              ratingsCache[name] = { avg_rating: data.avg_rating, total: data.total };
+              renderRatings();
+            }
+          } catch {}
+          setTimeout(() => picker.remove(), 600);
+        });
+      });
     });
   </script>
 

@@ -373,6 +373,35 @@ Keep answers short — one or two sentences. If you don't know something specifi
   res.json({ answer });
 });
 
+app.get('/api/kommune/ratings', async (_req: any, res: any) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT item_name,
+             ROUND(AVG(rating)::numeric, 1)::float AS avg_rating,
+             COUNT(*)::int AS total
+      FROM kommune_ratings
+      GROUP BY item_name
+    `);
+    res.json({ ratings: rows.rows });
+  } catch (err) {
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+app.post('/api/kommune/rate', async (req: any, res: any) => {
+  const item_name = String(req.body?.item_name ?? '').trim().slice(0, 200);
+  const rating = parseInt(req.body?.rating);
+  if (!item_name || isNaN(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ error: 'invalid' });
+  }
+  await db.execute(sql`INSERT INTO kommune_ratings (item_name, rating) VALUES (${item_name}, ${rating})`);
+  const rows = await db.execute(sql`
+    SELECT ROUND(AVG(rating)::numeric, 1)::float AS avg_rating, COUNT(*)::int AS total
+    FROM kommune_ratings WHERE item_name = ${item_name}
+  `);
+  res.json({ ok: true, ...(rows.rows[0] ?? {}) });
+});
+
 app.get('/table', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/table.html'));
 });

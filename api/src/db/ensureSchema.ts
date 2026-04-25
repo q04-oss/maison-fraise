@@ -325,5 +325,13 @@ export async function ensureSchema(): Promise<void> {
     ON nfc_connections (LEAST(user_a, user_b), GREATEST(user_a, user_b))
   `);
 
+  // ── Kommune menu ratings ─────────────────────────────────────────────────────
+  await run('kommune_ratings', sql`CREATE TABLE IF NOT EXISTS kommune_ratings (
+    id SERIAL PRIMARY KEY,
+    item_name TEXT NOT NULL,
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   logger.info('ensureSchema complete');
 }
