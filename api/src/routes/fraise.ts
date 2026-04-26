@@ -368,6 +368,56 @@ router.get('/businesses/me', requireBusiness, async (req: any, res: any) => {
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
+// POST /api/fraise/businesses/:slug/interest — widget interest capture (public)
+router.post('/businesses/:slug/interest', async (req: any, res: any) => {
+  const slug  = String(req.params.slug ?? '').trim().toLowerCase();
+  const name  = String(req.body?.name ?? '').trim().slice(0, 200);
+  const email = String(req.body?.email ?? '').trim().toLowerCase().slice(0, 200);
+  if (!name || !email) return res.status(400).json({ error: 'name and email required' });
+
+  // Basic email shape check
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ error: 'invalid email' });
+  }
+
+  try {
+    const bizRows = await db.execute(sql`SELECT id FROM fraise_businesses WHERE slug = ${slug} AND active = true LIMIT 1`);
+    const biz = ((bizRows as any).rows ?? bizRows)[0] as any;
+    if (!biz) return res.status(404).json({ error: 'business not found' });
+
+    // Link to existing member if email matches
+    const memRows = await db.execute(sql`SELECT id, credit_balance FROM fraise_members WHERE email = ${email} LIMIT 1`);
+    const member = ((memRows as any).rows ?? memRows)[0] as any;
+
+    await db.execute(sql`
+      INSERT INTO fraise_interest (business_id, name, email, fraise_member_id)
+      VALUES (${biz.id}, ${name}, ${email}, ${member?.id ?? null})
+      ON CONFLICT (business_id, email) DO UPDATE SET name = EXCLUDED.name, fraise_member_id = EXCLUDED.fraise_member_id
+    `);
+
+    res.json({ ok: true, has_credit: member ? member.credit_balance > 0 : false });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// GET /api/fraise/businesses/interest — business sees their interest list
+router.get('/businesses/interest', requireBusiness, async (req: any, res: any) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT i.id, i.name, i.email, i.created_at,
+             m.id AS member_id, m.credit_balance
+      FROM fraise_interest i
+      LEFT JOIN fraise_members m ON m.id = i.fraise_member_id
+      WHERE i.business_id = ${req.business.id}
+      ORDER BY i.created_at DESC
+    `);
+    res.json({ interest: (rows as any).rows ?? rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 // GET /api/fraise/businesses/members — ticket holders available to invite
 router.get('/businesses/members', requireBusiness, async (req: any, res: any) => {
   try {

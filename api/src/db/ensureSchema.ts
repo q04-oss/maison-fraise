@@ -516,6 +516,19 @@ export async function ensureSchema(): Promise<void> {
   await run('fraise_businesses.lat',      sql`ALTER TABLE fraise_businesses ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
   await run('fraise_businesses.lng',      sql`ALTER TABLE fraise_businesses ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`);
 
+  await run('fraise_interest', sql`CREATE TABLE IF NOT EXISTS fraise_interest (
+    id SERIAL PRIMARY KEY,
+    business_id INTEGER NOT NULL REFERENCES fraise_businesses(id),
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    fraise_member_id INTEGER REFERENCES fraise_members(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (business_id, email)
+  )`);
+  await run('fraise_interest_idx', sql`
+    CREATE INDEX IF NOT EXISTS fraise_interest_business_idx ON fraise_interest (business_id, created_at DESC)
+  `);
+
   // ── Kommune reservations — paid pre-order columns ─────────────────────────
   await run('kommune_reservations.email', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS email text`);
   await run('kommune_reservations.total_cents', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS total_cents integer NOT NULL DEFAULT 0`);
