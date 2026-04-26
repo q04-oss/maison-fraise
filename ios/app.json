@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Box Fraise",
+    "name": "fraise",
     "slug": "maison-fraise",
     "scheme": "boxfraise",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -19,28 +19,12 @@
       "entitlements": {
         "com.apple.developer.in-app-payments": [
           "merchant.com.boxfraise.app"
-        ],
-        "com.apple.developer.applesignin": [
-          "Default"
-        ],
-        "com.apple.developer.nfc.readersession.formats": [
-          "TAG"
-        ],
-        "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": []
+        ]
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Used to display augmented reality information about your Box Fraise order.",
-        "NSUserNotificationUsageDescription": "We'll notify you when your order is ready for collection.",
-        "NSLocationWhenInUseUsageDescription": "We use your location to show collection points near you.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "We use your location in the background to notify you when you're near a collection point so you can tap your box.",
-        "NFCReaderUsageDescription": "Used to scan your box at pickup.",
-        "NSBluetoothAlwaysUsageDescription": "Used to detect nearby Box Fraise collection points and notify you of available strawberries.",
-        "NSBluetoothPeripheralUsageDescription": "Used to detect nearby Box Fraise collection points.",
-        "NSLocationAlwaysUsageDescription": "We use your location in the background to detect nearby collection points via Bluetooth.",
-        "NSHealthShareUsageDescription": "Used to recommend menu items based on your nutrition and activity today.",
-        "NSHealthUpdateUsageDescription": "Used to log nutrition from your orders."
+        "NSLocationWhenInUseUsageDescription": "Used to show your location on the map.",
+        "NSUserNotificationUsageDescription": "We'll notify you when event dates are confirmed."
       }
     },
     "android": {
@@ -61,32 +45,16 @@
       "url": "https://u.expo.dev/ec4ad15d-2535-42a4-91a0-70599925e6f5"
     },
     "plugins": [
-      "./plugins/withARBoxModule",
       "expo-updates",
       "expo-font",
-      "expo-apple-authentication",
       "expo-notifications",
-      [
-        "react-native-nfc-manager",
-        {
-          "nfcPermission": "Used to scan your box at pickup.",
-          "includeNdefEntitlement": false
-        }
-      ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "We use your location in the background to notify you when you're near a collection point so you can tap your box.",
-          "locationWhenInUsePermission": "We use your location to show collection points near you.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "locationWhenInUsePermission": "Used to show your location on the map."
         }
       ],
-      "expo-secure-store",
-      ["@kingstinct/react-native-healthkit", {
-        "NSHealthShareUsageDescription": "Used to recommend menu items based on your nutrition and activity today.",
-        "NSHealthUpdateUsageDescription": "Used to log nutrition from your orders."
-      }]
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {
