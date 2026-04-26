@@ -614,6 +614,28 @@ function poolCors(req: any, res: any, next: any) {
   next();
 }
 
+// GET /api/table/pool/directory — public listing of all venues with active pools
+router.get('/pool/directory', async (req: any, res: any) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        tm.slug,
+        COALESCE(MIN(te.venue_name), tm.slug) AS display_name,
+        COALESCE(MIN(te.price_cents), 12000)   AS price_cents,
+        COUNT(*)::int                           AS total,
+        SUM(CASE WHEN tm.status = 'waiting' THEN 1 ELSE 0 END)::int AS waiting
+      FROM table_memberships tm
+      LEFT JOIN table_events te
+        ON te.venue_slug = tm.slug AND te.active = true
+      GROUP BY tm.slug
+      ORDER BY waiting DESC
+    `);
+    res.json({ venues: (rows as any).rows ?? rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 // POST /api/table/pool/checkout — create payment intent for joining the pool
 router.post('/pool/checkout', poolCors, async (req: any, res: any) => {
   const slug = String(req.body?.slug ?? '').trim();
