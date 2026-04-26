@@ -1151,6 +1151,34 @@ router.post('/webhook', async (req: Request, res: Response) => {
           }
           logger.info(`Personal toilet visit ${visitId} paid, host ${hostUserId} credited ${amountCents}c`);
         }
+      } else if (type === 'fraise_credits') {
+        const memberId = parseInt(pi.metadata?.member_id ?? '', 10);
+        const credits  = parseInt(pi.metadata?.credits ?? '', 10);
+        if (!isNaN(memberId) && credits > 0) {
+          // Idempotent — skip if already processed
+          const existing = await db.execute(sql`
+            SELECT id FROM fraise_credit_purchases WHERE stripe_payment_intent_id = ${pi.id} LIMIT 1
+          `);
+          if (!((existing as any).rows ?? existing).length) {
+            await db.execute(sql`
+              INSERT INTO fraise_credit_purchases (member_id, credits, amount_cents, stripe_payment_intent_id)
+              VALUES (${memberId}, ${credits}, ${pi.amount}, ${pi.id})
+            `);
+            await db.execute(sql`
+              UPDATE fraise_members
+              SET credit_balance    = credit_balance    + ${credits},
+                  credits_purchased = credits_purchased + ${credits}
+              WHERE id = ${memberId}
+            `);
+            const memRow = await db.execute(sql`SELECT name, email, credit_balance FROM fraise_members WHERE id = ${memberId} LIMIT 1`);
+            const mem = ((memRow as any).rows ?? memRow)[0] as any;
+            if (mem?.email) {
+              const { sendFraiseCreditsAdded } = await import('../lib/resend');
+              sendFraiseCreditsAdded({ to: mem.email, name: mem.name, credits, balance: mem.credit_balance }).catch(() => {});
+            }
+            logger.info(`fraise_credits: member ${memberId} +${credits} credits (PI ${pi.id})`);
+          }
+        }
       }
 
       // ── Community fund add-on (present on any payment type) ─────────────────
