@@ -720,4 +720,70 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
   }
 });
 
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+// POST /api/fraise/admin/members/merge
+// Merges drop_id into keep_id: transfers apple_sub, credits, invitations, interest.
+// Protected by ADMIN_PIN header.
+router.post('/admin/members/merge', async (req: any, res: any) => {
+  if (req.headers['x-admin-pin'] !== process.env.ADMIN_PIN) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  const keepId = parseInt(req.body?.keep_id);
+  const dropId = parseInt(req.body?.drop_id);
+  if (isNaN(keepId) || isNaN(dropId) || keepId === dropId) {
+    return res.status(400).json({ error: 'keep_id and drop_id required and must differ' });
+  }
+  try {
+    const keepRows = await db.execute(sql`SELECT id, apple_sub, credit_balance, credits_purchased FROM fraise_members WHERE id = ${keepId} LIMIT 1`);
+    const keep = ((keepRows as any).rows ?? keepRows)[0] as any;
+    if (!keep) return res.status(404).json({ error: 'keep member not found' });
+
+    const dropRows = await db.execute(sql`SELECT id, apple_sub, credit_balance, credits_purchased FROM fraise_members WHERE id = ${dropId} LIMIT 1`);
+    const drop = ((dropRows as any).rows ?? dropRows)[0] as any;
+    if (!drop) return res.status(404).json({ error: 'drop member not found' });
+
+    // Transfer apple_sub if keep doesn't have one
+    if (!keep.apple_sub && drop.apple_sub) {
+      await db.execute(sql`UPDATE fraise_members SET apple_sub = ${drop.apple_sub} WHERE id = ${keepId}`);
+    }
+
+    // Merge credits
+    if (drop.credit_balance > 0 || drop.credits_purchased > 0) {
+      await db.execute(sql`
+        UPDATE fraise_members
+        SET credit_balance    = credit_balance    + ${drop.credit_balance},
+            credits_purchased = credits_purchased + ${drop.credits_purchased}
+        WHERE id = ${keepId}
+      `);
+    }
+
+    // Reassign invitations (skip conflicts — keep's record wins)
+    await db.execute(sql`
+      UPDATE fraise_invitations SET member_id = ${keepId}
+      WHERE member_id = ${dropId}
+        AND NOT EXISTS (
+          SELECT 1 FROM fraise_invitations fi2
+          WHERE fi2.event_id = fraise_invitations.event_id AND fi2.member_id = ${keepId}
+        )
+    `);
+    await db.execute(sql`DELETE FROM fraise_invitations WHERE member_id = ${dropId}`);
+
+    // Reassign widget interest
+    await db.execute(sql`
+      UPDATE fraise_interest SET fraise_member_id = ${keepId}
+      WHERE fraise_member_id = ${dropId}
+    `);
+
+    // Delete drop's sessions then the member row
+    await db.execute(sql`DELETE FROM fraise_member_sessions WHERE member_id = ${dropId}`);
+    await db.execute(sql`DELETE FROM fraise_credit_purchases WHERE member_id = ${dropId}`);
+    await db.execute(sql`DELETE FROM fraise_members WHERE id = ${dropId}`);
+
+    res.json({ ok: true, kept: keepId, dropped: dropId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 export default router;
