@@ -931,8 +931,14 @@ export async function sendTableDateAnnouncedWithConfirm(params: {
   });
 }
 
+function htmlEsc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 export async function sendPoolJoinConfirmation(params: { to: string; name: string; venueName: string }) {
-  const { to, name, venueName } = params;
+  const { to } = params;
+  const name = htmlEsc(params.name);
+  const venueName = htmlEsc(params.venueName);
   const content =
     tableP(`hi ${name} — you're in the pool at <strong>${venueName.toLowerCase()}</strong>.`) +
     tableP('date tbd — once enough people join, a date gets set. you\'ll be the first to know.') +
@@ -947,7 +953,10 @@ export async function sendPoolJoinConfirmation(params: { to: string; name: strin
 }
 
 export async function sendPoolCallNotification(params: { to: string; name: string; venueName: string; note?: string }) {
-  const { to, name, venueName, note } = params;
+  const { to } = params;
+  const name = htmlEsc(params.name);
+  const venueName = htmlEsc(params.venueName);
+  const note = params.note ? htmlEsc(params.note) : undefined;
   const content =
     tableP(`hi ${name} — your table at <strong>${venueName.toLowerCase()}</strong> is ready.`) +
     (note ? tableP(note) : '') +

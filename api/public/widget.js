@@ -1,6 +1,9 @@
 (function () {
   'use strict';
 
+  // ── Per-instance counter (avoids ID collisions when multiple widgets on same page) ──
+  var instanceId = 'tf-' + (window._tfWidgetCount = ((window._tfWidgetCount || 0) + 1));
+
   // ── Parse config from the script tag ──────────────────────────────────────
   var currentScript = document.currentScript;
   var params = new URLSearchParams(currentScript ? currentScript.src.split('?')[1] : '');
@@ -69,47 +72,47 @@
   // ── Build HTML ─────────────────────────────────────────────────────────────
   mount.innerHTML = [
     '<div class="tf">',
-      '<button class="tf-join" id="tf-open-' + slug + '">' + label + '</button>',
-      '<div class="tf-form" id="tf-form-' + slug + '">',
+      '<button class="tf-join" id="tf-open-' + instanceId + '">' + label + '</button>',
+      '<div class="tf-form" id="tf-form-' + instanceId + '">',
         '<div>',
-          '<label class="tf-label" for="tf-name-' + slug + '">your name</label>',
-          '<input class="tf-input" id="tf-name-' + slug + '" type="text" placeholder="full name" autocomplete="name" />',
+          '<label class="tf-label" for="tf-name-' + instanceId + '">your name</label>',
+          '<input class="tf-input" id="tf-name-' + instanceId + '" type="text" placeholder="full name" autocomplete="name" />',
         '</div>',
         '<div>',
-          '<label class="tf-label" for="tf-email-' + slug + '">email</label>',
-          '<input class="tf-input" id="tf-email-' + slug + '" type="email" placeholder="you@example.com" autocomplete="email" />',
+          '<label class="tf-label" for="tf-email-' + instanceId + '">email</label>',
+          '<input class="tf-input" id="tf-email-' + instanceId + '" type="email" placeholder="you@example.com" autocomplete="email" />',
         '</div>',
         '<div>',
           '<label class="tf-label">payment</label>',
-          '<div class="tf-card" id="tf-card-' + slug + '"></div>',
+          '<div class="tf-card" id="tf-card-' + instanceId + '"></div>',
         '</div>',
         '<div class="tf-total">',
           '<span class="tf-total-label">total</span>',
           '<span>' + fmt(priceCents) + '</span>',
         '</div>',
-        '<div class="tf-err" id="tf-err-' + slug + '"></div>',
-        '<button class="tf-pay" id="tf-pay-' + slug + '">pay ' + fmt(priceCents) + '</button>',
-        '<button class="tf-cancel" id="tf-cancel-' + slug + '">cancel</button>',
+        '<div class="tf-err" id="tf-err-' + instanceId + '"></div>',
+        '<button class="tf-pay" id="tf-pay-' + instanceId + '">pay ' + fmt(priceCents) + '</button>',
+        '<button class="tf-cancel" id="tf-cancel-' + instanceId + '">cancel</button>',
         '<p class="tf-note">date tbd — you\'ll be notified when a date is set. full refund if it doesn\'t work for you.</p>',
       '</div>',
-      '<div class="tf-done" id="tf-done-' + slug + '">',
+      '<div class="tf-done" id="tf-done-' + instanceId + '">',
         'you\'re in.<br/>',
         '<span style="font-size:0.7rem;color:#8A8880;">we\'ll be in touch when the date is set.</span>',
       '</div>',
     '</div>',
   ].join('');
 
-  var openBtn   = document.getElementById('tf-open-'   + slug);
-  var form      = document.getElementById('tf-form-'   + slug);
-  var cancelBtn = document.getElementById('tf-cancel-' + slug);
-  var payBtn    = document.getElementById('tf-pay-'    + slug);
-  var errEl     = document.getElementById('tf-err-'    + slug);
-  var doneEl    = document.getElementById('tf-done-'   + slug);
+  var openBtn   = document.getElementById('tf-open-'   + instanceId);
+  var form      = document.getElementById('tf-form-'   + instanceId);
+  var cancelBtn = document.getElementById('tf-cancel-' + instanceId);
+  var payBtn    = document.getElementById('tf-pay-'    + instanceId);
+  var errEl     = document.getElementById('tf-err-'    + instanceId);
+  var doneEl    = document.getElementById('tf-done-'   + instanceId);
 
   openBtn.addEventListener('click', function () {
     openBtn.style.display = 'none';
     form.classList.add('open');
-    document.getElementById('tf-name-' + slug).focus();
+    document.getElementById('tf-name-' + instanceId).focus();
   });
 
   cancelBtn.addEventListener('click', function () {
@@ -123,9 +126,19 @@
 
   function loadStripe(cb) {
     if (window.Stripe) { cb(window.Stripe); return; }
+    // Only ever inject Stripe.js once — queue callbacks if already loading
+    if (window._tfStripeLoading) { window._tfStripeQueue.push(cb); return; }
+    var existing = document.querySelector('script[src^="https://js.stripe.com/v3"]');
+    if (existing) { existing.addEventListener('load', function () { cb(window.Stripe); }); return; }
+    window._tfStripeLoading = true;
+    window._tfStripeQueue = [cb];
     var s = document.createElement('script');
     s.src = 'https://js.stripe.com/v3/';
-    s.onload = function () { cb(window.Stripe); };
+    s.onload = function () {
+      window._tfStripeLoading = false;
+      window._tfStripeQueue.forEach(function (fn) { fn(window.Stripe); });
+      window._tfStripeQueue = [];
+    };
     document.head.appendChild(s);
   }
 
@@ -142,13 +155,13 @@
         }
       }
     });
-    cardEl.mount('#tf-card-' + slug);
+    cardEl.mount('#tf-card-' + instanceId);
   });
 
   // ── Pay ───────────────────────────────────────────────────────────────────
   payBtn.addEventListener('click', async function () {
-    var name  = document.getElementById('tf-name-'  + slug).value.trim();
-    var email = document.getElementById('tf-email-' + slug).value.trim();
+    var name  = document.getElementById('tf-name-'  + instanceId).value.trim();
+    var email = document.getElementById('tf-email-' + instanceId).value.trim();
 
     errEl.textContent = '';
     errEl.classList.remove('on');
@@ -184,17 +197,20 @@
       if (result.error) throw new Error(result.error.message);
 
       // 3. Confirm membership
-      await fetch(apiBase + '/api/table/pool/join', {
+      var joinRes = await fetch(apiBase + '/api/table/pool/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: slug,
           name: name,
           email: email,
-          amount_cents: priceCents,
           payment_intent_id: result.paymentIntent.id,
         }),
       });
+      if (!joinRes.ok) {
+        var joinData = await joinRes.json().catch(function () { return {}; });
+        throw new Error(joinData.error || 'membership save failed — contact support with reference: ' + result.paymentIntent.id);
+      }
 
       // 4. Show confirmation
       form.classList.remove('open');

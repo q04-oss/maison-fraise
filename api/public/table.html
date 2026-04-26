@@ -650,36 +650,51 @@
     }
 
     function renderPoolDirectory(venues) {
-      document.getElementById('pool-container').innerHTML = venues.map(v => `
-        <div class="pool-entry" onclick="openPool(${JSON.stringify(v).replace(/"/g,'&quot;')})">
-          <div>
-            <div class="pool-entry-name">${v.display_name.toLowerCase()}</div>
-            <div class="pool-entry-meta">${v.slug} &nbsp;·&nbsp; join the pool</div>
-          </div>
-          <div class="pool-entry-right">
-            <div class="pool-entry-count">${formatPrice(v.price_cents)}</div>
-            <div class="pool-entry-tbd">${v.waiting} waiting · date tbd</div>
-          </div>
-        </div>
-      `).join('');
+      const container = document.getElementById('pool-container');
+      container.innerHTML = '';
+      venues.forEach(v => {
+        const entry = document.createElement('div');
+        entry.className = 'pool-entry';
+        const nameEl = document.createElement('div');
+        nameEl.className = 'pool-entry-name';
+        nameEl.textContent = v.display_name.toLowerCase();
+        const metaEl = document.createElement('div');
+        metaEl.className = 'pool-entry-meta';
+        metaEl.textContent = v.slug + ' · join the pool';
+        const rightEl = document.createElement('div');
+        rightEl.className = 'pool-entry-right';
+        rightEl.innerHTML = `<div class="pool-entry-count">${formatPrice(v.price_cents)}</div><div class="pool-entry-tbd">${Number(v.waiting)} waiting · date tbd</div>`;
+        const leftEl = document.createElement('div');
+        leftEl.appendChild(nameEl);
+        leftEl.appendChild(metaEl);
+        entry.appendChild(leftEl);
+        entry.appendChild(rightEl);
+        entry.addEventListener('click', () => openPool(v));
+        container.appendChild(entry);
+      });
     }
 
     function renderVenuePoolRow(venue) {
       const section = document.createElement('div');
       section.style.marginTop = '2rem';
-      section.innerHTML = `
-        <div class="section-label">pool</div>
-        <div class="pool-entry" onclick="openPool(${JSON.stringify(venue).replace(/"/g,'&quot;')})">
-          <div>
-            <div class="pool-entry-name">join the pool</div>
-            <div class="pool-entry-meta">pay now, date confirmed once seats fill</div>
-          </div>
-          <div class="pool-entry-right">
-            <div class="pool-entry-count">${formatPrice(venue.price_cents)}</div>
-            <div class="pool-entry-tbd">${venue.waiting} waiting · date tbd</div>
-          </div>
+      const label = document.createElement('div');
+      label.className = 'section-label';
+      label.textContent = 'pool';
+      const entry = document.createElement('div');
+      entry.className = 'pool-entry';
+      entry.innerHTML = `
+        <div>
+          <div class="pool-entry-name">join the pool</div>
+          <div class="pool-entry-meta">pay now, date confirmed once seats fill</div>
+        </div>
+        <div class="pool-entry-right">
+          <div class="pool-entry-count">${formatPrice(venue.price_cents)}</div>
+          <div class="pool-entry-tbd">${Number(venue.waiting)} waiting · date tbd</div>
         </div>
       `;
+      entry.addEventListener('click', () => openPool(venue));
+      section.appendChild(label);
+      section.appendChild(entry);
       document.getElementById('events-section').appendChild(section);
     }
 
@@ -930,10 +945,14 @@
         });
         if (stripeError) throw new Error(stripeError.message);
 
-        await fetch('/api/table/pool/join', {
+        const joinRes = await fetch('/api/table/pool/join', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug: currentPool.slug, name, email, amount_cents: currentPool.price_cents, payment_intent_id: paymentIntent.id }),
+          body: JSON.stringify({ slug: currentPool.slug, name, email, payment_intent_id: paymentIntent.id }),
         });
+        if (!joinRes.ok) {
+          const joinData = await joinRes.json().catch(() => ({}));
+          throw new Error(joinData.error || 'membership save failed — contact support with reference: ' + paymentIntent.id);
+        }
 
         document.getElementById('pool-join-form').style.display = 'none';
         const conf = document.getElementById('confirmation');
@@ -949,27 +968,13 @@
 
     // Reset pool form when modal closes
     document.getElementById('modal-close').addEventListener('click', () => {
+      document.getElementById('overlay').classList.remove('open');
       document.getElementById('pool-join-form').style.display = 'none';
       document.getElementById('booking-form').style.display = 'flex';
       currentPool = null;
     });
 
-    // ── Get listed ────────────────────────────────────────────────────────
-    document.getElementById('gl-btn').addEventListener('click', async () => {
-      const name  = document.getElementById('gl-name').value.trim();
-      const email = document.getElementById('gl-email').value.trim();
-      const msg   = document.getElementById('gl-msg');
-      if (!name || !email) return;
-      document.getElementById('gl-btn').disabled = true;
-      try {
-        await fetch('/api/kommune/press/apply', { // reuse contact endpoint
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, note: 'table listing request' }),
-        });
-      } catch {}
-      msg.textContent = `got it — we'll be in touch at ${email}.`;
-      msg.classList.add('ok');
-    });
+    // ── Get listed — handled by the <a href="/table/join"> link in markup ──
 
     // Refund request
     document.getElementById('btn-refund').addEventListener('click', async () => {

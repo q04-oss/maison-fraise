@@ -168,9 +168,16 @@
   let venueToken = localStorage.getItem('venue_token');
   let venueSlug  = localStorage.getItem('venue_slug');
 
-  // Auto-login if token exists
+  // Auto-login: verify token against server before showing dashboard
   if (venueToken && venueSlug) {
-    showDone({ slug: venueSlug, display_name: localStorage.getItem('venue_name') || venueSlug, price_cents: parseInt(localStorage.getItem('venue_price') || '12000'), stripe_connect_onboarded: localStorage.getItem('venue_connected') === 'true' });
+    fetch('/api/table/venues/me', { headers: { 'X-Venue-Token': venueToken } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => showDone(data))
+      .catch(() => {
+        // Stale or revoked token — clear and show signup
+        ['venue_token','venue_slug','venue_name','venue_price','venue_connected'].forEach(k => localStorage.removeItem(k));
+        venueToken = null; venueSlug = null;
+      });
   }
 
   // Slug preview
@@ -288,7 +295,9 @@
   async function connectStripe() {
     if (!venueToken) return;
     const btn = document.getElementById('connect-btn');
+    const status = document.getElementById('connect-status');
     btn.textContent = '—';
+    btn.disabled = true;
     try {
       const res = await fetch('/api/table/venues/connect', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Venue-Token': venueToken },
@@ -299,20 +308,45 @@
       else throw new Error(data.error || 'failed');
     } catch (e) {
       btn.textContent = 'connect stripe →';
-      alert(e.message);
+      btn.disabled = false;
+      status.textContent = 'connection failed — try again.';
+      status.style.color = 'var(--red)';
+      status.classList.add('on');
     }
   }
 
   async function verifyConnect() {
     if (!venueToken) return;
-    const res = await fetch('/api/table/venues/connect/verify', {
-      method: 'POST', headers: { 'X-Venue-Token': venueToken },
-    });
-    const data = await res.json();
-    if (data.onboarded) {
-      localStorage.setItem('venue_connected', 'true');
-      document.getElementById('connect-status').classList.add('on');
-      document.getElementById('connect-btn').style.display = 'none';
+    const status = document.getElementById('connect-status');
+    const btn = document.getElementById('connect-btn');
+    try {
+      const res = await fetch('/api/table/venues/connect/verify', {
+        method: 'POST', headers: { 'X-Venue-Token': venueToken },
+      });
+      const data = await res.json();
+      if (data.onboarded) {
+        localStorage.setItem('venue_connected', 'true');
+        status.textContent = 'stripe connected. payouts active.';
+        status.style.color = '';
+        status.classList.add('on');
+        btn.style.display = 'none';
+      } else {
+        status.textContent = 'stripe setup incomplete — finish onboarding to receive payouts.';
+        status.style.color = 'var(--muted)';
+        status.classList.add('on');
+        btn.textContent = 'continue setup →';
+        btn.disabled = false;
+      }
+    } catch {
+      status.textContent = 'could not verify stripe status — try reconnecting.';
+      status.style.color = 'var(--red)';
+      status.classList.add('on');
+      btn.textContent = 'connect stripe →';
+      btn.disabled = false;
+    }
+    // Clean up URL so a reload doesn't re-trigger verification
+    if (window.location.search.includes('connect=done')) {
+      history.replaceState(null, '', window.location.pathname);
     }
   }
 </script>

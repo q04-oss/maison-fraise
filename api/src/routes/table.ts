@@ -771,20 +771,21 @@ router.post('/pool/checkout', poolCors, async (req: any, res: any) => {
   const slug = String(req.body?.slug ?? '').trim();
   const name = String(req.body?.name ?? '').trim().slice(0, 200);
   const email = String(req.body?.email ?? '').trim().slice(0, 200);
-  const amountCents = parseInt(req.body?.amount_cents) || 0;
-  if (!slug || !name || !email || amountCents < 100) {
-    return res.status(400).json({ error: 'slug, name, email, and amount_cents required' });
+  if (!slug || !name || !email) {
+    return res.status(400).json({ error: 'slug, name, and email required' });
   }
   try {
-    // Check if venue has Stripe Connect set up
-    const venueRows = await db.execute(sql`SELECT stripe_connect_account_id, stripe_connect_onboarded FROM table_venues WHERE slug = ${slug} LIMIT 1`);
+    // Fetch price and Connect status from venue record — never trust browser-supplied amount
+    const venueRows = await db.execute(sql`SELECT price_cents, stripe_connect_account_id, stripe_connect_onboarded FROM table_venues WHERE slug = ${slug} LIMIT 1`);
     const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
+    if (!venue) return res.status(404).json({ error: 'venue not found' });
+    const amountCents: number = venue.price_cents;
 
     const intentParams: any = {
       amount: amountCents,
       currency: 'cad',
       automatic_payment_methods: { enabled: true },
-      metadata: { slug, name, email, type: 'table_pool' },
+      metadata: { slug, name, email, type: 'table_pool', amount_cents: String(amountCents) },
     };
 
     if (venue?.stripe_connect_onboarded && venue?.stripe_connect_account_id) {
@@ -805,7 +806,6 @@ router.post('/pool/join', poolCors, async (req: any, res: any) => {
   const name = String(req.body?.name ?? '').trim().slice(0, 200);
   const email = String(req.body?.email ?? '').trim().slice(0, 200);
   const paymentIntentId = String(req.body?.payment_intent_id ?? '').trim();
-  const amountCents = parseInt(req.body?.amount_cents) || 0;
   if (!slug || !name || !email || !paymentIntentId) {
     return res.status(400).json({ error: 'missing fields' });
   }
@@ -814,15 +814,24 @@ router.post('/pool/join', poolCors, async (req: any, res: any) => {
     if (intent.status !== 'succeeded') {
       return res.status(402).json({ error: 'payment not confirmed' });
     }
+    // Verify the intent belongs to this pool and was not crafted by the browser
+    if (intent.metadata?.type !== 'table_pool' || intent.metadata?.slug !== slug) {
+      return res.status(400).json({ error: 'payment intent does not match this pool' });
+    }
+    // Verify amount against server-side venue price and get display name in one query
+    const venueRows = await db.execute(sql`SELECT price_cents, display_name FROM table_venues WHERE slug = ${slug} LIMIT 1`);
+    const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
+    if (!venue) return res.status(404).json({ error: 'venue not found' });
+    if (intent.amount < venue.price_cents) {
+      return res.status(400).json({ error: 'payment amount insufficient' });
+    }
+    const amountCents = intent.amount; // use verified amount from Stripe
     await db.execute(sql`
       INSERT INTO table_memberships (slug, name, email, amount_cents, stripe_payment_intent_id, status)
       VALUES (${slug}, ${name}, ${email}, ${amountCents}, ${paymentIntentId}, 'waiting')
       ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
-    // Get venue display name for email
-    const venueRows = await db.execute(sql`SELECT display_name FROM table_venues WHERE slug = ${slug} LIMIT 1`);
-    const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
-    const venueName = venue?.display_name ?? slug;
+    const venueName = venue.display_name ?? slug;
     sendPoolJoinConfirmation({ to: email, name, venueName }).catch(() => {});
     res.json({ ok: true });
   } catch (err: any) {
@@ -873,15 +882,22 @@ router.post('/pool/call', async (req: any, res: any) => {
   const note = String(req.body?.note ?? '').trim().slice(0, 500);
   if (seats < 1) return res.status(400).json({ error: 'seats required' });
   try {
+    // Atomic select+update with row locking to prevent double-calling on concurrent requests
     const rows = await db.execute(sql`
-      SELECT id, name, email FROM table_memberships
-      WHERE slug = ${slug} AND status = 'waiting'
-      ORDER BY created_at ASC LIMIT ${seats}
+      WITH selected AS (
+        SELECT id FROM table_memberships
+        WHERE slug = ${slug} AND status = 'waiting'
+        ORDER BY created_at ASC
+        LIMIT ${seats}
+        FOR UPDATE SKIP LOCKED
+      )
+      UPDATE table_memberships SET status = 'called', last_called_at = now()
+      FROM selected
+      WHERE table_memberships.id = selected.id
+      RETURNING table_memberships.id, table_memberships.name, table_memberships.email
     `);
     const members = (rows as any).rows ?? rows;
     if (!members.length) return res.status(400).json({ error: 'no waiting members' });
-    const ids = members.map((m: any) => m.id);
-    await db.execute(sql`UPDATE table_memberships SET status = 'called', last_called_at = now() WHERE id = ANY(${ids}::int[])`);
 
     // Get venue display name for emails
     const venueRows = await db.execute(sql`SELECT display_name FROM table_venues WHERE slug = ${slug} LIMIT 1`);
@@ -904,25 +920,39 @@ router.post('/pool/attend', async (req: any, res: any) => {
   const pin = req.headers['x-admin-pin'];
   const venueToken = req.headers['x-venue-token'] as string;
   const isAdmin = pin && pin === process.env.ADMIN_PIN;
-  if (!isAdmin && venueToken) {
+  let scopedSlug: string | null = null;
+
+  if (isAdmin) {
+    scopedSlug = null; // global admin can mark any slug
+  } else if (venueToken) {
     const r = await db.execute(sql`SELECT slug FROM table_venue_sessions WHERE token = ${venueToken} AND expires_at > now() LIMIT 1`);
-    if (!((r as any).rows ?? r).length) return res.status(401).json({ error: 'unauthorized' });
-  } else if (!isAdmin) {
+    const row = ((r as any).rows ?? r)[0] as any;
+    if (!row) return res.status(401).json({ error: 'unauthorized' });
+    scopedSlug = row.slug; // operator scoped to their own slug only
+  } else {
     return res.status(401).json({ error: 'unauthorized' });
   }
-  // fall through to handler below
-  return handleAttend(req, res);
+  return handleAttend(req, res, scopedSlug);
 });
 
-async function handleAttend(req: any, res: any) {
+async function handleAttend(req: any, res: any, scopedSlug: string | null) {
   const ids: number[] = req.body?.ids ?? [];
   if (!ids.length) return res.status(400).json({ error: 'ids required' });
   try {
-    await db.execute(sql`
-      UPDATE table_memberships
-      SET status = 'waiting', events_attended = events_attended + 1, last_called_at = now()
-      WHERE id = ANY(${ids}::int[])
-    `);
+    if (scopedSlug) {
+      // Scope update to authenticated venue's members only
+      await db.execute(sql`
+        UPDATE table_memberships
+        SET status = 'waiting', events_attended = events_attended + 1, last_called_at = now()
+        WHERE id = ANY(${ids}::int[]) AND slug = ${scopedSlug}
+      `);
+    } else {
+      await db.execute(sql`
+        UPDATE table_memberships
+        SET status = 'waiting', events_attended = events_attended + 1, last_called_at = now()
+        WHERE id = ANY(${ids}::int[])
+      `);
+    }
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });

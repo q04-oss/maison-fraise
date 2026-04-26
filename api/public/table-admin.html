@@ -437,7 +437,7 @@
           <label>note (optional)</label>
           <input type="text" id="${noteId}" placeholder="dinner, details to follow" />
         </div>
-        <button class="btn" onclick="sendCall('${slug}')">send call →</button>
+        <button class="btn pool-call-btn">send call →</button>
       </div>
       <div class="pool-call-result" id="${callResultId}"></div>
       ${members.length ? members.map(m => {
@@ -451,12 +451,17 @@
             <div class="pool-member-right">
               <div class="pool-member-meta">${joined}${m.events_attended > 0 ? ' · ' + m.events_attended + ' attended' : ''}</div>
               <span class="pool-status ${m.status}">${m.status}</span>
-              ${m.status === 'called' ? `<button class="pool-attended-btn" onclick="markAttended(${m.id}, '${slug}')">attended</button>` : ''}
+              ${m.status === 'called' ? `<button class="pool-attended-btn" data-id="${m.id}">attended</button>` : ''}
             </div>
           </div>
         `;
       }).join('') : '<div class="pool-empty">no members yet.</div>'}
     `;
+    // Wire event listeners after innerHTML — avoids slug injection in onclick attributes
+    div.querySelector('.pool-call-btn').addEventListener('click', () => sendCall(slug));
+    div.querySelectorAll('.pool-attended-btn').forEach(btn => {
+      btn.addEventListener('click', () => markAttended(parseInt(btn.dataset.id), slug));
+    });
     return div;
   }
 
@@ -473,8 +478,9 @@
     const data = await res.json();
     resultEl.style.display = 'block';
     if (!res.ok) { resultEl.textContent = data.error || 'failed.'; resultEl.classList.add('on'); return; }
-    const names = (data.called ?? []).map(m => m.name).join(', ');
-    resultEl.textContent = `called ${data.called.length}: ${names}`;
+    const called = data.called ?? [];
+    const names = called.map(m => m.name).join(', ');
+    resultEl.textContent = `called ${called.length}: ${names}`;
     resultEl.classList.add('on');
     loadDashboard();
   }

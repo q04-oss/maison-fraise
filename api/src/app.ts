@@ -670,11 +670,21 @@ app.post('/api/kommune/reservations', async (req: any, res: any) => {
   const time = String(req.body?.time ?? '').trim().slice(0, 10);
   const note = String(req.body?.note ?? '').trim().slice(0, 500);
   const email = String(req.body?.email ?? '').trim().slice(0, 200);
-  const totalCents = parseInt(req.body?.total_cents) || 0;
   const stripePaymentIntentId = String(req.body?.stripe_payment_intent_id ?? '').trim().slice(0, 200);
   const orderJson = req.body?.order_json ?? null;
   const eventId = req.body?.event_id ? parseInt(req.body.event_id) : null;
   if (!name || !size || !date || !time) return res.status(400).json({ error: 'invalid' });
+
+  // Verify payment server-side — never trust browser-supplied total_cents
+  let totalCents = 0;
+  if (stripePaymentIntentId) {
+    const intent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+    if (intent.status !== 'succeeded') {
+      return res.status(402).json({ error: 'payment not confirmed' });
+    }
+    totalCents = intent.amount;
+  }
+
   await db.execute(sql`
     INSERT INTO kommune_reservations (name, size, date, time, note, email, total_cents, stripe_payment_intent_id, order_json, event_id)
     VALUES (${name}, ${size}, ${date}, ${time}, ${note}, ${email}, ${totalCents},

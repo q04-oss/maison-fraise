@@ -1204,8 +1204,8 @@
         });
         if (result.error) throw new Error(result.error.message);
 
-        // Save reservation
-        await fetch('/api/kommune/reservations', {
+        // Save reservation — check response so a save failure surfaces to the user
+        const saveRes = await fetch('/api/kommune/reservations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1221,6 +1221,10 @@
             event_id: eventId,
           }),
         });
+        if (!saveRes.ok) {
+          const saveData = await saveRes.json().catch(() => ({}));
+          throw new Error(saveData.error || 'reservation save failed — your payment went through. contact us with reference: ' + result.paymentIntent.id);
+        }
 
         const canvas = document.getElementById('results-canvas');
         canvas.innerHTML = `<div class="result-state">booked.<br/><span style="font-size:0.65rem;color:var(--muted);margin-top:0.3rem;display:block;">confirmation sent to ${esc(email)}. see you ${esc(reserveData.date)} at ${esc(reserveData.time)}.</span></div>`;
