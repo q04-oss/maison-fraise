@@ -726,9 +726,6 @@ app.get('/table/widget.js', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/widget.js'));
 });
 
-app.get('/table/pool-admin', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/table-pool-admin.html'));
-});
 
 app.get('/table/:slug', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/table.html'));

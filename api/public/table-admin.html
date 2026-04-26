@@ -108,6 +108,32 @@
     .form-msg { font-size: 0.68rem; color: var(--muted); }
     .form-msg.ok { color: var(--green); }
     .form-msg.err { color: var(--red); }
+
+    /* Pool */
+    .pool-slug { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1.5rem; }
+    .pool-slug-header { display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1.25rem; background: var(--card); border-bottom: 1px solid var(--border); gap: 1rem; }
+    .pool-slug-name { font-size: 0.9rem; font-weight: 500; }
+    .pool-slug-stats { font-size: 0.65rem; color: var(--muted); }
+    .pool-call-form { display: flex; gap: 0.65rem; align-items: flex-end; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .pool-call-form label { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .pool-call-form input { font-family: 'DM Mono', monospace; font-size: 0.78rem; background: var(--input); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.7rem; color: var(--text); outline: none; }
+    .pool-call-form input:focus { border-color: var(--text); background: var(--bg); }
+    .pool-call-result { font-size: 0.65rem; color: var(--muted); padding: 0 1.25rem 0.65rem; display: none; }
+    .pool-call-result.on { display: block; }
+    .pool-member { display: flex; justify-content: space-between; align-items: center; padding: 0.55rem 1.25rem; border-top: 1px solid var(--border); gap: 1rem; font-size: 0.72rem; }
+    .pool-member:hover { background: var(--card); }
+    .pool-member-left { flex: 1; }
+    .pool-member-name { color: var(--text); }
+    .pool-member-email { font-size: 0.62rem; color: var(--muted); }
+    .pool-member-right { display: flex; gap: 0.75rem; align-items: center; flex-shrink: 0; }
+    .pool-member-meta { font-size: 0.62rem; color: var(--muted); text-align: right; }
+    .pool-status { font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 9999px; }
+    .pool-status.waiting  { background: var(--card); color: var(--muted); }
+    .pool-status.called   { background: #fef3cd; color: #856404; }
+    .pool-status.attended { background: #d4edda; color: #155724; }
+    .pool-attended-btn { font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 9999px; padding: 0.15rem 0.55rem; cursor: pointer; }
+    .pool-attended-btn:hover { border-color: var(--text); color: var(--text); }
+    .pool-empty { padding: 0.75rem 1.25rem; font-size: 0.65rem; color: var(--muted); border-top: 1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -128,6 +154,12 @@
   <div id="dashboard" style="display:none;">
     <div class="section-label" style="margin-bottom:1.5rem;">events</div>
     <div class="events" id="events-list"></div>
+
+    <div id="pool-section" style="margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);display:none;">
+      <div class="section-label" style="margin-bottom:1.5rem;">pool</div>
+      <div id="pool-list"></div>
+    </div>
+
     <div class="add-event-section">
       <div class="section-label">add event</div>
       <div class="form-grid" id="add-event-form">
@@ -199,13 +231,107 @@
   }
 
   async function loadDashboard() {
-    const [eventsRes, bookingsRes] = await Promise.all([
+    const [eventsRes, bookingsRes, slugsRes] = await Promise.all([
       fetch('/api/table/events', { headers: { 'X-Admin-PIN': pin } }),
       fetch('/api/table/bookings', { headers: { 'X-Admin-PIN': pin } }),
+      fetch('/api/table/pool/slugs', { headers: { 'X-Admin-PIN': pin } }),
     ]);
     const events = await eventsRes.json();
     const bookings = await bookingsRes.json();
+    const slugsData = await slugsRes.json();
     renderEvents(events, bookings);
+    if ((slugsData.slugs ?? []).length) {
+      document.getElementById('pool-section').style.display = 'block';
+      loadAllPools(slugsData.slugs);
+    }
+  }
+
+  async function loadAllPools(slugs) {
+    const results = await Promise.all(
+      slugs.map(s => fetch('/api/table/pool?slug=' + encodeURIComponent(s.slug), { headers: { 'X-Admin-PIN': pin } }).then(r => r.json()))
+    );
+    const container = document.getElementById('pool-list');
+    container.innerHTML = '';
+    results.forEach((data, i) => {
+      const slug = slugs[i].slug;
+      container.appendChild(buildPoolCard(slug, data.members ?? [], data.waiting ?? 0, data.total ?? 0));
+    });
+  }
+
+  function buildPoolCard(slug, members, waiting, total) {
+    const div = document.createElement('div');
+    div.className = 'pool-slug';
+    div.id = 'pool-card-' + slug;
+
+    const callResultId = 'pool-call-result-' + slug;
+    const seatsId = 'pool-seats-' + slug;
+    const noteId  = 'pool-note-' + slug;
+
+    div.innerHTML = `
+      <div class="pool-slug-header">
+        <div>
+          <div class="pool-slug-name">${esc(slug)}</div>
+          <div class="pool-slug-stats">${waiting} waiting · ${total} total</div>
+        </div>
+      </div>
+      <div class="pool-call-form">
+        <div>
+          <label>seats to call</label>
+          <input type="number" id="${seatsId}" value="8" min="1" style="width:5rem;" />
+        </div>
+        <div style="flex:1;min-width:160px;">
+          <label>note (optional)</label>
+          <input type="text" id="${noteId}" placeholder="dinner, details to follow" />
+        </div>
+        <button class="btn" onclick="sendCall('${slug}')">send call →</button>
+      </div>
+      <div class="pool-call-result" id="${callResultId}"></div>
+      ${members.length ? members.map(m => {
+        const joined = new Date(m.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+        return `
+          <div class="pool-member">
+            <div class="pool-member-left">
+              <div class="pool-member-name">${esc(m.name)}</div>
+              <div class="pool-member-email">${esc(m.email)}</div>
+            </div>
+            <div class="pool-member-right">
+              <div class="pool-member-meta">${joined}${m.events_attended > 0 ? ' · ' + m.events_attended + ' attended' : ''}</div>
+              <span class="pool-status ${m.status}">${m.status}</span>
+              ${m.status === 'called' ? `<button class="pool-attended-btn" onclick="markAttended(${m.id}, '${slug}')">attended</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('') : '<div class="pool-empty">no members yet.</div>'}
+    `;
+    return div;
+  }
+
+  async function sendCall(slug) {
+    const seats = parseInt(document.getElementById('pool-seats-' + slug).value) || 0;
+    const note  = document.getElementById('pool-note-' + slug).value.trim();
+    const resultEl = document.getElementById('pool-call-result-' + slug);
+    if (seats < 1) return;
+    const res = await fetch('/api/table/pool/call', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      body: JSON.stringify({ slug, seats, note }),
+    });
+    const data = await res.json();
+    resultEl.style.display = 'block';
+    if (!res.ok) { resultEl.textContent = data.error || 'failed.'; resultEl.classList.add('on'); return; }
+    const names = (data.called ?? []).map(m => m.name).join(', ');
+    resultEl.textContent = `called ${data.called.length}: ${names}`;
+    resultEl.classList.add('on');
+    loadDashboard();
+  }
+
+  async function markAttended(id, slug) {
+    await fetch('/api/table/pool/attend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      body: JSON.stringify({ ids: [id] }),
+    });
+    loadDashboard();
   }
 
   function fmtPrice(cents) {
