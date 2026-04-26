@@ -27,8 +27,9 @@
  *   <script src="https://api.fraise.box/fraise-widget.js"></script>
  *
  * Optional attributes on the div:
- *   data-fraise-api   Override API base URL (default: https://api.fraise.box)
- *   data-fraise-theme "light" (default) or "dark"
+ *   data-fraise-api     Override API base URL (default: https://api.fraise.box)
+ *   data-fraise-theme   "light" (default) or "dark"
+ *   data-fraise-tagline One-line description shown to visitors (default: "private experiences, by invitation only.")
  */
 
 (function () {
@@ -68,9 +69,10 @@
   }
 
   function mount(el) {
-    var slug  = el.getAttribute('data-fraise');
-    var api   = (el.getAttribute('data-fraise-api') || DEFAULT_API).replace(/\/$/, '');
-    var theme = el.getAttribute('data-fraise-theme') === 'dark' ? 'dark' : 'light';
+    var slug    = el.getAttribute('data-fraise');
+    var api     = (el.getAttribute('data-fraise-api') || DEFAULT_API).replace(/\/$/, '');
+    var theme   = el.getAttribute('data-fraise-theme') === 'dark' ? 'dark' : 'light';
+    var tagline = el.getAttribute('data-fraise-tagline') || 'private experiences, by invitation only.';
 
     if (!slug) {
       el.textContent = '[fraise: missing data-fraise slug]';
@@ -86,7 +88,7 @@
     wrap.innerHTML = [
       '<div class="fw-eyebrow">box fraise</div>',
       '<div class="fw-heading">get considered.</div>',
-      '<div class="fw-sub">we run private experiences through box fraise.<br>leave your name and we\'ll consider you for future invitations.</div>',
+      '<div class="fw-sub">' + tagline + '<br>leave your name and we\'ll consider you for future invitations.</div>',
       '<form class="fw-form" novalidate>',
       '  <input class="fw-input" type="text"  name="name"  placeholder="your name"  autocomplete="name"  required />',
       '  <input class="fw-input" type="email" name="email" placeholder="your email" autocomplete="email" required />',
