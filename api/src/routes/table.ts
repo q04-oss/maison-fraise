@@ -97,7 +97,7 @@ router.post('/standing', async (req: any, res: any) => {
     // None exists — create one
     const created = await db.execute(sql`
       INSERT INTO table_events (title, venue_name, venue_slug, date_tbd, price_cents, capacity, event_type, active)
-      VALUES ('next event', 'Kommune', ${slug}, true, 2500, 30, 'group', true)
+      VALUES ('next event', 'Kommune', ${slug}, true, 12000, 30, 'group', true)
       RETURNING id, title, venue_name, venue_slug, price_cents, capacity, seats_taken, date_tbd, active
     `);
     res.json(((created as any).rows ?? created)[0]);
