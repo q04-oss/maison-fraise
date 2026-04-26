@@ -2,7 +2,7 @@
  * fraise-widget.js
  * MIT License
  *
- * Copyright (c) 2026 Box Fraise / Rajzyngier Research
+ * Copyright (c) 2026 Box Fraise
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -84,9 +84,9 @@
     wrap.className = 'fw-wrap';
 
     wrap.innerHTML = [
-      '<div class="fw-eyebrow">fraise</div>',
+      '<div class="fw-eyebrow">box fraise</div>',
       '<div class="fw-heading">get considered.</div>',
-      '<div class="fw-sub">we run private experiences through fraise.<br>leave your name and we\'ll consider you for future invitations.</div>',
+      '<div class="fw-sub">we run private experiences through box fraise.<br>leave your name and we\'ll consider you for future invitations.</div>',
       '<form class="fw-form" novalidate>',
       '  <input class="fw-input" type="text"  name="name"  placeholder="your name"  autocomplete="name"  required />',
       '  <input class="fw-input" type="email" name="email" placeholder="your email" autocomplete="email" required />',
@@ -132,12 +132,12 @@
           var hasCredit = res.data.has_credit;
           wrap.innerHTML = [
             '<div class="fw-done">',
-            '  <div class="fw-eyebrow">fraise</div>',
+            '  <div class="fw-eyebrow">box fraise</div>',
             '  <div class="fw-done-heading">you\'re on the list.</div>',
             '  <div class="fw-done-sub">',
             hasCredit
               ? 'you\'re eligible for invitations. we\'ll be in touch.'
-              : 'get a <a class="fw-done-link" href="https://fraise.box" target="_blank" rel="noopener">fraise credit</a> to be eligible for invitations.',
+              : 'get a <a class="fw-done-link" href="https://fraise.box" target="_blank" rel="noopener">box fraise credit</a> to be eligible for invitations.',
             '  </div>',
             '</div>',
           ].join('');
