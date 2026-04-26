@@ -760,6 +760,7 @@
     let tableStripe = null;
     let tableCardEl = null;
     let currentTableEvent = null;
+    let _pendingRec = null; // holds recommendation text across onclick boundaries
 
     function fmtTablePrice(cents) { return `CA$${(cents / 100).toFixed(0)}`; }
     function fmtTableDate(iso) {
@@ -928,6 +929,7 @@
     function renderReserveStep2(canvas) {
       const carried = reserveData._prefillPreorder;
       if (carried) {
+        _pendingRec = carried;
         canvas.innerHTML = `
           <div class="reserve-step">2 of 2 — pre-order <button class="reserve-skip" onclick="submitReservation(null)">skip</button></div>
           <div class="reserve-preorder">
@@ -935,7 +937,7 @@
             ${esc(carried)}
           </div>
           <div style="display:flex;gap:1.5rem;margin-top:0.5rem;align-items:baseline;">
-            <button class="apply-submit" type="button" onclick="submitReservation(${JSON.stringify(carried)})">book with this →</button>
+            <button class="apply-submit" type="button" onclick="submitReservation(_pendingRec)">book with this →</button>
             <button class="reserve-skip" type="button" onclick="reserveData._prefillPreorder=null;renderReserveStep2(document.getElementById('results-canvas'))">change</button>
             <button class="reserve-skip" type="button" onclick="submitReservation(null)">skip</button>
           </div>
@@ -967,13 +969,14 @@
         });
         const data = await res.json();
         const rec = data.recommendation ?? '';
+        _pendingRec = rec;
         area.innerHTML = `
           <div class="reserve-preorder">
             <div class="reserve-preorder-label">suggested order</div>
             ${esc(rec)}
           </div>
           <div style="display:flex;gap:1.5rem;margin-top:0.5rem;align-items:baseline;">
-            <button class="apply-submit" type="button" onclick="submitReservation(${JSON.stringify(esc(rec))})">book with this →</button>
+            <button class="apply-submit" type="button" onclick="submitReservation(_pendingRec)">book with this →</button>
             <button class="reserve-skip" type="button" onclick="runReserveRecommend({preventDefault:()=>{}})">again</button>
             <button class="reserve-skip" type="button" onclick="submitReservation(null)">skip</button>
           </div>
@@ -1369,7 +1372,8 @@
         });
         const data = await res.json();
         const rec = data.recommendation ?? 'unavailable right now';
-        result.innerHTML = esc(rec) + '<div style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border);font-size:0.62rem;color:var(--muted);">booking a table? <button class="reserve-skip" onclick="closeRecommendPanel();showReserveFlow({size:' + people + ',preorder:' + JSON.stringify(rec) + '})">reserve</button></div>';
+        _pendingRec = rec;
+        result.innerHTML = esc(rec) + '<div style="margin-top:0.75rem;padding-top:0.5rem;border-top:1px solid var(--border);font-size:0.62rem;color:var(--muted);">booking a table? <button class="reserve-skip" onclick="closeRecommendPanel();showReserveFlow({size:' + people + ',preorder:_pendingRec})">reserve</button></div>';
       } catch { result.textContent = 'unavailable right now'; }
       document.getElementById('rec-again-btn').style.display = '';
     }
