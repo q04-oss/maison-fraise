@@ -434,6 +434,87 @@ export async function ensureSchema(): Promise<void> {
   await run('table_memberships.confirmed_at', sql`ALTER TABLE table_memberships ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ`);
   await run('table_memberships.refunded_at', sql`ALTER TABLE table_memberships ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ`);
 
+  // ── Fraise platform ──────────────────────────────────────────────────────────
+
+  await run('fraise_members', sql`CREATE TABLE IF NOT EXISTS fraise_members (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    credit_balance INTEGER NOT NULL DEFAULT 0,
+    credits_purchased INTEGER NOT NULL DEFAULT 0,
+    stripe_customer_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_member_sessions', sql`CREATE TABLE IF NOT EXISTS fraise_member_sessions (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES fraise_members(id),
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_credit_purchases', sql`CREATE TABLE IF NOT EXISTS fraise_credit_purchases (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES fraise_members(id),
+    credits INTEGER NOT NULL,
+    amount_cents INTEGER NOT NULL,
+    stripe_payment_intent_id TEXT UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_businesses', sql`CREATE TABLE IF NOT EXISTS fraise_businesses (
+    id SERIAL PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    description TEXT,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    stripe_connect_account_id TEXT,
+    stripe_connect_onboarded BOOLEAN NOT NULL DEFAULT false,
+    active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_business_sessions', sql`CREATE TABLE IF NOT EXISTS fraise_business_sessions (
+    id SERIAL PRIMARY KEY,
+    business_id INTEGER NOT NULL REFERENCES fraise_businesses(id),
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_events', sql`CREATE TABLE IF NOT EXISTS fraise_events (
+    id SERIAL PRIMARY KEY,
+    business_id INTEGER NOT NULL REFERENCES fraise_businesses(id),
+    title TEXT NOT NULL,
+    description TEXT,
+    price_cents INTEGER NOT NULL DEFAULT 12000,
+    min_seats INTEGER NOT NULL DEFAULT 6,
+    max_seats INTEGER NOT NULL DEFAULT 20,
+    seats_claimed INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    event_date TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('fraise_claims', sql`CREATE TABLE IF NOT EXISTS fraise_claims (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES fraise_members(id),
+    event_id INTEGER NOT NULL REFERENCES fraise_events(id),
+    status TEXT NOT NULL DEFAULT 'claimed',
+    confirm_token TEXT UNIQUE,
+    confirmed_at TIMESTAMPTZ,
+    declined_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (member_id, event_id)
+  )`);
+
+  await run('fraise_claims_idx', sql`
+    CREATE INDEX IF NOT EXISTS fraise_claims_event_idx ON fraise_claims (event_id, status)
+  `);
+
   // ── Kommune reservations — paid pre-order columns ─────────────────────────
   await run('kommune_reservations.email', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS email text`);
   await run('kommune_reservations.total_cents', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS total_cents integer NOT NULL DEFAULT 0`);

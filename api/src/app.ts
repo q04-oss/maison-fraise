@@ -88,6 +88,7 @@ import arVideosRouter from './routes/ar-videos';
 import socialRouter from './routes/social';
 import mapsRouter from './routes/maps';
 import tableRouter from './routes/table';
+import fraiseRouter from './routes/fraise';
 import proposalsRouter from './routes/proposals';
 import artRouter from './routes/art';
 import artAdminRouter from './routes/art-admin';
@@ -270,6 +271,7 @@ app.use('/api/art', artRouter);
 app.use('/api/art-admin', artAdminRouter);
 app.use('/api/ar-poem', arPoemRouter);
 app.use('/api/table', tableRouter);
+app.use('/api/fraise', fraiseRouter);
 
 // POST /api/upload — Cloudinary media upload (50mb limit on this route only)
 app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req: any, res: any) => {

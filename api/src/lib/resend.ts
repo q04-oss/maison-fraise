@@ -1007,3 +1007,87 @@ export async function sendPasswordReset(params: { to: string; resetUrl: string }
     html: tableTemplate(content, 'password reset.'),
   });
 }
+
+// ── Fraise platform emails ────────────────────────────────────────────────────
+
+export async function sendFraiseWelcome(params: { to: string; name: string }) {
+  const { to } = params;
+  const name = htmlEsc(params.name);
+  const content =
+    tableP(`welcome, ${name}.`) +
+    tableP('you\'re now a fraise member. buy credits to claim spots at events hosted by our partner businesses.') +
+    tableMuted('credits don\'t expire. if an event doesn\'t go ahead, your credit is returned automatically.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: 'welcome to fraise',
+    html: tableTemplate(content, 'welcome.'),
+  });
+}
+
+export async function sendFraiseCreditsAdded(params: { to: string; name: string; credits: number; balance: number }) {
+  const { to, credits, balance } = params;
+  const name = htmlEsc(params.name);
+  const content =
+    tableP(`hi ${name} — ${credits} credit${credits === 1 ? '' : 's'} added to your account.`) +
+    tableRow('credits added', String(credits)) +
+    tableRow('total balance', String(balance)) +
+    tableMuted('use them to claim spots at events. credits don\'t expire.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `${credits} credit${credits === 1 ? '' : 's'} added — fraise`,
+    html: tableTemplate(content, 'credits added.'),
+  });
+}
+
+export async function sendFraiseClaimConfirmation(params: { to: string; name: string; eventTitle: string; businessName: string; creditBalance: number }) {
+  const { to, creditBalance } = params;
+  const name = htmlEsc(params.name);
+  const eventTitle = htmlEsc(params.eventTitle);
+  const businessName = htmlEsc(params.businessName);
+  const content =
+    tableP(`hi ${name} — you've claimed a spot at <strong>${eventTitle.toLowerCase()}</strong> by ${businessName.toLowerCase()}.`) +
+    tableP('date tbd — once the minimum number of spots are filled, the host will set a date and you\'ll be the first to know.') +
+    tableRow('credits remaining', String(creditBalance)) +
+    tableMuted('your credit is held until the event is confirmed. if you need to release your spot before then, contact us.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `spot claimed — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, 'you\'re in.'),
+  });
+}
+
+export async function sendFraiseEventConfirmed(params: { to: string; name: string; eventTitle: string; businessName: string; eventDate: string; confirmUrl: string; declineUrl: string }) {
+  const { to, confirmUrl, declineUrl } = params;
+  const name = htmlEsc(params.name);
+  const eventTitle = htmlEsc(params.eventTitle);
+  const businessName = htmlEsc(params.businessName);
+  const eventDate = htmlEsc(params.eventDate);
+  const content =
+    tableP(`hi ${name} — <strong>${eventTitle.toLowerCase()}</strong> by ${businessName.toLowerCase()} is happening.`) +
+    tableRow('date', eventDate) +
+    tableP('can you make it?') +
+    `<table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+      <tr>
+        <td style="padding-right:12px;">
+          <a href="${confirmUrl}" style="display:inline-block;background:#1C1C1E;color:#FFFFFF;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;letter-spacing:2px;text-transform:uppercase;padding:10px 22px;border-radius:9999px;text-decoration:none;">i'm in</a>
+        </td>
+        <td>
+          <a href="${declineUrl}" style="display:inline-block;color:#8E8E93;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;padding:10px 22px;border-radius:9999px;text-decoration:none;border:1px solid #E5E1DA;">can't make it</a>
+        </td>
+      </tr>
+    </table>` +
+    tableMuted('clicking "can\'t make it" releases your spot and returns your credit automatically.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `date confirmed — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, 'date confirmed.'),
+  });
+}
