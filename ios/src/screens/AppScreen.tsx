@@ -41,6 +41,9 @@ export default function AppScreen() {
     if (pendingScreen === 'my-claims') {
       clearPendingScreen();
       jumpToPanel('my-claims');
+    } else if (pendingScreen === 'home') {
+      clearPendingScreen();
+      goHome();
     }
   }, [pendingScreen]);
 
@@ -50,6 +53,7 @@ export default function AppScreen() {
     else if (tab === 'members')  jumpToPanel('members');
     else if (tab === 'claims')   jumpToPanel('my-claims');
     else                         jumpToPanel('account');
+    // Double-tap on active tab always resets to that tab's root (handled by jumpToPanel resetting stack)
   };
 
   return (

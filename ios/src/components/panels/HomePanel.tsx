@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel, FraiseInvitation } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { fetchInvitations, getMemberToken } from '../../lib/api';
-import { PanelHeader, PillBadge } from '../ui';
+import { PanelHeader, PillBadge, Card, PrimaryButton } from '../ui';
 
 function invitationColor(inv: FraiseInvitation, c: any): string {
   if (inv.status === 'accepted')  return '#27AE60';
@@ -54,7 +54,7 @@ function InvitationRow({ inv, onPress }: { inv: FraiseInvitation; onPress: () =>
 }
 
 export default function HomePanel() {
-  const { showPanel, setActiveInvitation, invitations, setInvitations, member } = usePanel();
+  const { showPanel, setActiveInvitation, invitations, setInvitations, member, jumpToPanel } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
@@ -95,13 +95,28 @@ export default function HomePanel() {
       </PanelHeader>
 
       {!member ? (
-        <Text style={[styles.empty, { color: c.muted }]}>
-          sign in to receive invitations.
-        </Text>
+        <Card style={styles.onboardCard}>
+          <Text style={[styles.onboardTitle, { color: c.text }]}>invitation only.</Text>
+          <Text style={[styles.onboardBody, { color: c.muted }]}>
+            box fraise is a private network. businesses select guests for experiences that don't exist anywhere else.{'\n\n'}sign in or create an account to get started.
+          </Text>
+          <PrimaryButton label="sign in →" onPress={() => showPanel('account')} />
+        </Card>
       ) : pending.length === 0 && others.length === 0 ? (
-        <Text style={[styles.empty, { color: c.muted }]}>
-          no invitations yet.{'\n'}when a business invites you, it'll appear here.
-        </Text>
+        <Card style={styles.onboardCard}>
+          <Text style={[styles.onboardTitle, { color: c.text }]}>
+            {member.credit_balance > 0 ? 'you\'re eligible.' : 'get a credit.'}
+          </Text>
+          <Text style={[styles.onboardBody, { color: c.muted }]}>
+            {member.credit_balance > 0
+              ? 'businesses can now invite you to private experiences. invitations will appear here when you\'re selected.'
+              : 'a box fraise credit is your entry into the network. hold one and businesses can invite you to private experiences.'
+            }
+          </Text>
+          {member.credit_balance === 0 && (
+            <PrimaryButton label="buy a credit →" onPress={() => showPanel('credits')} />
+          )}
+        </Card>
       ) : (
         <View>
           {pending.length > 0 && (
@@ -159,6 +174,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
     paddingBottom: SPACING.sm,
   },
+  onboardCard: { marginHorizontal: SPACING.lg, gap: SPACING.md, padding: SPACING.lg },
+  onboardTitle: { fontSize: 15, fontFamily: fonts.dmMono, fontWeight: '500' },
+  onboardBody: { fontSize: 12, fontFamily: fonts.dmMono, lineHeight: 19 },
   empty: {
     fontSize: 13,
     fontFamily: fonts.dmMono,

@@ -20,6 +20,23 @@ function token(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
+async function sendExpoPush(
+  pushTokens: string[],
+  title: string,
+  body: string,
+  data: Record<string, any> = {},
+): Promise<void> {
+  const messages = pushTokens
+    .filter(t => t && (t.startsWith('ExponentPushToken[') || t.startsWith('ExpoPushToken[')))
+    .map(to => ({ to, title, body, data, sound: 'default' }));
+  if (!messages.length) return;
+  fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(messages),
+  }).catch(() => {});
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 
 async function requireMember(req: any, res: any, next: NextFunction) {
@@ -541,16 +558,28 @@ router.post('/events/:id/invite', requireBusiness, async (req: any, res: any) =>
     const evRows = await db.execute(sql`SELECT id, max_seats FROM fraise_events WHERE id = ${eventId} AND business_id = ${req.business.id} LIMIT 1`);
     if (!((evRows as any).rows ?? evRows).length) return res.status(404).json({ error: 'event not found' });
 
+    const evDetailRows = await db.execute(sql`SELECT title FROM fraise_events WHERE id = ${eventId} LIMIT 1`);
+    const evTitle = (((evDetailRows as any).rows ?? evDetailRows)[0] as any)?.title ?? 'an invitation';
+
     let sent = 0;
+    const notifyTokens: string[] = [];
     for (const memberId of memberIds) {
       try {
-        await db.execute(sql`
+        const result = await db.execute(sql`
           INSERT INTO fraise_invitations (event_id, member_id) VALUES (${eventId}, ${memberId})
           ON CONFLICT (event_id, member_id) DO NOTHING
+          RETURNING id
         `);
-        sent++;
+        if (((result as any).rows ?? result).length) {
+          sent++;
+          const memRow = await db.execute(sql`SELECT push_token FROM fraise_members WHERE id = ${memberId} AND push_token IS NOT NULL LIMIT 1`);
+          const pt = (((memRow as any).rows ?? memRow)[0] as any)?.push_token;
+          if (pt) notifyTokens.push(pt);
+        }
       } catch {}
     }
+
+    sendExpoPush(notifyTokens, `${req.business.name}`, `you've been invited: ${evTitle}`, { screen: 'home' });
     res.json({ ok: true, sent });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
@@ -623,6 +652,17 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
       RETURNING id, member_id
     `);
     const invitations = (invRows as any).rows ?? invRows;
+
+    // Notify confirmed members
+    if (invitations.length) {
+      const memberIds = invitations.map((i: any) => i.member_id);
+      const tokenRows = await db.execute(sql`
+        SELECT push_token FROM fraise_members
+        WHERE id = ANY(${memberIds}::int[]) AND push_token IS NOT NULL
+      `);
+      const pushTokens = ((tokenRows as any).rows ?? tokenRows).map((r: any) => r.push_token);
+      sendExpoPush(pushTokens, `${event.title}`, `date confirmed: ${eventDate}`, { screen: 'my-claims' });
+    }
 
     res.json({ ok: true, confirmed: invitations.length, event_date: eventDate });
   } catch (err: any) {

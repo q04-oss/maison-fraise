@@ -42,7 +42,7 @@ export default function CreditsPanel() {
 
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: client_secret,
-        merchantDisplayName: 'fraise',
+        merchantDisplayName: 'box fraise',
         applePay: { merchantCountryCode: 'CA' },
         style: 'alwaysLight',
         primaryButtonLabel: `Pay ${totalDisplay}`,

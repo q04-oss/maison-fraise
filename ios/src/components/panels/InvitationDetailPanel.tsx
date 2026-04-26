@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel, FraiseInvitation } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
-import { acceptInvitation, declineInvitation, getMemberToken } from '../../lib/api';
+import { acceptInvitation, declineInvitation, fetchMe, getMemberToken } from '../../lib/api';
 import { PanelHeader, PrimaryButton } from '../ui';
 
 export default function InvitationDetailPanel() {
@@ -43,9 +43,9 @@ export default function InvitationDetailPanel() {
     setError(null);
     try {
       const result = await acceptInvitation(inv.event_id);
-      setMember({ ...member, credit_balance: result.credit_balance });
       updateInvitation({ status: 'accepted', responded_at: new Date().toISOString() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchMe().then(me => { if (me) setMember(me); }).catch(() => {});
     } catch (err: any) {
       setError(err.message || 'something went wrong.');
     }
@@ -57,11 +57,9 @@ export default function InvitationDetailPanel() {
     setLoading(true);
     setError(null);
     try {
-      const result = await declineInvitation(inv.event_id);
-      if (member && result.credit_returned) {
-        setMember({ ...member, credit_balance: result.credit_balance });
-      }
+      await declineInvitation(inv.event_id);
       updateInvitation({ status: 'declined', responded_at: new Date().toISOString() });
+      fetchMe().then(me => { if (me) setMember(me); }).catch(() => {});
       goBack();
     } catch (err: any) {
       setError(err.message || 'something went wrong.');

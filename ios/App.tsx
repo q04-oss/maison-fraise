@@ -48,8 +48,8 @@ export default function App() {
     // Tap on notification → navigate
     const sub = Notifications.addNotificationResponseReceivedListener(response => {
       const screen = response.notification.request.content.data?.screen;
-      if (screen === 'my-claims') {
-        setPendingScreen('my-claims');
+      if (screen === 'my-claims' || screen === 'home') {
+        setPendingScreen(screen);
         setPendingData(null);
       }
     });
