@@ -133,6 +133,28 @@ router.get('/members/me', requireMember, async (req: any, res: any) => {
   res.json(((rows as any).rows ?? rows)[0]);
 });
 
+// GET /api/fraise/members/claims
+router.get('/members/claims', requireMember, async (req: any, res: any) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT
+        c.id, c.status, c.created_at,
+        e.id AS event_id, e.title, e.description, e.price_cents,
+        e.min_seats, e.max_seats, e.seats_claimed, e.status AS event_status, e.event_date,
+        b.name AS business_name, b.slug AS business_slug
+      FROM fraise_claims c
+      JOIN fraise_events e ON e.id = c.event_id
+      JOIN fraise_businesses b ON b.id = e.business_id
+      WHERE c.member_id = ${req.member.id}
+        AND c.status NOT IN ('declined')
+      ORDER BY c.created_at DESC
+    `);
+    res.json({ claims: (rows as any).rows ?? rows });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 // ── Credits ───────────────────────────────────────────────────────────────────
 
 // POST /api/fraise/members/credits/checkout — create PI for N credits

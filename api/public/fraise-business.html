@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fraise — for businesses</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --text: #1C1C1E; --muted: #8E8E93;
+      --border: #E5E1DA; --card: #F7F5F2; --input: #F0EDE8;
+      --green: #27AE60; --red: #C0392B;
+    }
+    html { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body { min-height: 100dvh; }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.9); backdrop-filter: blur(8px);
+      padding: 0.85rem clamp(1.5rem, 6vw, 4rem);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .nav-logo { font-size: 0.85rem; font-weight: 500; text-decoration: none; color: var(--text); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-biz { font-size: 0.7rem; color: var(--muted); }
+    .nav-biz strong { color: var(--text); }
+    .btn-nav { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; background: var(--text); color: var(--bg); border: none; border-radius: 9999px; padding: 0.4rem 1rem; cursor: pointer; transition: opacity 0.15s; }
+    .btn-nav:hover { opacity: 0.75; }
+    .btn-nav-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn-nav-ghost:hover { color: var(--text); border-color: var(--text); opacity: 1; }
+    main { max-width: 680px; margin-inline: auto; padding-inline: clamp(1.5rem, 6vw, 4rem); padding-block: clamp(3rem, 8vw, 5rem); }
+    .eyebrow { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.5rem; }
+    h1 { font-size: 1rem; font-weight: 500; margin-bottom: 2rem; }
+    .section-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.25rem; }
+
+    /* ── Auth ── */
+    .auth-panel { max-width: 340px; }
+    .field { margin-bottom: 0.75rem; }
+    .field label { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .field input, .field textarea {
+      width: 100%; font-family: 'DM Mono', monospace; font-size: 0.85rem;
+      background: var(--input); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.65rem 0.9rem; color: var(--text); outline: none; transition: border-color 0.15s;
+      resize: vertical;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--text); background: var(--bg); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    .btn-primary {
+      font-family: 'DM Mono', monospace; font-size: 0.78rem; font-weight: 500;
+      letter-spacing: 0.08em; text-transform: uppercase; background: var(--text); color: var(--bg);
+      border: none; border-radius: 9999px; padding: 0.65rem 1.5rem; cursor: pointer; transition: opacity 0.15s;
+    }
+    .btn-primary:hover { opacity: 0.8; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-full { width: 100%; }
+    .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--text); opacity: 1; }
+    .err-msg { font-size: 0.7rem; color: var(--red); margin-top: 0.5rem; display: none; }
+    .err-msg.on { display: block; }
+    .ok-msg { font-size: 0.7rem; color: var(--green); display: none; }
+    .ok-msg.on { display: block; }
+    .form-toggle { font-size: 0.68rem; color: var(--muted); margin-top: 0.75rem; }
+    .form-toggle button { font-family: inherit; font-size: inherit; color: var(--text); background: none; border: none; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+
+    /* ── Connect card ── */
+    .connect-card { border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 2.5rem; }
+    .connect-card h3 { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem; }
+    .connect-status { font-size: 0.78rem; margin-bottom: 0.75rem; }
+    .connect-status.ok { color: var(--green); }
+    .connect-status.pending { color: var(--muted); }
+
+    /* ── Event cards ── */
+    .event-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+    .event-hd { display: flex; justify-content: space-between; align-items: flex-start; padding: 1rem 1.25rem; background: var(--card); border-bottom: 1px solid var(--border); gap: 1rem; }
+    .event-hd-left .event-title { font-size: 0.9rem; font-weight: 500; }
+    .event-hd-left .event-sub { font-size: 0.65rem; color: var(--muted); margin-top: 0.2rem; }
+    .badge { font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 9999px; border: 1px solid var(--border); color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+    .badge.threshold { border-color: var(--green); color: var(--green); }
+    .badge.confirmed { border-color: var(--text); color: var(--text); }
+
+    /* Progress */
+    .progress-row { padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); }
+    .progress-lbl { font-size: 0.62rem; color: var(--muted); display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+    .progress-bar { height: 4px; background: var(--border); border-radius: 9999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--text); border-radius: 9999px; }
+    .progress-fill.ready { background: var(--green); }
+
+    /* Confirm date form */
+    .confirm-row { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+    .confirm-row label { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.3rem; }
+    .confirm-row input { font-family: 'DM Mono', monospace; font-size: 0.8rem; background: var(--input); border: 1px solid var(--border); border-radius: 8px; padding: 0.45rem 0.75rem; color: var(--text); outline: none; min-width: 160px; }
+    .confirm-row input:focus { border-color: var(--text); background: var(--bg); }
+    .confirm-msg { font-size: 0.65rem; color: var(--muted); width: 100%; }
+    .confirm-msg.ok { color: var(--green); }
+    .confirm-msg.err { color: var(--red); }
+
+    /* Claims list */
+    .claims-toggle { padding: 0.65rem 1.25rem; font-size: 0.65rem; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+    .claims-toggle:hover { color: var(--text); }
+    .claims-list { display: none; }
+    .claims-list.open { display: block; }
+    .claim-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.55rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.72rem; gap: 1rem; }
+    .claim-row:hover { background: var(--card); }
+    .claim-name { font-weight: 500; }
+    .claim-email { font-size: 0.62rem; color: var(--muted); }
+    .claim-status { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+    .claim-status.confirmed { color: var(--green); }
+    .claim-status.declined { color: var(--red); }
+    .no-claims { padding: 0.75rem 1.25rem; font-size: 0.65rem; color: var(--muted); border-top: 1px solid var(--border); }
+
+    /* ── Create event ── */
+    .create-section { margin-top: 3rem; padding-top: 2.5rem; border-top: 1px solid var(--border); }
+    .form-actions { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; }
+    .form-msg { font-size: 0.7rem; color: var(--muted); }
+    .form-msg.ok { color: var(--green); }
+    .form-msg.err { color: var(--red); }
+
+    /* ── Empty ── */
+    .empty-state { padding-block: 2rem; font-size: 0.8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <a href="/fraise" class="nav-logo">fraise</a>
+  <div class="nav-right">
+    <div class="nav-biz" id="nav-biz" style="display:none;"><strong id="nav-biz-name"></strong></div>
+    <button class="btn-nav btn-nav-ghost" id="btn-signin" onclick="openAuth('login')">sign in</button>
+    <button class="btn-nav" id="btn-signout" style="display:none;" onclick="signOut()">sign out</button>
+  </div>
+</header>
+
+<main>
+  <div class="eyebrow">fraise</div>
+  <h1>for businesses</h1>
+
+  <!-- Auth panel -->
+  <div id="auth-panel">
+
+    <!-- Login -->
+    <div id="login-panel" class="auth-panel">
+      <div class="section-label">sign in</div>
+      <div class="field"><label>email</label><input type="email" id="li-email" placeholder="you@yourbusiness.com" autocomplete="email" /></div>
+      <div class="field"><label>password</label><input type="password" id="li-pw" placeholder="••••••••" autocomplete="current-password" /></div>
+      <div class="err-msg" id="li-err"></div>
+      <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem;">
+        <button class="btn-primary" id="btn-login" onclick="doLogin()">sign in →</button>
+      </div>
+      <div class="form-toggle">no account? <button onclick="openAuth('signup')">create one</button></div>
+    </div>
+
+    <!-- Signup -->
+    <div id="signup-panel" class="auth-panel" style="display:none;">
+      <div class="section-label">create account</div>
+      <div class="field"><label>business name</label><input type="text" id="su-name" placeholder="e.g. Commune Coffee" autocomplete="organization" /></div>
+      <div class="form-row">
+        <div class="field"><label>slug</label><input type="text" id="su-slug" placeholder="commune-coffee" /></div>
+        <div class="field"><label>email</label><input type="email" id="su-email" placeholder="you@yourbusiness.com" autocomplete="email" /></div>
+      </div>
+      <div class="field"><label>description</label><textarea id="su-desc" rows="2" placeholder="one sentence about what you do"></textarea></div>
+      <div class="field"><label>password</label><input type="password" id="su-pw" placeholder="8+ characters" autocomplete="new-password" /></div>
+      <div class="err-msg" id="su-err"></div>
+      <div style="display:flex;gap:0.75rem;align-items:center;margin-top:0.25rem;">
+        <button class="btn-primary" id="btn-signup" onclick="doSignup()">create account →</button>
+      </div>
+      <div class="form-toggle">have an account? <button onclick="openAuth('login')">sign in</button></div>
+    </div>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" style="display:none;">
+
+    <!-- Stripe Connect -->
+    <div class="connect-card" id="connect-card">
+      <h3>payouts</h3>
+      <div class="connect-status pending" id="connect-status">stripe not connected — payouts disabled.</div>
+      <button class="btn-primary btn-ghost" id="btn-connect" onclick="doConnect()" style="font-size:0.68rem;">connect stripe →</button>
+      <div class="ok-msg" id="connect-ok" style="margin-top:0.5rem;">stripe connected. payouts active.</div>
+    </div>
+
+    <!-- Events -->
+    <div class="section-label">your events</div>
+    <div id="events-list">
+      <div class="empty-state" id="events-empty" style="display:none;">no events yet — create one below.</div>
+    </div>
+
+    <!-- Create event -->
+    <div class="create-section">
+      <div class="section-label">create event</div>
+      <div class="field">
+        <label>title</label>
+        <input type="text" id="ce-title" placeholder="e.g. natural wine evening" />
+      </div>
+      <div class="field">
+        <label>description</label>
+        <textarea id="ce-desc" rows="3" placeholder="what's this event about?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="field"><label>min seats</label><input type="number" id="ce-min" placeholder="6" value="6" min="2" /></div>
+        <div class="field"><label>max seats</label><input type="number" id="ce-max" placeholder="20" value="20" min="2" /></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" id="btn-create" onclick="doCreateEvent()">create event →</button>
+        <span class="form-msg" id="create-msg"></span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';
+
+  let bizToken = localStorage.getItem('fraise_biz_token') || null;
+  let biz = null;
+
+  // ── Init ─────────────────────────────────────────────────────────────────────
+
+  async function init() {
+    if (bizToken) {
+      try {
+        const r = await fetch(API + '/api/fraise/businesses/me', { headers: { 'x-business-token': bizToken } });
+        if (!r.ok) { bizToken = null; localStorage.removeItem('fraise_biz_token'); }
+        else { biz = await r.json(); showDashboard(); }
+      } catch { bizToken = null; }
+    }
+    if (!biz) openAuth('login');
+
+    // Check if returning from Stripe Connect
+    const params = new URLSearchParams(location.search);
+    if (params.get('connect') === 'done' && bizToken) {
+      history.replaceState({}, '', location.pathname);
+      await verifyConnect();
+    }
+  }
+
+  // ── Auth ─────────────────────────────────────────────────────────────────────
+
+  function openAuth(mode) {
+    document.getElementById('auth-panel').style.display = '';
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('login-panel').style.display  = mode === 'login'  ? '' : 'none';
+    document.getElementById('signup-panel').style.display = mode === 'signup' ? '' : 'none';
+    document.getElementById('btn-signin').style.display = '';
+    document.getElementById('btn-signout').style.display = 'none';
+    document.getElementById('nav-biz').style.display = 'none';
+  }
+
+  async function doLogin() {
+    const email = document.getElementById('li-email').value.trim();
+    const pw    = document.getElementById('li-pw').value;
+    const err   = document.getElementById('li-err');
+    const btn   = document.getElementById('btn-login');
+    err.classList.remove('on');
+    if (!email || !pw) { err.textContent = 'email and password required.'; err.classList.add('on'); return; }
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + '/api/fraise/businesses/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pw }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'login failed');
+      bizToken = data.token; biz = data;
+      localStorage.setItem('fraise_biz_token', bizToken);
+      showDashboard();
+    } catch (e) {
+      err.textContent = e.message; err.classList.add('on');
+      btn.disabled = false; btn.textContent = 'sign in →';
+    }
+  }
+
+  async function doSignup() {
+    const name  = document.getElementById('su-name').value.trim();
+    const slug  = document.getElementById('su-slug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const email = document.getElementById('su-email').value.trim();
+    const desc  = document.getElementById('su-desc').value.trim();
+    const pw    = document.getElementById('su-pw').value;
+    const err   = document.getElementById('su-err');
+    const btn   = document.getElementById('btn-signup');
+    err.classList.remove('on');
+    if (!name || !slug || !email || pw.length < 8) { err.textContent = 'all fields required, password 8+ chars.'; err.classList.add('on'); return; }
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + '/api/fraise/businesses/signup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, slug, email, description: desc, password: pw }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'signup failed');
+      bizToken = data.token; biz = data;
+      localStorage.setItem('fraise_biz_token', bizToken);
+      showDashboard();
+    } catch (e) {
+      err.textContent = e.message; err.classList.add('on');
+      btn.disabled = false; btn.textContent = 'create account →';
+    }
+  }
+
+  function signOut() {
+    bizToken = null; biz = null;
+    localStorage.removeItem('fraise_biz_token');
+    openAuth('login');
+  }
+
+  // ── Dashboard ────────────────────────────────────────────────────────────────
+
+  async function showDashboard() {
+    document.getElementById('auth-panel').style.display = 'none';
+    document.getElementById('dashboard').style.display = '';
+    document.getElementById('btn-signin').style.display = 'none';
+    document.getElementById('btn-signout').style.display = '';
+    document.getElementById('nav-biz').style.display = '';
+    document.getElementById('nav-biz-name').textContent = biz.name;
+    updateConnectUI();
+    loadEvents();
+  }
+
+  function updateConnectUI() {
+    const onboarded = biz.stripe_connect_onboarded;
+    const statusEl = document.getElementById('connect-status');
+    const btnEl    = document.getElementById('btn-connect');
+    const okEl     = document.getElementById('connect-ok');
+    if (onboarded) {
+      statusEl.style.display = 'none';
+      btnEl.style.display = 'none';
+      okEl.classList.add('on');
+    } else {
+      statusEl.style.display = '';
+      btnEl.style.display = '';
+      okEl.classList.remove('on');
+    }
+  }
+
+  async function doConnect() {
+    const btn = document.getElementById('btn-connect');
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + '/api/fraise/businesses/connect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-business-token': bizToken },
+        body: JSON.stringify({ return_url: location.href }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'connect failed');
+      location.href = data.url;
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'connect stripe →';
+      alert(e.message);
+    }
+  }
+
+  async function verifyConnect() {
+    try {
+      const r = await fetch(API + '/api/fraise/businesses/connect/verify', {
+        method: 'POST', headers: { 'x-business-token': bizToken },
+      });
+      const data = await r.json();
+      if (data.onboarded) {
+        biz.stripe_connect_onboarded = true;
+        updateConnectUI();
+      }
+    } catch {}
+  }
+
+  // ── Events ───────────────────────────────────────────────────────────────────
+
+  async function loadEvents() {
+    try {
+      const r = await fetch(API + '/api/fraise/events', { headers: { 'x-business-token': bizToken } });
+      // Get all events and filter by business
+      const data = await r.json();
+      // We need business-specific events — use admin or filter client-side
+      // Actually we filter by business_slug from biz
+      const allEvents = (data.events || []).filter(e => e.business_slug === biz.slug);
+      renderEvents(allEvents);
+    } catch {}
+  }
+
+  function renderEvents(events) {
+    const list = document.getElementById('events-list');
+    const empty = document.getElementById('events-empty');
+    Array.from(list.querySelectorAll('.event-card')).forEach(el => el.remove());
+
+    if (!events.length) { empty.style.display = ''; return; }
+    empty.style.display = 'none';
+
+    events.forEach(ev => {
+      const card = buildEventCard(ev);
+      list.insertBefore(card, empty);
+    });
+  }
+
+  function buildEventCard(ev) {
+    const card = document.createElement('div');
+    card.className = 'event-card';
+    card.id = `ev-card-${ev.id}`;
+
+    const pct = ev.min_seats > 0 ? Math.min(100, Math.round((ev.seats_claimed / ev.min_seats) * 100)) : 0;
+    const badgeLabel = ev.status === 'confirmed' ? 'confirmed' : ev.status === 'threshold_met' ? 'going ahead' : 'open';
+    const badgeCls   = ev.status === 'confirmed' ? 'confirmed' : ev.status === 'threshold_met' ? 'threshold' : '';
+
+    // Header
+    const hd = document.createElement('div'); hd.className = 'event-hd';
+    const hdLeft = document.createElement('div'); hdLeft.className = 'event-hd-left';
+    const titleEl = document.createElement('div'); titleEl.className = 'event-title'; titleEl.textContent = ev.title;
+    const subEl = document.createElement('div'); subEl.className = 'event-sub';
+    subEl.textContent = `CA$120 · ${ev.seats_claimed}/${ev.max_seats} claimed · min ${ev.min_seats}`;
+    if (ev.event_date) { const dt = document.createElement('span'); dt.style.marginLeft='0.5rem'; dt.textContent = ev.event_date; subEl.appendChild(dt); }
+    hdLeft.append(titleEl, subEl);
+    const badge = document.createElement('div'); badge.className = 'badge' + (badgeCls ? ' ' + badgeCls : ''); badge.textContent = badgeLabel;
+    hd.append(hdLeft, badge);
+
+    // Progress
+    const prog = document.createElement('div'); prog.className = 'progress-row';
+    const lbl = document.createElement('div'); lbl.className = 'progress-lbl';
+    const lblL = document.createElement('span'); lblL.textContent = `${ev.seats_claimed} of ${ev.min_seats} to go ahead`;
+    const lblR = document.createElement('span'); lblR.textContent = pct + '%';
+    lbl.append(lblL, lblR);
+    const bar = document.createElement('div'); bar.className = 'progress-bar';
+    const fill = document.createElement('div'); fill.className = 'progress-fill' + (ev.status !== 'open' ? ' ready' : ''); fill.style.width = pct + '%';
+    bar.appendChild(fill); prog.append(lbl, bar);
+
+    // Confirm date row (only if threshold met or open)
+    const confirmRow = document.createElement('div'); confirmRow.className = 'confirm-row';
+    const dateWrap = document.createElement('div');
+    const dateLbl = document.createElement('label'); dateLbl.textContent = 'date';
+    const dateInput = document.createElement('input'); dateInput.type = 'text'; dateInput.placeholder = 'e.g. Saturday June 14, 7pm';
+    dateInput.id = `date-input-${ev.id}`;
+    if (ev.event_date) dateInput.value = ev.event_date;
+    dateWrap.append(dateLbl, dateInput);
+    const confirmBtn = document.createElement('button'); confirmBtn.className = 'btn-primary'; confirmBtn.style.fontSize = '0.68rem';
+    confirmBtn.textContent = ev.status === 'confirmed' ? 'resend →' : 'confirm + notify →';
+    confirmBtn.addEventListener('click', () => doConfirm(ev.id, confirmBtn));
+    const confirmMsg = document.createElement('div'); confirmMsg.className = 'confirm-msg'; confirmMsg.id = `confirm-msg-${ev.id}`;
+    confirmRow.append(dateWrap, confirmBtn, confirmMsg);
+
+    // Claims toggle
+    const toggle = document.createElement('div'); toggle.className = 'claims-toggle';
+    const toggleLeft = document.createElement('span'); toggleLeft.textContent = 'claims';
+    const toggleRight = document.createElement('span'); toggleRight.id = `toggle-icon-${ev.id}`; toggleRight.textContent = '↓';
+    toggle.append(toggleLeft, toggleRight);
+    const claimsList = document.createElement('div'); claimsList.className = 'claims-list'; claimsList.id = `claims-${ev.id}`;
+    toggle.addEventListener('click', () => toggleClaims(ev.id));
+
+    card.append(hd, prog, confirmRow, toggle, claimsList);
+    // Load claims immediately
+    fetchClaims(ev.id);
+    return card;
+  }
+
+  async function fetchClaims(eventId) {
+    try {
+      const r = await fetch(API + `/api/fraise/events/${eventId}/claims`, { headers: { 'x-business-token': bizToken } });
+      const data = await r.json();
+      renderClaims(eventId, data.claims || []);
+    } catch {}
+  }
+
+  function renderClaims(eventId, claims) {
+    const list = document.getElementById(`claims-${eventId}`);
+    const toggleEl = document.querySelector(`#ev-card-${eventId} .claims-toggle`);
+    if (!list) return;
+    list.innerHTML = '';
+    const count = claims.filter(c => c.status !== 'declined').length;
+
+    // Update toggle label
+    const toggleLeft = toggleEl?.querySelector('span:first-child');
+    if (toggleLeft) toggleLeft.textContent = `claims (${count})`;
+
+    if (!claims.length) {
+      const empty = document.createElement('div'); empty.className = 'no-claims'; empty.textContent = 'no claims yet.';
+      list.appendChild(empty); return;
+    }
+    claims.forEach(c => {
+      const row = document.createElement('div'); row.className = 'claim-row';
+      const left = document.createElement('div');
+      const name = document.createElement('div'); name.className = 'claim-name'; name.textContent = c.name;
+      const email = document.createElement('div'); email.className = 'claim-email'; email.textContent = c.email;
+      left.append(name, email);
+      const statusEl = document.createElement('div');
+      statusEl.className = 'claim-status' + (c.status === 'confirmed' ? ' confirmed' : c.status === 'declined' ? ' declined' : '');
+      statusEl.textContent = c.status;
+      row.append(left, statusEl);
+      list.appendChild(row);
+    });
+  }
+
+  function toggleClaims(eventId) {
+    const list = document.getElementById(`claims-${eventId}`);
+    const icon = document.getElementById(`toggle-icon-${eventId}`);
+    const open = list.classList.toggle('open');
+    icon.textContent = open ? '↑' : '↓';
+  }
+
+  async function doConfirm(eventId, btn) {
+    const dateVal = document.getElementById(`date-input-${eventId}`).value.trim();
+    const msgEl   = document.getElementById(`confirm-msg-${eventId}`);
+    msgEl.className = 'confirm-msg';
+    if (!dateVal) { msgEl.className = 'confirm-msg err'; msgEl.textContent = 'enter a date first.'; return; }
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = '—';
+    try {
+      const r = await fetch(API + `/api/fraise/events/${eventId}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-business-token': bizToken },
+        body: JSON.stringify({ event_date: dateVal }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'failed');
+      msgEl.className = 'confirm-msg ok'; msgEl.textContent = `confirmed. ${data.notified} member${data.notified === 1 ? '' : 's'} notified.`;
+      btn.textContent = 'resend →';
+    } catch (e) {
+      msgEl.className = 'confirm-msg err'; msgEl.textContent = e.message;
+      btn.textContent = orig;
+    }
+    btn.disabled = false;
+  }
+
+  // ── Create event ─────────────────────────────────────────────────────────────
+
+  async function doCreateEvent() {
+    const title = document.getElementById('ce-title').value.trim();
+    const desc  = document.getElementById('ce-desc').value.trim();
+    const min   = parseInt(document.getElementById('ce-min').value) || 6;
+    const max   = parseInt(document.getElementById('ce-max').value) || 20;
+    const msg   = document.getElementById('create-msg');
+    const btn   = document.getElementById('btn-create');
+    msg.className = 'form-msg';
+    if (!title) { msg.className = 'form-msg err'; msg.textContent = 'title required.'; return; }
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + '/api/fraise/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-business-token': bizToken },
+        body: JSON.stringify({ title, description: desc, min_seats: min, max_seats: max }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'failed');
+      msg.className = 'form-msg ok'; msg.textContent = 'event created.';
+      document.getElementById('ce-title').value = '';
+      document.getElementById('ce-desc').value = '';
+      loadEvents();
+    } catch (e) {
+      msg.className = 'form-msg err'; msg.textContent = e.message;
+    }
+    btn.disabled = false; btn.textContent = 'create event →';
+  }
+
+  // ── Keyboard ─────────────────────────────────────────────────────────────────
+
+  document.getElementById('li-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+  document.getElementById('su-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doSignup(); });
+
+  init();
+</script>
+</body>
+</html>

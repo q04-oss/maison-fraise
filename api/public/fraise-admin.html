@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>fraise — admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FFFFFF; --text: #1C1C1E; --muted: #8E8E93;
+      --border: #E5E1DA; --card: #F7F5F2; --input: #F0EDE8;
+      --green: #27AE60; --red: #C0392B;
+    }
+    html { background: var(--bg); color: var(--text); font-family: 'DM Mono', monospace; font-size: 14px; -webkit-font-smoothing: antialiased; }
+    body { min-height: 100dvh; }
+    main { max-width: 800px; margin-inline: auto; padding: clamp(3rem,8vw,5rem) clamp(1.5rem,6vw,4rem); }
+    nav { margin-bottom: 2.5rem; }
+    nav a { font-size: 0.72rem; color: var(--muted); text-decoration: none; letter-spacing: 0.04em; }
+    nav a:hover { color: var(--text); }
+    .eyebrow { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+    h1 { font-size: 1rem; font-weight: 500; margin-bottom: 2rem; }
+
+    /* Auth */
+    .auth { max-width: 280px; }
+    .auth label { font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.4rem; }
+    .auth input { width: 100%; font-family: 'DM Mono', monospace; font-size: 0.85rem; background: var(--input); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.85rem; color: var(--text); outline: none; margin-bottom: 0.75rem; }
+    .auth input:focus { border-color: var(--text); background: var(--bg); }
+    .btn { font-family: 'DM Mono', monospace; font-size: 0.72rem; letter-spacing: 0.06em; background: var(--text); color: var(--bg); border: none; border-radius: 9999px; padding: 0.55rem 1.25rem; cursor: pointer; transition: opacity 0.15s; }
+    .btn:hover { opacity: 0.8; }
+    .err { font-size: 0.7rem; color: var(--red); margin-top: 0.5rem; display: none; }
+    .err.on { display: block; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+    .tab { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; background: none; border: none; color: var(--muted); padding: 0.6rem 1.25rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); border-bottom-color: var(--text); }
+
+    /* Table */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; font-weight: 400; }
+    .data-table td { font-size: 0.72rem; padding: 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    .data-table tr:hover td { background: var(--card); }
+    .data-table .muted { color: var(--muted); }
+    .badge { font-size: 0.55rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 9999px; border: 1px solid var(--border); color: var(--muted); }
+    .badge.active { border-color: var(--green); color: var(--green); }
+    .badge.threshold { border-color: var(--text); color: var(--text); }
+    .badge.confirmed { border-color: var(--text); color: var(--text); }
+
+    /* Stats bar */
+    .stats { display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }
+    .stat { display: flex; flex-direction: column; gap: 0.2rem; }
+    .stat-val { font-size: 1.5rem; font-weight: 500; }
+    .stat-lbl { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+
+    .section-label { font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .empty { font-size: 0.78rem; color: var(--muted); padding-block: 2rem; }
+
+    .overflow-x { overflow-x: auto; }
+  </style>
+</head>
+<body>
+<main>
+  <nav><a href="/fraise">← fraise</a></nav>
+  <div class="eyebrow">fraise</div>
+  <h1>admin</h1>
+
+  <div id="auth-section">
+    <div class="auth">
+      <label for="pin-input">admin pin</label>
+      <input type="password" id="pin-input" placeholder="••••••" autocomplete="off" />
+      <button class="btn" onclick="doAuth()">enter →</button>
+      <div class="err" id="auth-err">incorrect pin.</div>
+    </div>
+  </div>
+
+  <div id="dashboard" style="display:none;">
+    <div class="stats">
+      <div class="stat"><span class="stat-val" id="stat-members">—</span><span class="stat-lbl">members</span></div>
+      <div class="stat"><span class="stat-val" id="stat-businesses">—</span><span class="stat-lbl">businesses</span></div>
+      <div class="stat"><span class="stat-val" id="stat-events">—</span><span class="stat-lbl">events</span></div>
+      <div class="stat"><span class="stat-val" id="stat-credits">—</span><span class="stat-lbl">credits sold</span></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('members')">members</button>
+      <button class="tab" onclick="showTab('businesses')">businesses</button>
+      <button class="tab" onclick="showTab('events')">events</button>
+    </div>
+
+    <div class="tab-panel active" id="tab-members">
+      <div class="overflow-x">
+        <table class="data-table">
+          <thead><tr><th>name</th><th>email</th><th>credits</th><th>purchased</th><th>joined</th></tr></thead>
+          <tbody id="members-tbody"><tr><td colspan="5" class="empty muted">loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-businesses">
+      <div class="overflow-x">
+        <table class="data-table">
+          <thead><tr><th>name</th><th>slug</th><th>email</th><th>stripe</th><th>joined</th></tr></thead>
+          <tbody id="businesses-tbody"><tr><td colspan="5" class="empty muted">loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="tab-events">
+      <div class="overflow-x">
+        <table class="data-table">
+          <thead><tr><th>title</th><th>business</th><th>claimed</th><th>min</th><th>max</th><th>status</th><th>date</th></tr></thead>
+          <tbody id="events-tbody"><tr><td colspan="7" class="empty muted">loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';
+  let pin = '';
+
+  document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(); });
+
+  async function doAuth() {
+    const val = document.getElementById('pin-input').value;
+    const err = document.getElementById('auth-err');
+    err.classList.remove('on');
+    // Verify pin by attempting to load members
+    try {
+      const r = await fetch(API + '/api/fraise/admin/members', { headers: { 'x-admin-pin': val } });
+      if (!r.ok) { err.classList.add('on'); return; }
+      pin = val;
+      document.getElementById('auth-section').style.display = 'none';
+      document.getElementById('dashboard').style.display = '';
+      loadAll();
+    } catch { err.classList.add('on'); }
+  }
+
+  function showTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    event.currentTarget.classList.add('active');
+  }
+
+  async function loadAll() {
+    const [mr, br, er] = await Promise.all([
+      fetch(API + '/api/fraise/admin/members',    { headers: { 'x-admin-pin': pin } }),
+      fetch(API + '/api/fraise/admin/businesses', { headers: { 'x-admin-pin': pin } }),
+      fetch(API + '/api/fraise/admin/events',     { headers: { 'x-admin-pin': pin } }),
+    ]);
+    const [md, bd, ed] = await Promise.all([mr.json(), br.json(), er.json()]);
+
+    const members    = md.members    || [];
+    const businesses = bd.businesses || [];
+    const events     = ed.events     || [];
+
+    // Stats
+    document.getElementById('stat-members').textContent    = members.length;
+    document.getElementById('stat-businesses').textContent = businesses.length;
+    document.getElementById('stat-events').textContent     = events.length;
+    const totalCredits = members.reduce((s, m) => s + (m.credits_purchased || 0), 0);
+    document.getElementById('stat-credits').textContent    = totalCredits;
+
+    // Members table
+    const mtbody = document.getElementById('members-tbody');
+    mtbody.innerHTML = '';
+    if (!members.length) { mtbody.innerHTML = '<tr><td colspan="5" class="muted">none yet.</td></tr>'; }
+    else members.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '';
+      const tdName = document.createElement('td'); tdName.textContent = m.name;
+      const tdEmail = document.createElement('td'); tdEmail.className = 'muted'; tdEmail.textContent = m.email;
+      const tdBal = document.createElement('td'); tdBal.textContent = m.credit_balance;
+      const tdPurch = document.createElement('td'); tdPurch.className = 'muted'; tdPurch.textContent = m.credits_purchased;
+      const tdJoined = document.createElement('td'); tdJoined.className = 'muted'; tdJoined.textContent = fmtDate(m.created_at);
+      tr.append(tdName, tdEmail, tdBal, tdPurch, tdJoined);
+      mtbody.appendChild(tr);
+    });
+
+    // Businesses table
+    const btbody = document.getElementById('businesses-tbody');
+    btbody.innerHTML = '';
+    if (!businesses.length) { btbody.innerHTML = '<tr><td colspan="5" class="muted">none yet.</td></tr>'; }
+    else businesses.forEach(b => {
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td'); tdName.textContent = b.name;
+      const tdSlug = document.createElement('td'); tdSlug.className = 'muted'; tdSlug.textContent = b.slug;
+      const tdEmail = document.createElement('td'); tdEmail.className = 'muted'; tdEmail.textContent = b.email;
+      const tdStripe = document.createElement('td');
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (b.stripe_connect_onboarded ? ' active' : '');
+      badge.textContent = b.stripe_connect_onboarded ? 'connected' : 'pending';
+      tdStripe.appendChild(badge);
+      const tdJoined = document.createElement('td'); tdJoined.className = 'muted'; tdJoined.textContent = fmtDate(b.created_at);
+      tr.append(tdName, tdSlug, tdEmail, tdStripe, tdJoined);
+      btbody.appendChild(tr);
+    });
+
+    // Events table
+    const etbody = document.getElementById('events-tbody');
+    etbody.innerHTML = '';
+    if (!events.length) { etbody.innerHTML = '<tr><td colspan="7" class="muted">none yet.</td></tr>'; }
+    else events.forEach(ev => {
+      const tr = document.createElement('tr');
+      const tdTitle = document.createElement('td'); tdTitle.textContent = ev.title;
+      const tdBiz = document.createElement('td'); tdBiz.className = 'muted'; tdBiz.textContent = ev.business_name;
+      const tdClaimed = document.createElement('td'); tdClaimed.textContent = ev.seats_claimed;
+      const tdMin = document.createElement('td'); tdMin.className = 'muted'; tdMin.textContent = ev.min_seats;
+      const tdMax = document.createElement('td'); tdMax.className = 'muted'; tdMax.textContent = ev.max_seats;
+      const tdStatus = document.createElement('td');
+      const sbadge = document.createElement('span');
+      sbadge.className = 'badge' + (ev.status === 'threshold_met' ? ' threshold' : ev.status === 'confirmed' ? ' confirmed' : '');
+      sbadge.textContent = ev.status === 'threshold_met' ? 'going ahead' : ev.status;
+      tdStatus.appendChild(sbadge);
+      const tdDate = document.createElement('td'); tdDate.className = 'muted'; tdDate.textContent = ev.event_date || '—';
+      tr.append(tdTitle, tdBiz, tdClaimed, tdMin, tdMax, tdStatus, tdDate);
+      etbody.appendChild(tr);
+    });
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    return new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+</script>
+</body>
+</html>
