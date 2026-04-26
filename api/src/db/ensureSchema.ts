@@ -515,6 +515,9 @@ export async function ensureSchema(): Promise<void> {
   await run('fraise_members.push_token',  sql`ALTER TABLE fraise_members  ADD COLUMN IF NOT EXISTS push_token TEXT`);
   await run('fraise_members.apple_sub',   sql`ALTER TABLE fraise_members  ADD COLUMN IF NOT EXISTS apple_sub TEXT UNIQUE`);
   await run('fraise_members.password_hash_nullable', sql`ALTER TABLE fraise_members ALTER COLUMN password_hash DROP NOT NULL`);
+  await run('fraise_events.location_text', sql`ALTER TABLE fraise_events ADD COLUMN IF NOT EXISTS location_text TEXT`);
+  await run('fraise_events.lat',           sql`ALTER TABLE fraise_events ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
+  await run('fraise_events.lng',           sql`ALTER TABLE fraise_events ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`);
   await run('fraise_businesses.lat',      sql`ALTER TABLE fraise_businesses ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION`);
   await run('fraise_businesses.lng',      sql`ALTER TABLE fraise_businesses ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION`);
 

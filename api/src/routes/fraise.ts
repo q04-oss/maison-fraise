@@ -266,6 +266,7 @@ router.get('/members/invitations', requireMember, async (req: any, res: any) => 
         i.id, i.status, i.created_at, i.responded_at,
         e.id AS event_id, e.title, e.description, e.price_cents,
         e.min_seats, e.max_seats, e.seats_claimed, e.status AS event_status, e.event_date,
+        e.location_text, e.lat, e.lng,
         b.name AS business_name, b.slug AS business_slug
       FROM fraise_invitations i
       JOIN fraise_events e ON e.id = i.event_id
@@ -678,7 +679,10 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  const eventDate = String(req.body?.event_date ?? '').trim().slice(0, 100);
+  const eventDate    = String(req.body?.event_date ?? '').trim().slice(0, 100);
+  const locationText = String(req.body?.location_text ?? '').trim().slice(0, 500) || null;
+  const lat          = req.body?.lat  != null ? parseFloat(req.body.lat)  : null;
+  const lng          = req.body?.lng  != null ? parseFloat(req.body.lng)  : null;
   if (!eventDate) return res.status(400).json({ error: 'event_date required' });
 
   try {
@@ -692,7 +696,10 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
     if (event.status === 'confirmed') return res.status(400).json({ error: 'already confirmed' });
 
     await db.execute(sql`
-      UPDATE fraise_events SET status = 'confirmed', event_date = ${eventDate} WHERE id = ${eventId}
+      UPDATE fraise_events
+      SET status = 'confirmed', event_date = ${eventDate},
+          location_text = ${locationText}, lat = ${lat}, lng = ${lng}
+      WHERE id = ${eventId}
     `);
 
     // Auto-confirm all accepted invitations
@@ -714,7 +721,7 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
       sendExpoPush(pushTokens, `${event.title}`, `date confirmed: ${eventDate}`, { screen: 'my-claims' });
     }
 
-    res.json({ ok: true, confirmed: invitations.length, event_date: eventDate });
+    res.json({ ok: true, confirmed: invitations.length, event_date: eventDate, location_text: locationText, lat, lng });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
