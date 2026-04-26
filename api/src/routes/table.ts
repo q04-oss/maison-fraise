@@ -3,8 +3,12 @@ import { db } from '../db';
 import { tableEvents, tableInstructors, tableBookings, tableBookingTokens, users } from '../db/schema';
 import { eq, and, sql, inArray, isNull } from 'drizzle-orm';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 import { stripe } from '../lib/stripe';
-import { sendTableBookingConfirmation, sendTableClaimEmail, sendTableDateAnnouncedWithConfirm } from '../lib/resend';
+import {
+  sendTableBookingConfirmation, sendTableClaimEmail, sendTableDateAnnouncedWithConfirm,
+  sendPoolJoinConfirmation, sendPoolCallNotification,
+} from '../lib/resend';
 import { requireUser } from '../lib/auth';
 
 function requirePin(req: Request, res: Response, next: NextFunction): void {
@@ -604,6 +608,132 @@ router.post('/bookings/:id/refund', requirePin, async (req: any, res: any) => {
   }
 });
 
+// ── Venue operator accounts ──────────────────────────────────────────────
+
+const FRAISE_PLATFORM_FEE = 0.15; // 15% platform fee
+
+async function requireVenueSession(req: any, res: any, next: any) {
+  const token = req.headers['x-venue-token'] as string;
+  if (!token) { res.status(401).json({ error: 'unauthorized' }); return; }
+  const rows = await db.execute(sql`
+    SELECT slug FROM table_venue_sessions
+    WHERE token = ${token} AND expires_at > now()
+    LIMIT 1
+  `);
+  const row = ((rows as any).rows ?? rows)[0] as any;
+  if (!row) { res.status(401).json({ error: 'session expired' }); return; }
+  req.venueSlug = row.slug;
+  next();
+}
+
+// POST /api/table/venues/signup
+router.post('/venues/signup', async (req: any, res: any) => {
+  const displayName = String(req.body?.display_name ?? '').trim().slice(0, 200);
+  const slug        = String(req.body?.slug ?? '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 60);
+  const email       = String(req.body?.email ?? '').trim().slice(0, 200);
+  const password    = String(req.body?.password ?? '');
+  const priceCents  = parseInt(req.body?.price_cents) || 12000;
+  if (!displayName || !slug || !email || password.length < 8) {
+    return res.status(400).json({ error: 'display_name, slug, email, and password (8+ chars) required' });
+  }
+  try {
+    const existing = await db.execute(sql`SELECT id FROM table_venues WHERE slug = ${slug} OR email = ${email} LIMIT 1`);
+    if (((existing as any).rows ?? existing).length) {
+      return res.status(409).json({ error: 'slug or email already taken' });
+    }
+    const passwordHash = await bcrypt.hash(password, 10);
+    await db.execute(sql`
+      INSERT INTO table_venues (slug, display_name, email, password_hash, price_cents)
+      VALUES (${slug}, ${displayName}, ${email}, ${passwordHash}, ${priceCents})
+    `);
+    const token = crypto.randomBytes(32).toString('hex');
+    await db.execute(sql`
+      INSERT INTO table_venue_sessions (slug, token, expires_at)
+      VALUES (${slug}, ${token}, now() + interval '30 days')
+    `);
+    res.json({ ok: true, slug, token });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/table/venues/login
+router.post('/venues/login', async (req: any, res: any) => {
+  const email    = String(req.body?.email ?? '').trim();
+  const password = String(req.body?.password ?? '');
+  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+  try {
+    const rows = await db.execute(sql`SELECT slug, password_hash, display_name, price_cents, stripe_connect_onboarded FROM table_venues WHERE email = ${email} LIMIT 1`);
+    const venue = ((rows as any).rows ?? rows)[0] as any;
+    if (!venue) return res.status(401).json({ error: 'invalid credentials' });
+    const valid = await bcrypt.compare(password, venue.password_hash);
+    if (!valid) return res.status(401).json({ error: 'invalid credentials' });
+    const token = crypto.randomBytes(32).toString('hex');
+    await db.execute(sql`
+      INSERT INTO table_venue_sessions (slug, token, expires_at)
+      VALUES (${venue.slug}, ${token}, now() + interval '30 days')
+    `);
+    res.json({ ok: true, slug: venue.slug, display_name: venue.display_name, price_cents: venue.price_cents, stripe_connect_onboarded: venue.stripe_connect_onboarded, token });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// GET /api/table/venues/me — operator's own venue info
+router.get('/venues/me', requireVenueSession, async (req: any, res: any) => {
+  const rows = await db.execute(sql`
+    SELECT slug, display_name, email, price_cents, stripe_connect_account_id, stripe_connect_onboarded, created_at
+    FROM table_venues WHERE slug = ${req.venueSlug} LIMIT 1
+  `);
+  const venue = ((rows as any).rows ?? rows)[0] as any;
+  if (!venue) return res.status(404).json({ error: 'not found' });
+  res.json(venue);
+});
+
+// POST /api/table/venues/connect — create Stripe Connect account + onboarding link
+router.post('/venues/connect', requireVenueSession, async (req: any, res: any) => {
+  const returnUrl = String(req.body?.return_url ?? 'https://fraise.box/table/admin');
+  try {
+    const rows = await db.execute(sql`SELECT stripe_connect_account_id FROM table_venues WHERE slug = ${req.venueSlug} LIMIT 1`);
+    const venue = ((rows as any).rows ?? rows)[0] as any;
+    if (!venue) return res.status(404).json({ error: 'not found' });
+
+    let accountId = venue.stripe_connect_account_id;
+    if (!accountId) {
+      const account = await stripe.accounts.create({ type: 'express' });
+      accountId = account.id;
+      await db.execute(sql`UPDATE table_venues SET stripe_connect_account_id = ${accountId} WHERE slug = ${req.venueSlug}`);
+    }
+
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: returnUrl,
+      return_url: returnUrl + '?connect=done',
+      type: 'account_onboarding',
+    });
+    res.json({ url: link.url });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/table/venues/connect/verify — called on return from Stripe, marks onboarded
+router.post('/venues/connect/verify', requireVenueSession, async (req: any, res: any) => {
+  try {
+    const rows = await db.execute(sql`SELECT stripe_connect_account_id FROM table_venues WHERE slug = ${req.venueSlug} LIMIT 1`);
+    const venue = ((rows as any).rows ?? rows)[0] as any;
+    if (!venue?.stripe_connect_account_id) return res.status(400).json({ error: 'no connect account' });
+    const account = await stripe.accounts.retrieve(venue.stripe_connect_account_id);
+    const onboarded = account.details_submitted;
+    if (onboarded) {
+      await db.execute(sql`UPDATE table_venues SET stripe_connect_onboarded = true WHERE slug = ${req.venueSlug}`);
+    }
+    res.json({ onboarded });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 // ── Pool (table memberships) ─────────────────────────────────────────────
 
 function poolCors(req: any, res: any, next: any) {
@@ -646,12 +776,23 @@ router.post('/pool/checkout', poolCors, async (req: any, res: any) => {
     return res.status(400).json({ error: 'slug, name, email, and amount_cents required' });
   }
   try {
-    const intent = await stripe.paymentIntents.create({
+    // Check if venue has Stripe Connect set up
+    const venueRows = await db.execute(sql`SELECT stripe_connect_account_id, stripe_connect_onboarded FROM table_venues WHERE slug = ${slug} LIMIT 1`);
+    const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
+
+    const intentParams: any = {
       amount: amountCents,
       currency: 'cad',
       automatic_payment_methods: { enabled: true },
       metadata: { slug, name, email, type: 'table_pool' },
-    });
+    };
+
+    if (venue?.stripe_connect_onboarded && venue?.stripe_connect_account_id) {
+      intentParams.application_fee_amount = Math.round(amountCents * FRAISE_PLATFORM_FEE);
+      intentParams.transfer_data = { destination: venue.stripe_connect_account_id };
+    }
+
+    const intent = await stripe.paymentIntents.create(intentParams);
     res.json({ client_secret: intent.client_secret });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
@@ -669,7 +810,6 @@ router.post('/pool/join', poolCors, async (req: any, res: any) => {
     return res.status(400).json({ error: 'missing fields' });
   }
   try {
-    // Verify payment succeeded
     const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (intent.status !== 'succeeded') {
       return res.status(402).json({ error: 'payment not confirmed' });
@@ -679,6 +819,11 @@ router.post('/pool/join', poolCors, async (req: any, res: any) => {
       VALUES (${slug}, ${name}, ${email}, ${amountCents}, ${paymentIntentId}, 'waiting')
       ON CONFLICT (stripe_payment_intent_id) DO NOTHING
     `);
+    // Get venue display name for email
+    const venueRows = await db.execute(sql`SELECT display_name FROM table_venues WHERE slug = ${slug} LIMIT 1`);
+    const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
+    const venueName = venue?.display_name ?? slug;
+    sendPoolJoinConfirmation({ to: email, name, venueName }).catch(() => {});
     res.json({ ok: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
@@ -706,37 +851,70 @@ router.get('/pool', requirePin, async (req: any, res: any) => {
   }
 });
 
-// POST /api/table/pool/call — admin: call N members from the pool
-router.post('/pool/call', requirePin, async (req: any, res: any) => {
-  const slug = String(req.body?.slug ?? '').trim();
+// POST /api/table/pool/call — admin: call N members from the pool (pin OR venue session)
+router.post('/pool/call', async (req: any, res: any) => {
+  // Accept either global admin PIN or a venue session token
+  const pin = req.headers['x-admin-pin'];
+  const venueToken = req.headers['x-venue-token'] as string;
+  let authorizedSlug: string | null = null;
+
+  if (pin && pin === process.env.ADMIN_PIN) {
+    authorizedSlug = String(req.body?.slug ?? '').trim(); // global admin can call any slug
+  } else if (venueToken) {
+    const tokenRows = await db.execute(sql`SELECT slug FROM table_venue_sessions WHERE token = ${venueToken} AND expires_at > now() LIMIT 1`);
+    const row = ((tokenRows as any).rows ?? tokenRows)[0] as any;
+    if (row) authorizedSlug = row.slug; // operator can only call their own slug
+  }
+
+  if (!authorizedSlug) return res.status(401).json({ error: 'unauthorized' });
+
+  const slug = authorizedSlug;
   const seats = parseInt(req.body?.seats) || 0;
   const note = String(req.body?.note ?? '').trim().slice(0, 500);
-  if (!slug || seats < 1) return res.status(400).json({ error: 'slug and seats required' });
+  if (seats < 1) return res.status(400).json({ error: 'seats required' });
   try {
-    // Select longest-waiting members not recently called
     const rows = await db.execute(sql`
-      SELECT id, name, email
-      FROM table_memberships
+      SELECT id, name, email FROM table_memberships
       WHERE slug = ${slug} AND status = 'waiting'
-      ORDER BY created_at ASC
-      LIMIT ${seats}
+      ORDER BY created_at ASC LIMIT ${seats}
     `);
     const members = (rows as any).rows ?? rows;
     if (!members.length) return res.status(400).json({ error: 'no waiting members' });
     const ids = members.map((m: any) => m.id);
-    await db.execute(sql`
-      UPDATE table_memberships
-      SET status = 'called', last_called_at = now()
-      WHERE id = ANY(${ids}::int[])
-    `);
+    await db.execute(sql`UPDATE table_memberships SET status = 'called', last_called_at = now() WHERE id = ANY(${ids}::int[])`);
+
+    // Get venue display name for emails
+    const venueRows = await db.execute(sql`SELECT display_name FROM table_venues WHERE slug = ${slug} LIMIT 1`);
+    const venue = ((venueRows as any).rows ?? venueRows)[0] as any;
+    const venueName = venue?.display_name ?? slug;
+
+    // Fire-and-forget notifications
+    for (const m of members) {
+      sendPoolCallNotification({ to: m.email, name: m.name, venueName, note: note || undefined }).catch(() => {});
+    }
+
     res.json({ called: members, note });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
 });
 
-// POST /api/table/pool/attend — admin: mark members as attended and roll them back to waiting
-router.post('/pool/attend', requirePin, async (req: any, res: any) => {
+// POST /api/table/pool/attend — mark members as attended (pin or venue session)
+router.post('/pool/attend', async (req: any, res: any) => {
+  const pin = req.headers['x-admin-pin'];
+  const venueToken = req.headers['x-venue-token'] as string;
+  const isAdmin = pin && pin === process.env.ADMIN_PIN;
+  if (!isAdmin && venueToken) {
+    const r = await db.execute(sql`SELECT slug FROM table_venue_sessions WHERE token = ${venueToken} AND expires_at > now() LIMIT 1`);
+    if (!((r as any).rows ?? r).length) return res.status(401).json({ error: 'unauthorized' });
+  } else if (!isAdmin) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  // fall through to handler below
+  return handleAttend(req, res);
+});
+
+async function handleAttend(req: any, res: any) {
   const ids: number[] = req.body?.ids ?? [];
   if (!ids.length) return res.status(400).json({ error: 'ids required' });
   try {
@@ -749,7 +927,7 @@ router.post('/pool/attend', requirePin, async (req: any, res: any) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
-});
+}
 
 // GET /api/table/pool/slugs — admin: list all slugs that have a pool
 router.get('/pool/slugs', requirePin, async (req: any, res: any) => {

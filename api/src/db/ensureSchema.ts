@@ -391,6 +391,28 @@ export async function ensureSchema(): Promise<void> {
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
   )`);
 
+  // ── Table venues (operator accounts) ────────────────────────────────────
+  await run('table_venues', sql`CREATE TABLE IF NOT EXISTS table_venues (
+    id SERIAL PRIMARY KEY,
+    slug TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    price_cents INTEGER NOT NULL DEFAULT 12000,
+    active BOOLEAN NOT NULL DEFAULT true,
+    stripe_connect_account_id TEXT,
+    stripe_connect_onboarded BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
+  await run('table_venue_sessions', sql`CREATE TABLE IF NOT EXISTS table_venue_sessions (
+    id SERIAL PRIMARY KEY,
+    slug TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // ── Table memberships (pool) ─────────────────────────────────────────────
   await run('table_memberships', sql`CREATE TABLE IF NOT EXISTS table_memberships (
     id SERIAL PRIMARY KEY,

@@ -720,6 +720,10 @@ app.get('/table/abstract', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/table-abstract.html'));
 });
 
+app.get('/table/join', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/table-join.html'));
+});
+
 app.get('/table/widget.js', (_req, res) => {
   res.setHeader('Content-Type', 'application/javascript');
   res.setHeader('Access-Control-Allow-Origin', '*');

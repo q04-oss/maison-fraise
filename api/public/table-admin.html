@@ -134,6 +134,19 @@
     .pool-attended-btn { font-family: 'DM Mono', monospace; font-size: 0.58rem; color: var(--muted); background: none; border: 1px solid var(--border); border-radius: 9999px; padding: 0.15rem 0.55rem; cursor: pointer; }
     .pool-attended-btn:hover { border-color: var(--text); color: var(--text); }
     .pool-empty { padding: 0.75rem 1.25rem; font-size: 0.65rem; color: var(--muted); border-top: 1px solid var(--border); }
+
+    /* Embed + connect */
+    .embed-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:1.25rem; margin-bottom:2rem; }
+    .embed-card h3 { font-size:0.65rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:0.75rem; }
+    .embed-code { font-size:0.68rem; word-break:break-all; line-height:1.7; color:var(--text); cursor:pointer; }
+    .embed-code:hover { text-decoration:underline; text-underline-offset:3px; }
+    .copy-hint { font-size:0.6rem; color:var(--muted); margin-top:0.35rem; }
+    .connect-btn { font-family:inherit; font-size:0.65rem; letter-spacing:0.06em; background:none; color:var(--text); border:1px solid var(--border); border-radius:9999px; padding:0.4rem 1rem; cursor:pointer; margin-top:0.75rem; }
+    .connect-btn:hover { border-color:var(--text); }
+    .connect-ok { font-size:0.65rem; color:var(--green); margin-top:0.5rem; display:none; }
+    .connect-ok.on { display:block; }
+    .auth-toggle { font-size:0.65rem; color:var(--muted); margin-top:0.75rem; }
+    .auth-toggle button { font-family:inherit; font-size:inherit; color:var(--text); background:none; border:none; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   </style>
 </head>
 <body>
@@ -143,15 +156,42 @@
   <h1>table admin</h1>
 
   <div id="auth-section">
-    <div class="auth">
+    <!-- Global admin PIN -->
+    <div id="pin-view" class="auth">
       <label for="pin-input">admin pin</label>
       <input type="password" id="pin-input" placeholder="••••••" autocomplete="off" />
       <button class="btn" onclick="doAuth()">enter →</button>
       <div class="err" id="auth-err">incorrect pin</div>
+      <div class="auth-toggle" style="margin-top:0.75rem;">venue operator? <button onclick="showVenueLogin()">sign in here</button></div>
+    </div>
+
+    <!-- Venue operator login -->
+    <div id="venue-login-view" style="display:none;" class="auth">
+      <label for="v-email">email</label>
+      <input type="email" id="v-email" placeholder="you@yourvenue.com" autocomplete="email" style="margin-bottom:0.75rem;" />
+      <label for="v-pw">password</label>
+      <input type="password" id="v-pw" placeholder="••••••••" autocomplete="current-password" />
+      <button class="btn" style="margin-top:0.75rem;" onclick="doVenueLogin()">sign in →</button>
+      <div class="err" id="venue-err"></div>
+      <div class="auth-toggle">box fraise admin? <button onclick="showPinLogin()">use pin</button></div>
     </div>
   </div>
 
   <div id="dashboard" style="display:none;">
+    <!-- Embed + connect card (shown for venue operators) -->
+    <div id="venue-card" style="display:none;">
+      <div class="embed-card">
+        <h3>embed code</h3>
+        <div class="embed-code" id="embed-code-display" onclick="copyEmbed()"></div>
+        <div class="copy-hint" id="embed-copy-hint">click to copy</div>
+        <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;">
+          <div style="font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;">payouts</div>
+          <button class="connect-btn" id="connect-stripe-btn" onclick="connectStripe()">connect stripe →</button>
+          <div class="connect-ok" id="connect-ok">stripe connected. payouts active.</div>
+        </div>
+      </div>
+    </div>
+
     <div class="section-label" style="margin-bottom:1.5rem;">events</div>
     <div class="events" id="events-list"></div>
 
@@ -210,39 +250,153 @@
 
 <script>
   let pin = '';
+  let venueToken = null;
+  let venueSlug  = null;
+  let venuePriceCents = 12000;
 
-  document.getElementById('pin-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') doAuth();
-  });
+  // Auto-login if venue session exists
+  const storedToken = localStorage.getItem('venue_token');
+  const storedSlug  = localStorage.getItem('venue_slug');
+  if (storedToken && storedSlug) {
+    venueToken = storedToken; venueSlug = storedSlug;
+    venuePriceCents = parseInt(localStorage.getItem('venue_price') || '12000');
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    loadDashboard();
+    showVenueCard();
+  }
+
+  document.getElementById('pin-input').addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(); });
+  document.getElementById('v-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doVenueLogin(); });
+
+  function showVenueLogin() {
+    document.getElementById('pin-view').style.display = 'none';
+    document.getElementById('venue-login-view').style.display = 'block';
+    document.getElementById('v-email').focus();
+  }
+  function showPinLogin() {
+    document.getElementById('venue-login-view').style.display = 'none';
+    document.getElementById('pin-view').style.display = 'block';
+  }
 
   async function doAuth() {
     const val = document.getElementById('pin-input').value.trim();
     if (!val) return;
-    // Test pin by fetching events
     const res = await fetch('/api/table/events', { headers: { 'X-Admin-PIN': val } });
-    if (!res.ok && res.status === 401) {
-      document.getElementById('auth-err').classList.add('on');
-      return;
-    }
+    if (!res.ok && res.status === 401) { document.getElementById('auth-err').classList.add('on'); return; }
     pin = val;
     document.getElementById('auth-section').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
     loadDashboard();
   }
 
+  async function doVenueLogin() {
+    const email = document.getElementById('v-email').value.trim();
+    const pw    = document.getElementById('v-pw').value;
+    const err   = document.getElementById('venue-err');
+    err.classList.remove('on');
+    if (!email || !pw) return;
+    const res = await fetch('/api/table/venues/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pw }),
+    });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'invalid credentials'; err.classList.add('on'); return; }
+    venueToken = data.token; venueSlug = data.slug; venuePriceCents = data.price_cents;
+    localStorage.setItem('venue_token', data.token);
+    localStorage.setItem('venue_slug',  data.slug);
+    localStorage.setItem('venue_price', String(data.price_cents));
+    localStorage.setItem('venue_name',  data.display_name || data.slug);
+    localStorage.setItem('venue_connected', String(data.stripe_connect_onboarded || false));
+    document.getElementById('auth-section').style.display = 'none';
+    document.getElementById('dashboard').style.display = 'block';
+    showVenueCard(data);
+    loadDashboard();
+  }
+
+  function showVenueCard(data) {
+    const card = document.getElementById('venue-card');
+    card.style.display = 'block';
+    const slug  = venueSlug;
+    const price = venuePriceCents;
+    const code  = `<script src="https://api.fraise.box/table/widget.js?slug=${slug}&price=${price}"><\/script>`;
+    document.getElementById('embed-code-display').textContent = code;
+    const connected = data?.stripe_connect_onboarded || localStorage.getItem('venue_connected') === 'true';
+    if (connected) {
+      document.getElementById('connect-ok').classList.add('on');
+      document.getElementById('connect-stripe-btn').style.display = 'none';
+    }
+    if (window.location.search.includes('connect=done')) verifyConnect();
+  }
+
+  function copyEmbed() {
+    const code = document.getElementById('embed-code-display').textContent;
+    navigator.clipboard?.writeText(code);
+    const hint = document.getElementById('embed-copy-hint');
+    hint.textContent = 'copied.';
+    setTimeout(() => { hint.textContent = 'click to copy'; }, 2000);
+  }
+
+  async function connectStripe() {
+    if (!venueToken) return;
+    document.getElementById('connect-stripe-btn').textContent = '—';
+    const res = await fetch('/api/table/venues/connect', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Venue-Token': venueToken },
+      body: JSON.stringify({ return_url: window.location.href }),
+    });
+    const data = await res.json();
+    if (data.url) window.location.href = data.url;
+    else document.getElementById('connect-stripe-btn').textContent = 'connect stripe →';
+  }
+
+  async function verifyConnect() {
+    if (!venueToken) return;
+    const res = await fetch('/api/table/venues/connect/verify', {
+      method: 'POST', headers: { 'X-Venue-Token': venueToken },
+    });
+    const data = await res.json();
+    if (data.onboarded) {
+      localStorage.setItem('venue_connected', 'true');
+      document.getElementById('connect-ok').classList.add('on');
+      document.getElementById('connect-stripe-btn').style.display = 'none';
+    }
+  }
+
+  function authHeaders() {
+    if (venueToken) return { 'X-Venue-Token': venueToken };
+    return { 'X-Admin-PIN': pin };
+  }
+
   async function loadDashboard() {
-    const [eventsRes, bookingsRes, slugsRes] = await Promise.all([
-      fetch('/api/table/events', { headers: { 'X-Admin-PIN': pin } }),
-      fetch('/api/table/bookings', { headers: { 'X-Admin-PIN': pin } }),
-      fetch('/api/table/pool/slugs', { headers: { 'X-Admin-PIN': pin } }),
-    ]);
-    const events = await eventsRes.json();
-    const bookings = await bookingsRes.json();
-    const slugsData = await slugsRes.json();
-    renderEvents(events, bookings);
-    if ((slugsData.slugs ?? []).length) {
+    if (venueToken && venueSlug) {
+      // Operator: only load their own slug pool
+      const [eventsRes, poolRes] = await Promise.all([
+        fetch('/api/table/events?slug=' + venueSlug),
+        fetch('/api/table/pool?slug=' + venueSlug, { headers: authHeaders() }),
+      ]);
+      const events = (await eventsRes.json()) ?? [];
+      const poolData = await poolRes.json();
+      renderEvents(events, []);
       document.getElementById('pool-section').style.display = 'block';
-      loadAllPools(slugsData.slugs);
+      document.getElementById('pool-list').innerHTML = '';
+      document.getElementById('pool-list').appendChild(
+        buildPoolCard(venueSlug, poolData.members ?? [], poolData.waiting ?? 0, poolData.total ?? 0)
+      );
+    } else {
+      // Global admin: all events + all pools
+      const [eventsRes, bookingsRes, slugsRes] = await Promise.all([
+        fetch('/api/table/events', { headers: authHeaders() }),
+        fetch('/api/table/bookings', { headers: authHeaders() }),
+        fetch('/api/table/pool/slugs', { headers: authHeaders() }),
+      ]);
+      const events = await eventsRes.json();
+      const bookings = await bookingsRes.json();
+      const slugsData = await slugsRes.json();
+      renderEvents(events, bookings);
+      if ((slugsData.slugs ?? []).length) {
+        document.getElementById('pool-section').style.display = 'block';
+        loadAllPools(slugsData.slugs);
+      }
     }
   }
 
@@ -313,7 +467,7 @@
     if (seats < 1) return;
     const res = await fetch('/api/table/pool/call', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ slug, seats, note }),
     });
     const data = await res.json();
@@ -328,7 +482,7 @@
   async function markAttended(id, slug) {
     await fetch('/api/table/pool/attend', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-PIN': pin },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ ids: [id] }),
     });
     loadDashboard();

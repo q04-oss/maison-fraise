@@ -931,6 +931,36 @@ export async function sendTableDateAnnouncedWithConfirm(params: {
   });
 }
 
+export async function sendPoolJoinConfirmation(params: { to: string; name: string; venueName: string }) {
+  const { to, name, venueName } = params;
+  const content =
+    tableP(`hi ${name} — you're in the pool at <strong>${venueName.toLowerCase()}</strong>.`) +
+    tableP('date tbd — once enough people join, a date gets set. you\'ll be the first to know.') +
+    tableMuted('full refund if the date doesn\'t work for you. no questions.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `you're in the pool — ${venueName.toLowerCase()}`,
+    html: tableTemplate(content, 'you\'re in.'),
+  });
+}
+
+export async function sendPoolCallNotification(params: { to: string; name: string; venueName: string; note?: string }) {
+  const { to, name, venueName, note } = params;
+  const content =
+    tableP(`hi ${name} — your table at <strong>${venueName.toLowerCase()}</strong> is ready.`) +
+    (note ? tableP(note) : '') +
+    tableMuted('reply to this email if you can\'t make it and we\'ll roll your spot to the next one.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `your table is ready — ${venueName.toLowerCase()}`,
+    html: tableTemplate(content, 'your table is ready.'),
+  });
+}
+
 export async function sendPasswordReset(params: { to: string; resetUrl: string }) {
   const { to, resetUrl } = params;
   const content =
