@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, Platform,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import {
-  memberLogin, memberSignup, setMemberToken, deleteMemberToken,
-  fetchInvitations,
+  memberLogin, memberSignup, fraiseAppleSignin,
+  setMemberToken, deleteMemberToken, fetchInvitations,
 } from '../../lib/api';
 import { PanelHeader, Card, PrimaryButton } from '../ui';
 
@@ -60,6 +61,36 @@ export default function AccountPanel() {
       reset();
     } catch (err: any) {
       setError(err.message || 'signup failed.');
+    }
+    setLoading(false);
+  };
+
+  const handleAppleSignIn = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLoading(true);
+    setError(null);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean).join(' ');
+      const data = await fraiseAppleSignin({
+        identityToken: credential.identityToken!,
+        name: fullName || undefined,
+        email: credential.email ?? undefined,
+      });
+      await setMemberToken(data.token!);
+      setMember(data);
+      setInvitations(await fetchInvitations());
+      reset();
+    } catch (err: any) {
+      if (err?.code !== 'ERR_REQUEST_CANCELED') {
+        setError(err.message || 'apple sign in failed.');
+      }
     }
     setLoading(false);
   };
@@ -135,6 +166,21 @@ export default function AccountPanel() {
       ) : (
         // ── Auth form ──────────────────────────────────────────────────────────
         <View style={styles.body}>
+          {Platform.OS === 'ios' && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={9999}
+              style={styles.appleBtn}
+              onPress={handleAppleSignIn}
+            />
+          )}
+          <View style={[styles.divider]}>
+            <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+            <Text style={[styles.dividerText, { color: c.muted }]}>or</Text>
+            <View style={[styles.dividerLine, { backgroundColor: c.border }]} />
+          </View>
+
           <View style={styles.tabs}>
             <TouchableOpacity
               style={[styles.tabBtn, view === 'login' && { borderBottomColor: c.text }]}
@@ -241,6 +287,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   btnGhostText: { fontSize: 12, fontFamily: fonts.dmMono, letterSpacing: 1 },
+  appleBtn: {
+    height: 44,
+    width: '100%',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  dividerText: { fontSize: 11, fontFamily: fonts.dmMono },
   tabs: {
     flexDirection: 'row',
     gap: SPACING.lg,

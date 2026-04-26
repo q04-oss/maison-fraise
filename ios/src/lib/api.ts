@@ -89,6 +89,17 @@ export async function memberSignup(name: string, email: string, password: string
   });
 }
 
+export async function fraiseAppleSignin(params: {
+  identityToken: string;
+  name?: string;
+  email?: string;
+}): Promise<FraiseMember> {
+  return apiFetch('/members/apple-signin', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
 export async function fetchMe(): Promise<FraiseMember | null> {
   const headers = await authHeaders();
   if (!headers['x-member-token']) return null;

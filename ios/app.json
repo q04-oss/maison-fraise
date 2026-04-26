@@ -47,7 +47,8 @@
       "expo-updates",
       "expo-font",
       "expo-notifications",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-apple-authentication"
     ],
     "extra": {
       "eas": {

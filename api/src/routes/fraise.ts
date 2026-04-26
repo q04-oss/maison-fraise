@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import appleSignin from 'apple-signin-auth';
 import { stripe } from '../lib/stripe';
 import {
   sendFraiseWelcome,
@@ -102,6 +103,55 @@ router.post('/members/signup', async (req: any, res: any) => {
     res.json({ token: t, name, email, credit_balance: 0 });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/fraise/members/apple-signin
+router.post('/members/apple-signin', async (req: any, res: any) => {
+  const { identityToken, name: bodyName, email: bodyEmail } = req.body ?? {};
+  if (!identityToken) return res.status(400).json({ error: 'identityToken required' });
+  try {
+    const payload = await appleSignin.verifyIdToken(String(identityToken), {
+      audience: 'com.boxfraise.app',
+    });
+    const sub   = payload.sub as string;
+    const email = (payload.email ?? bodyEmail ?? '').toString().toLowerCase().trim();
+    const name  = String(bodyName ?? '').trim().slice(0, 200);
+
+    // 1. Find existing member by apple_sub
+    let rows = await db.execute(sql`SELECT id, name, email, credit_balance, credits_purchased, created_at FROM fraise_members WHERE apple_sub = ${sub} LIMIT 1`);
+    let m = ((rows as any).rows ?? rows)[0] as any;
+
+    if (!m && email) {
+      // 2. Link apple_sub to existing member matched by email
+      rows = await db.execute(sql`
+        UPDATE fraise_members SET apple_sub = ${sub}
+        WHERE email = ${email} AND apple_sub IS NULL
+        RETURNING id, name, email, credit_balance, credits_purchased, created_at
+      `);
+      m = ((rows as any).rows ?? rows)[0] as any;
+    }
+
+    if (!m) {
+      // 3. Create new member — no password
+      const displayName = name || (email ? email.split('@')[0] : 'member');
+      const insertRows = await db.execute(sql`
+        INSERT INTO fraise_members (name, email, apple_sub)
+        VALUES (${displayName}, ${email || null}, ${sub})
+        RETURNING id, name, email, credit_balance, credits_purchased, created_at
+      `);
+      m = ((insertRows as any).rows ?? insertRows)[0] as any;
+      if (email) sendFraiseWelcome({ to: email, name: displayName }).catch(() => {});
+    }
+
+    const t = token();
+    await db.execute(sql`
+      INSERT INTO fraise_member_sessions (member_id, token, expires_at)
+      VALUES (${m.id}, ${t}, now() + interval '30 days')
+    `);
+    res.json({ token: t, name: m.name, email: m.email ?? '', credit_balance: m.credit_balance });
+  } catch (err: any) {
+    res.status(401).json({ error: err.message ?? 'apple sign in failed' });
   }
 });
 
