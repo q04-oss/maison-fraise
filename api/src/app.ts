@@ -559,6 +559,89 @@ app.post('/api/kommune/rate', async (req: any, res: any) => {
   res.json({ ok: true, avg_rating: row.avg_rating, total: row.total });
 });
 
+app.post('/api/kommune/chat', async (req: any, res: any) => {
+  const message = String(req.body?.message ?? '').trim().slice(0, 500);
+  if (!message) return res.status(400).json({ error: 'message required' });
+
+  let activeEvents: any[] = [];
+  try {
+    const evRows = await db.execute(sql`
+      SELECT id, title, price_cents, capacity, seats_taken, event_date, date_tbd
+      FROM table_events WHERE active = true
+    `);
+    activeEvents = ((evRows as any).rows ?? evRows) as any[];
+  } catch {}
+
+  const eventContext = activeEvents.length
+    ? `Current events:\n${activeEvents.map((e: any) =>
+        `- "${e.title}" (id:${e.id}) — ${e.date_tbd ? 'date TBD' : new Date(e.event_date).toDateString()} — CA$${(e.price_cents / 100).toFixed(0)}/person — ${e.capacity - e.seats_taken} seats left`
+      ).join('\n')}`
+    : 'No active events right now.';
+
+  const Anthropic = (await import('@anthropic-ai/sdk')).default;
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 300,
+      system: `You are the concierge for Kommune, a snack bar at 11931 Jasper Ave NW, Edmonton. Open daily from 10am. $0 oat milk on every drink (Minor Figures oat).
+
+Menu: matcha by Whisked (Regular $7, Premium $10, Maple Sea Salt / Apple Cinnamon / Pumpkin Spice / Earl Grey $8, Hojicha $7), plates, bakes, snacks, sweets, coffee, fog (tea lattes), NA cocktails, cocktails, beer, wine.
+
+${eventContext}
+
+WiFi: Kommune@1. Instagram: @kommune.whisked.
+
+Use the route_customer tool for EVERY response. Always set "text". Add "action" when the customer wants to book, see events, or browse the menu. Short and direct — one or two sentences. No filler.`,
+      messages: [{ role: 'user', content: message }],
+      tools: [
+        {
+          name: 'route_customer',
+          description: 'Respond to the customer and optionally route them to an action',
+          input_schema: {
+            type: 'object' as const,
+            properties: {
+              text: { type: 'string' },
+              action: {
+                type: 'object' as const,
+                properties: {
+                  type: { type: 'string', enum: ['reservation', 'event', 'open_menu', 'press'] },
+                  label: { type: 'string' },
+                  eventId: { type: 'number' },
+                  prefill: {
+                    type: 'object' as const,
+                    properties: { size: { type: 'number' }, preorder: { type: 'string' } },
+                  },
+                },
+                required: ['type', 'label'],
+              },
+            },
+            required: ['text'],
+          },
+        },
+      ],
+      tool_choice: { type: 'auto' },
+    });
+
+    let text = '';
+    let action = null;
+    for (const block of response.content) {
+      if (block.type === 'text') text = block.text;
+      if (block.type === 'tool_use' && block.name === 'route_customer') {
+        const inp = block.input as any;
+        text = inp.text || text;
+        action = inp.action ?? null;
+      }
+    }
+    if (!text) text = 'unavailable right now';
+    res.json({ text, action });
+  } catch (err) {
+    logger.error('Kommune chat error', err);
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 app.post('/api/kommune/suggest', async (req: any, res: any) => {
   const suggestion = String(req.body?.suggestion ?? '').trim().slice(0, 300);
   if (!suggestion) return res.status(400).json({ error: 'invalid' });
