@@ -350,6 +350,10 @@ app.get('/join', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/join.html'));
 });
 
+app.get('/business', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/fraise-business.html'));
+});
+
 app.get('/press', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/press.html'));
 });
