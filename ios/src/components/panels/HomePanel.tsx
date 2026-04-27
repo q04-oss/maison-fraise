@@ -89,7 +89,7 @@ export default function HomePanel() {
       <PanelHeader title={member ? member.name : 'fraise'}>
         {member ? (
           <Pressable onPress={() => showPanel('credits')}>
-            <View style={[styles.boxBadge, { borderColor: c.border }]}>
+            <View style={styles.boxBadge}>
               <Text style={[styles.boxBadgeNum, { color: c.muted }]}>{member.credit_balance}</Text>
             </View>
           </Pressable>
@@ -126,8 +126,6 @@ const styles = StyleSheet.create({
   container: { paddingTop: SPACING.md },
   balance: { fontSize: 12, fontFamily: fonts.dmMono, marginTop: 2 },
   boxBadge: {
-    borderWidth: 1,
-    borderRadius: 3,
     paddingHorizontal: 7,
     paddingVertical: 2,
     alignSelf: 'flex-start',
