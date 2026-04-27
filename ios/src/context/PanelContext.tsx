@@ -2,8 +2,8 @@ import React, { createContext, useContext, useRef, useState, ReactNode, useCallb
 import { Animated, Dimensions } from 'react-native';
 import { FraiseInvitation, FraiseMember } from '../lib/api';
 
-export type PanelId = 'home' | 'invitation-detail' | 'my-claims' | 'account' | 'credits' | 'members';
-export type RootTab = 'discover' | 'members' | 'claims' | 'account';
+export type PanelId = 'home' | 'invitation-detail' | 'my-claims' | 'account' | 'credits';
+export type RootTab = 'discover' | 'claims' | 'account';
 
 export { FraiseInvitation, FraiseMember };
 
@@ -49,9 +49,8 @@ export function PanelProvider({ children }: { children: ReactNode }) {
   const lastNavType = useRef<'show' | 'jump'>('show');
 
   const activeRootTab: RootTab =
-    currentPanel === 'my-claims' ? 'claims'   :
-    currentPanel === 'account'   ? 'account'  :
-    currentPanel === 'members'   ? 'members'  : 'discover';
+    currentPanel === 'my-claims' ? 'claims'  :
+    currentPanel === 'account'   ? 'account' : 'discover';
 
   const clearSafety = () => {
     if (safetyRef.current) { clearTimeout(safetyRef.current); safetyRef.current = null; }

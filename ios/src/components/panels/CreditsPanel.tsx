@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel } from '../../context/PanelContext';
 import { useColors, fonts, SPACING } from '../../theme';
 import { creditsCheckout, creditsConfirm, getMemberToken } from '../../lib/api';
-import { PanelHeader, Card, MetaRow, PrimaryButton } from '../ui';
+import { PanelHeader, Card, PrimaryButton } from '../ui';
 
 const CREDIT_PRICE_CENTS = 12000; // CA$120
 
@@ -70,7 +70,7 @@ export default function CreditsPanel() {
   if (!member) {
     return (
       <View style={[styles.center, { backgroundColor: c.panelBg }]}>
-        <Text style={[styles.muted, { color: c.muted }]}>sign in to buy credits.</Text>
+        <Text style={[styles.muted, { color: c.muted }]}>sign in to buy akènes.</Text>
       </View>
     );
   }
@@ -81,30 +81,21 @@ export default function CreditsPanel() {
       contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}
       showsVerticalScrollIndicator={false}
     >
-      <PanelHeader
-        title="buy credits"
-        subtitle="CA$120 per credit · no expiry"
-        back
-        onBack={goBack}
-      />
+      <PanelHeader title="buy akènes" back onBack={goBack} />
 
       {done ? (
         <Card style={styles.doneCard}>
-          <Text style={[styles.doneTitle, { color: c.text }]}>credits added.</Text>
+          <Text style={[styles.doneTitle, { color: c.text }]}>akènes added.</Text>
           {newBalance !== null ? (
             <Text style={[styles.doneSub, { color: c.muted }]}>
-              balance: {newBalance} credit{newBalance !== 1 ? 's' : ''}
+              balance: {newBalance} akène{newBalance !== 1 ? 's' : ''}
             </Text>
           ) : null}
         </Card>
       ) : (
         <View style={styles.body}>
-          {/* Current balance */}
-          <Card>
-            <MetaRow label="current balance" value={`${member.credit_balance} credit${member.credit_balance !== 1 ? 's' : ''}`} last />
-          </Card>
+          <Text style={[styles.priceNote, { color: c.muted }]}>CA$120 per akène · no expiry</Text>
 
-          {/* Quantity */}
           <View style={styles.qtyRow}>
             <TouchableOpacity
               style={[styles.qtyBtn, { borderColor: c.border }]}
@@ -116,7 +107,7 @@ export default function CreditsPanel() {
             <View style={styles.qtyCenter}>
               <Text style={[styles.qtyVal, { color: c.text }]}>{qty}</Text>
               <Text style={[styles.qtyLabel, { color: c.muted }]}>
-                credit{qty !== 1 ? 's' : ''}
+                akène{qty !== 1 ? 's' : ''}
               </Text>
             </View>
             <TouchableOpacity
@@ -128,24 +119,18 @@ export default function CreditsPanel() {
             </TouchableOpacity>
           </View>
 
-          {/* Total */}
-          <View style={[styles.totalRow, { borderTopColor: c.border }]}>
-            <Text style={[styles.totalLabel, { color: c.muted }]}>total</Text>
-            <Text style={[styles.totalValue, { color: c.text }]}>{totalDisplay}</Text>
-          </View>
-
           {error ? (
             <Text style={[styles.errText, { color: '#C0392B' }]}>{error}</Text>
           ) : null}
 
           <PrimaryButton
-            label={`pay ${totalDisplay} →`}
+            label={totalDisplay}
             onPress={handleBuy}
             loading={loading}
           />
 
           <Text style={[styles.note, { color: c.muted }]}>
-            credits never expire. if an event doesn't go ahead, your credit is returned automatically.
+            akènes never expire. if an event doesn't go ahead, your akène is returned automatically.
           </Text>
         </View>
       )}
@@ -189,5 +174,6 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: 13, fontFamily: fonts.dmMono, fontWeight: '500' },
   errText: { fontSize: 12, fontFamily: fonts.dmMono },
   note: { fontSize: 11, fontFamily: fonts.dmMono, lineHeight: 17 },
+  priceNote: { fontSize: 12, fontFamily: fonts.dmMono },
   muted: { fontSize: 13, fontFamily: fonts.dmMono },
 });

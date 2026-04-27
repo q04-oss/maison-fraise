@@ -2,8 +2,7 @@ import React from 'react';
 import {
   View, Text, TouchableOpacity, ActivityIndicator, StyleSheet,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors, fonts, SPACING } from '../theme';
+import { useColors, fonts, type, SPACING } from '../theme';
 
 // ─── PanelHeader ─────────────────────────────────────────────────────────────
 
@@ -17,34 +16,26 @@ interface PanelHeaderProps {
 
 export function PanelHeader({ title, subtitle, back, onBack, children }: PanelHeaderProps) {
   const c = useColors();
-  const insets = useSafeAreaInsets();
   return (
-    <View style={[headerStyles.wrap, { paddingTop: insets.top + SPACING.md }]}>
-      {back && (
-        <TouchableOpacity onPress={onBack} activeOpacity={0.6} style={headerStyles.back}>
-          <Text style={[headerStyles.backText, { color: c.muted }]}>← back</Text>
-        </TouchableOpacity>
-      )}
-      <Text style={[headerStyles.eyebrow, { color: c.muted }]}>fraise</Text>
+    <View style={headerStyles.wrap}>
       <Text style={[headerStyles.title, { color: c.text }]}>{title}</Text>
       {subtitle ? <Text style={[headerStyles.subtitle, { color: c.muted }]}>{subtitle}</Text> : null}
       {children}
+      {back && (
+        <TouchableOpacity onPress={onBack} activeOpacity={0.6} style={headerStyles.back}>
+          <Text style={[headerStyles.backText, { color: c.muted }]}>back</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const headerStyles = StyleSheet.create({
-  wrap: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xl, gap: 4 },
-  back: { marginBottom: SPACING.sm },
-  backText: { fontSize: 12, fontFamily: fonts.dmMono },
-  eyebrow: {
-    fontSize: 10,
-    fontFamily: fonts.dmMono,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  title: { fontSize: 20, fontFamily: fonts.dmMono, fontWeight: '500' },
-  subtitle: { fontSize: 12, fontFamily: fonts.dmMono, marginTop: 2 },
+  wrap: { paddingHorizontal: SPACING.lg, paddingBottom: 40 },
+  back: { marginTop: SPACING.sm },
+  backText: { ...type.small },
+  title: { ...type.title, marginBottom: 4 },
+  subtitle: { ...type.label },
 });
 
 // ─── Card ─────────────────────────────────────────────────────────────────────

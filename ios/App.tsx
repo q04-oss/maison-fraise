@@ -3,7 +3,7 @@ import { View, ActivityIndicator, Platform, AppState } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import * as Notifications from 'expo-notifications';
-import { DMMono_400Regular } from '@expo-google-fonts/dm-mono';
+import { DMMono_400Regular, DMMono_500Medium } from '@expo-google-fonts/dm-mono';
 import { useFonts } from 'expo-font';
 import RootNavigator from './src/navigation/RootNavigator';
 import { updatePushToken, getMemberToken } from './src/lib/api';
@@ -38,7 +38,7 @@ export default function App() {
   const [pendingScreen, setPendingScreen] = useState<string | null>(null);
   const [pendingData, setPendingData] = useState<Record<string, any> | null>(null);
 
-  const [fontsLoaded] = useFonts({ DMMono_400Regular });
+  const [fontsLoaded] = useFonts({ DMMono_400Regular, DMMono_500Medium });
 
   useEffect(() => {
     registerForPushNotifications().then(token => {

@@ -1,12 +1,12 @@
 import React, { useCallback, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  RefreshControl, StyleSheet,
+  RefreshControl, StyleSheet, Pressable,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel, FraiseInvitation } from '../../context/PanelContext';
-import { useColors, fonts, SPACING } from '../../theme';
+import { useColors, fonts, type, SPACING } from '../../theme';
 import { fetchInvitations, getMemberToken } from '../../lib/api';
 import { PanelHeader, PillBadge, Card, PrimaryButton } from '../ui';
 
@@ -88,36 +88,15 @@ export default function HomePanel() {
     >
       <PanelHeader title={member ? member.name : 'fraise'}>
         {member ? (
-          <Text style={[styles.balance, { color: c.muted }]}>
-            {member.credit_balance} credit{member.credit_balance !== 1 ? 's' : ''}
-          </Text>
+          <Pressable onPress={() => showPanel('credits')}>
+            <View style={[styles.boxBadge, { borderColor: c.border }]}>
+              <Text style={[styles.boxBadgeNum, { color: c.muted }]}>{member.credit_balance}</Text>
+            </View>
+          </Pressable>
         ) : null}
       </PanelHeader>
 
-      {!member ? (
-        <Card style={styles.onboardCard}>
-          <Text style={[styles.onboardTitle, { color: c.text }]}>invitation only.</Text>
-          <Text style={[styles.onboardBody, { color: c.muted }]}>
-            box fraise is a private network. businesses select guests for experiences that don't exist anywhere else.{'\n\n'}sign in or create an account to get started.
-          </Text>
-          <PrimaryButton label="sign in →" onPress={() => showPanel('account')} />
-        </Card>
-      ) : pending.length === 0 && others.length === 0 ? (
-        <Card style={styles.onboardCard}>
-          <Text style={[styles.onboardTitle, { color: c.text }]}>
-            {member.credit_balance > 0 ? 'you\'re eligible.' : 'get a credit.'}
-          </Text>
-          <Text style={[styles.onboardBody, { color: c.muted }]}>
-            {member.credit_balance > 0
-              ? 'businesses can now invite you to private experiences. invitations will appear here when you\'re selected.'
-              : 'a box fraise credit is your entry into the network. hold one and businesses can invite you to private experiences.'
-            }
-          </Text>
-          {member.credit_balance === 0 && (
-            <PrimaryButton label="buy a credit →" onPress={() => showPanel('credits')} />
-          )}
-        </Card>
-      ) : (
+      {!member ? null : (
         <View>
           {pending.length > 0 && (
             <>
@@ -146,29 +125,36 @@ export default function HomePanel() {
 const styles = StyleSheet.create({
   container: { paddingTop: SPACING.md },
   balance: { fontSize: 12, fontFamily: fonts.dmMono, marginTop: 2 },
+  boxBadge: {
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  boxBadgeNum: { fontSize: 11, fontFamily: fonts.dmMono },
   row: {
     flexDirection: 'row',
-    paddingVertical: SPACING.lg,
+    paddingTop: 20,
+    paddingBottom: 22,
     paddingHorizontal: SPACING.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
     gap: SPACING.md,
     alignItems: 'flex-start',
   },
   lastBorder: { borderBottomWidth: StyleSheet.hairlineWidth },
-  rowLeft: { flex: 1, gap: 4 },
+  rowLeft: { flex: 1 },
   rowBiz: {
-    fontSize: 10,
-    fontFamily: fonts.dmMono,
-    letterSpacing: 1.5,
+    ...type.eyebrow,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  rowTitle: { fontSize: 14, fontFamily: fonts.dmMono, fontWeight: '500' },
-  rowDesc: { fontSize: 11, fontFamily: fonts.dmMono, lineHeight: 16 },
-  rowRight: { paddingTop: 2, flexShrink: 0 },
+  rowTitle: { ...type.heading, marginBottom: 6 },
+  rowDesc: { ...type.small },
+  rowRight: { paddingTop: 4, flexShrink: 0 },
   sectionLabel: {
-    fontSize: 10,
-    fontFamily: fonts.dmMono,
-    letterSpacing: 1.5,
+    ...type.eyebrow,
     textTransform: 'uppercase',
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.lg,

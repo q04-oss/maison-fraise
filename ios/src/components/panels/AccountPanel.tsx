@@ -15,7 +15,7 @@ import {
 import { PanelHeader, Card, PrimaryButton } from '../ui';
 
 export default function AccountPanel() {
-  const { member, setMember, setInvitations, showPanel } = usePanel();
+  const { member, setMember, setInvitations, showPanel, goHome } = usePanel();
   const c = useColors();
   const insets = useSafeAreaInsets();
 
@@ -39,6 +39,7 @@ export default function AccountPanel() {
       setMember(data);
       setInvitations(await fetchInvitations());
       reset();
+      goHome();
     } catch (err: any) {
       setError(err.message || 'login failed.');
     }
@@ -59,6 +60,7 @@ export default function AccountPanel() {
       setMember(data);
       setInvitations([]);
       reset();
+      goHome();
     } catch (err: any) {
       setError(err.message || 'signup failed.');
     }
@@ -87,6 +89,7 @@ export default function AccountPanel() {
       setMember(data);
       setInvitations(await fetchInvitations());
       reset();
+      goHome();
     } catch (err: any) {
       if (err?.code !== 'ERR_REQUEST_CANCELED') {
         setError(err.message || 'apple sign in failed.');
@@ -115,40 +118,35 @@ export default function AccountPanel() {
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      <PanelHeader title={member ? member.name : 'account'} />
+      <PanelHeader title={member ? member.name : 'your box'} subtitle={!member ? 'open your box.' : undefined} />
 
       {member ? (
         // ── Signed in ──────────────────────────────────────────────────────────
         <View style={styles.body}>
           <Card style={styles.card}>
             <View style={styles.cardRow}>
-              <Text style={[styles.cardLabel, { color: c.muted }]}>standing</Text>
-              <Text style={[styles.cardValue, { color: c.text }]}>{member.standing ?? 0}</Text>
-            </View>
-            <View style={[styles.cardRow, styles.cardRowBorder, { borderColor: c.border }]}>
               <Text style={[styles.cardLabel, { color: c.muted }]}>email</Text>
               <Text style={[styles.cardValue, { color: c.text }]}>{member.email}</Text>
             </View>
             <View style={[styles.cardRow, styles.cardRowBorder, { borderColor: c.border }]}>
-              <Text style={[styles.cardLabel, { color: c.muted }]}>credit balance</Text>
-              <Text style={[styles.cardValue, { color: c.text }]}>
-                {member.credit_balance} credit{member.credit_balance !== 1 ? 's' : ''}
-              </Text>
+              <Text style={[styles.cardLabel, { color: c.muted }]}>akènes</Text>
+              <Text style={[styles.cardValue, { color: c.text }]}>{member.credit_balance}</Text>
             </View>
-            <View style={[styles.cardRow, styles.cardRowBorder, { borderColor: c.border }]}>
-              <Text style={[styles.cardLabel, { color: c.muted }]}>events attended</Text>
-              <Text style={[styles.cardValue, { color: c.text }]}>{member.events_attended ?? 0}</Text>
-            </View>
-            {member.response_rate != null && (
-              <View style={[styles.cardRow, styles.cardRowBorder, { borderColor: c.border }]}>
-                <Text style={[styles.cardLabel, { color: c.muted }]}>response rate</Text>
-                <Text style={[styles.cardValue, { color: c.text }]}>{member.response_rate}%</Text>
-              </View>
-            )}
           </Card>
 
+          {member.credit_balance > 0 && (
+            <View style={styles.berryRow}>
+              {Array.from({ length: Math.min(member.credit_balance, 12) }).map((_, i) => (
+                <View key={i} style={styles.berry} />
+              ))}
+              {member.credit_balance > 12 && (
+                <Text style={[styles.berryMore, { color: c.muted }]}>+{member.credit_balance - 12}</Text>
+              )}
+            </View>
+          )}
+
           <PrimaryButton
-            label="buy credits →"
+            label="buy akènes"
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               showPanel('credits');
@@ -247,7 +245,7 @@ export default function AccountPanel() {
             ) : null}
 
             <PrimaryButton
-              label={view === 'login' ? 'sign in →' : 'create account →'}
+              label={view === 'login' ? 'sign in' : 'create account'}
               onPress={view === 'login' ? handleLogin : handleSignup}
               loading={loading}
             />
@@ -325,4 +323,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   errText: { fontSize: 12, fontFamily: fonts.dmMono },
+  berryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    paddingVertical: SPACING.sm,
+  },
+  berry: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#C0392B',
+  },
+  berryMore: { fontSize: 11, fontFamily: fonts.dmMono, alignSelf: 'center' },
 });

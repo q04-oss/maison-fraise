@@ -79,6 +79,7 @@ export default function InvitationDetailPanel() {
     >
       <PanelHeader
         title={inv.title}
+        subtitle={inv.event_date ?? undefined}
         back
         onBack={goBack}
       >
@@ -89,45 +90,28 @@ export default function InvitationDetailPanel() {
         <Text style={[styles.desc, { color: c.muted }]}>{inv.description}</Text>
       ) : null}
 
-      {inv.event_date ? (
-        <View style={[styles.notice, { backgroundColor: c.card, borderColor: c.border }]}>
-          <Text style={[styles.noticeText, { color: c.text }]}>
-            {inv.event_status === 'confirmed' ? `date confirmed: ${inv.event_date}` : inv.event_date}
-          </Text>
-        </View>
-      ) : null}
-
       {error ? (
         <Text style={[styles.error, { color: '#C0392B' }]}>{error}</Text>
       ) : null}
 
       {isAccepted ? (
-        <View style={[styles.doneCard, { borderColor: c.border }]}>
-          <Text style={[styles.doneTitle, { color: c.text }]}>you're in.</Text>
-          <Text style={[styles.doneSub, { color: c.muted }]}>
-            {inv.event_date
-              ? `date: ${inv.event_date}`
-              : `we'll let you know when the date is set.`}
-          </Text>
-        </View>
+        <Text style={[styles.doneTitle, { color: c.text, paddingHorizontal: SPACING.lg }]}>you're in.</Text>
       ) : isDeclined ? (
-        <View style={[styles.doneCard, { borderColor: c.border }]}>
-          <Text style={[styles.doneTitle, { color: c.muted }]}>declined.</Text>
-        </View>
+        <Text style={[styles.doneTitle, { color: c.muted, paddingHorizontal: SPACING.lg }]}>declined.</Text>
       ) : isPending ? (
         <View style={styles.actions}>
           {!member ? (
-            <PrimaryButton label="sign in to accept →" onPress={() => showPanel('account')} />
+            <PrimaryButton label="sign in to accept" onPress={() => showPanel('account')} />
           ) : member.credit_balance < 1 ? (
             <>
               <Text style={[styles.noCredits, { color: c.muted }]}>
-                you need a credit to accept.
+                you need an akène to accept.
               </Text>
-              <PrimaryButton label="buy a credit →" onPress={() => showPanel('credits')} />
+              <PrimaryButton label="add to your box" onPress={() => showPanel('credits')} />
             </>
           ) : (
             <PrimaryButton
-              label="accept →"
+              label="accept"
               onPress={handleAccept}
               loading={loading}
             />
@@ -147,7 +131,7 @@ export default function InvitationDetailPanel() {
 
       {isPending && (
         <Text style={[styles.note, { color: c.muted }]}>
-          accepting uses 1 credit (CA$120). date tbd — you'll be notified when it's set. full refund if it doesn't work for you.
+          accepting uses 1 akène (CA$120). date tbd — you'll be notified when it's set. full refund if it doesn't work for you.
         </Text>
       )}
     </ScrollView>

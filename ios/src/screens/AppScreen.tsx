@@ -47,13 +47,17 @@ export default function AppScreen() {
     }
   }, [pendingScreen]);
 
-  const handleTabPress = (tab: 'discover' | 'members' | 'claims' | 'account') => {
+  const tabs = [
+    { key: 'discover', label: 'discover' },
+    { key: 'claims',   label: 'going' },
+    { key: 'account',  label: 'box' },
+  ] as const;
+
+  const handleTabPress = (key: 'discover' | 'claims' | 'account') => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (tab === 'discover')      goHome();
-    else if (tab === 'members')  jumpToPanel('members');
-    else if (tab === 'claims')   jumpToPanel('my-claims');
-    else                         jumpToPanel('account');
-    // Double-tap on active tab always resets to that tab's root (handled by jumpToPanel resetting stack)
+    if (key === 'discover') goHome();
+    else if (key === 'claims') jumpToPanel('my-claims');
+    else jumpToPanel('account');
   };
 
   return (
@@ -65,17 +69,17 @@ export default function AppScreen() {
         styles.tabBar,
         { borderTopColor: c.border, backgroundColor: c.panelBg, paddingBottom: insets.bottom },
       ]}>
-        {(['discover', 'members', 'claims', 'account'] as const).map(tab => (
+        {tabs.map(({ key, label }) => (
           <TouchableOpacity
-            key={tab}
+            key={key}
             style={styles.tabItem}
-            onPress={() => handleTabPress(tab)}
+            onPress={() => handleTabPress(key)}
             activeOpacity={0.6}
             accessibilityRole="tab"
-            accessibilityState={{ selected: activeRootTab === tab }}
+            accessibilityState={{ selected: activeRootTab === key }}
           >
-            <Text style={[styles.tabLabel, { color: activeRootTab === tab ? c.text : c.muted }]}>
-              {tab}
+            <Text style={[styles.tabLabel, { color: activeRootTab === key ? c.text : c.muted }]}>
+              {label}
             </Text>
           </TouchableOpacity>
         ))}

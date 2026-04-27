@@ -6,9 +6,9 @@ import {
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePanel, FraiseInvitation } from '../../context/PanelContext';
-import { useColors, fonts, SPACING } from '../../theme';
+import { useColors, fonts, type, SPACING } from '../../theme';
 import { declineInvitation, fetchInvitations } from '../../lib/api';
-import { PanelHeader, Card, PillBadge } from '../ui';
+import { PanelHeader, Card } from '../ui';
 
 export default function MyClaimsPanel() {
   const { invitations, setInvitations, member, setMember } = usePanel();
@@ -28,7 +28,7 @@ export default function MyClaimsPanel() {
   const handleRelease = (inv: FraiseInvitation) => {
     Alert.alert(
       'Release spot?',
-      'Your credit will be returned to your balance.',
+      'Your akène will be returned to your balance.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -67,7 +67,7 @@ export default function MyClaimsPanel() {
       <PanelHeader title="your spots">
         {member ? (
           <Text style={[styles.balance, { color: c.muted }]}>
-            {member.credit_balance} credit{member.credit_balance !== 1 ? 's' : ''} remaining
+            {member.credit_balance} in your box
           </Text>
         ) : null}
       </PanelHeader>
@@ -79,21 +79,16 @@ export default function MyClaimsPanel() {
       ) : (
         accepted.map(inv => {
           const isReleasing = releasingId === inv.event_id;
-          const badgeColor = inv.status === 'confirmed' ? '#27AE60' : c.muted;
           return (
             <Card key={inv.id} style={styles.card}>
               <View style={styles.cardTop}>
                 <View style={styles.cardLeft}>
                   <Text style={[styles.cardBiz, { color: c.muted }]}>{inv.business_name}</Text>
                   <Text style={[styles.cardTitle, { color: c.text }]}>{inv.title}</Text>
-                  <Text style={[styles.cardDate, { color: c.muted }]}>
-                    {inv.event_date ? `date: ${inv.event_date}` : 'date tbd'}
-                  </Text>
+                  {inv.event_date ? (
+                    <Text style={[styles.cardDate, { color: c.muted }]}>{inv.event_date}</Text>
+                  ) : null}
                 </View>
-                <PillBadge
-                  label={inv.status === 'confirmed' ? 'confirmed' : 'accepted'}
-                  color={badgeColor}
-                />
               </View>
               <View style={[styles.cardFooter, { borderTopColor: c.border }]}>
                 <TouchableOpacity
@@ -131,15 +126,14 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     gap: SPACING.md,
   },
-  cardLeft: { flex: 1, gap: 3 },
+  cardLeft: { flex: 1 },
   cardBiz: {
-    fontSize: 10,
-    fontFamily: fonts.dmMono,
-    letterSpacing: 1.5,
+    ...type.eyebrow,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  cardTitle: { fontSize: 14, fontFamily: fonts.dmMono, fontWeight: '500' },
-  cardDate: { fontSize: 11, fontFamily: fonts.dmMono },
+  cardTitle: { ...type.heading, marginBottom: 6 },
+  cardDate: { ...type.small },
   cardFooter: {
     borderTopWidth: StyleSheet.hairlineWidth,
     padding: SPACING.sm,

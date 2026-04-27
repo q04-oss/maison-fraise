@@ -68,4 +68,15 @@ export const fonts = {
   dmSans: 'DMMono_400Regular',
   body: 'DMMono_400Regular',
   dmMono: 'DMMono_400Regular',
+  dmMonoMedium: 'DMMono_500Medium',
+};
+
+// Type scale — use these instead of ad-hoc font sizes
+export const type = {
+  title:    { fontFamily: 'DMMono_500Medium', fontSize: 26, lineHeight: 32 },
+  heading:  { fontFamily: 'DMMono_500Medium', fontSize: 18, lineHeight: 24 },
+  body:     { fontFamily: 'DMMono_400Regular', fontSize: 14, lineHeight: 21 },
+  label:    { fontFamily: 'DMMono_400Regular', fontSize: 12, lineHeight: 18 },
+  small:    { fontFamily: 'DMMono_400Regular', fontSize: 11, lineHeight: 16 },
+  eyebrow:  { fontFamily: 'DMMono_400Regular', fontSize: 10, lineHeight: 14, letterSpacing: 2 },
 };
