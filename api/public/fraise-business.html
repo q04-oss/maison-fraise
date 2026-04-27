@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>fraise — for businesses</title>
+  <title>box fraise — for businesses</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -111,12 +111,32 @@
 
     /* ── Empty ── */
     .empty-state { padding-block: 2rem; font-size: 0.8rem; color: var(--muted); }
+
+    /* ── Marketing ── */
+    .marketing { margin-bottom: 4rem; }
+    .mkt-headline { font-size: clamp(1rem, 2.5vw, 1.25rem); font-weight: 500; line-height: 1.5; margin-bottom: 0.75rem; }
+    .mkt-sub { font-size: 0.8rem; color: var(--muted); line-height: 1.75; max-width: 520px; margin-bottom: 3rem; }
+    .mkt-points { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 3rem; }
+    .mkt-point { display: flex; gap: 1rem; align-items: flex-start; }
+    .mkt-point-num { font-size: 0.6rem; letter-spacing: 0.1em; color: var(--muted); padding-top: 0.15rem; flex-shrink: 0; width: 1.5rem; }
+    .mkt-point-body { font-size: 0.78rem; line-height: 1.7; color: var(--muted); }
+    .mkt-point-body strong { color: var(--text); font-weight: 500; }
+    .mkt-split { border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 3rem; display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; }
+    .mkt-split-item { display: flex; flex-direction: column; gap: 0.3rem; }
+    .mkt-split-pct { font-size: 1.5rem; font-weight: 500; }
+    .mkt-split-lbl { font-size: 0.65rem; letter-spacing: 0.08em; color: var(--muted); text-transform: uppercase; }
+    .mkt-split-divider { font-size: 0.8rem; color: var(--border); }
+    .widget-block { margin-bottom: 3rem; }
+    .widget-code { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; font-size: 0.7rem; color: var(--muted); line-height: 1.9; overflow-x: auto; white-space: pre; margin-bottom: 0.75rem; }
+    .widget-note { font-size: 0.68rem; color: var(--muted); line-height: 1.65; }
+    .mkt-cta { display: inline-block; background: var(--text); color: var(--bg); border: none; border-radius: 9999px; padding: 0.65rem 1.75rem; font-family: 'DM Mono', monospace; font-size: 0.75rem; letter-spacing: 0.06em; cursor: pointer; transition: opacity 0.15s; }
+    .mkt-cta:hover { opacity: 0.75; }
   </style>
 </head>
 <body>
 
 <header>
-  <a href="/fraise" class="nav-logo">fraise</a>
+  <a href="/" class="nav-logo">box fraise</a>
   <div class="nav-right">
     <div class="nav-biz" id="nav-biz" style="display:none;"><strong id="nav-biz-name"></strong></div>
     <button class="btn-nav btn-nav-ghost" id="btn-signin" onclick="openAuth('login')">sign in</button>
@@ -125,8 +145,63 @@
 </header>
 
 <main>
-  <div class="eyebrow">fraise</div>
+  <div class="eyebrow">box fraise</div>
   <h1>for businesses</h1>
+
+  <!-- Marketing — hidden once signed in -->
+  <div class="marketing" id="marketing-section">
+
+    <p class="mkt-headline">your guests are already paying to be here.</p>
+    <p class="mkt-sub">
+      box fraise is a private network where members hold akènes — CA$120 each — to get considered for exclusive experiences.
+      you curate the room. we handle the rest.
+    </p>
+
+    <div class="mkt-points">
+      <div class="mkt-point">
+        <div class="mkt-point-num">01</div>
+        <div class="mkt-point-body"><strong>demand pooling.</strong> create an event with a minimum and maximum. invitations go out without a date. once enough members accept, you confirm the time. if the threshold isn't met, every akène is returned automatically.</div>
+      </div>
+      <div class="mkt-point">
+        <div class="mkt-point-num">02</div>
+        <div class="mkt-point-body"><strong>you choose your guests.</strong> browse your interest list and the full member pool. every accepting member has already committed CA$120. no no-shows. no walk-ins.</div>
+      </div>
+      <div class="mkt-point">
+        <div class="mkt-point-num">03</div>
+        <div class="mkt-point-body"><strong>nothing is public.</strong> no listings, no reviews, no algorithm. the invitation is the product. your events are only visible to the people you invite.</div>
+      </div>
+    </div>
+
+    <div class="mkt-split">
+      <div class="mkt-split-item">
+        <div class="mkt-split-pct">80%</div>
+        <div class="mkt-split-lbl">to you</div>
+      </div>
+      <div class="mkt-split-divider">·</div>
+      <div class="mkt-split-item">
+        <div class="mkt-split-pct">20%</div>
+        <div class="mkt-split-lbl">platform fee</div>
+      </div>
+      <div class="mkt-split-divider">·</div>
+      <div class="mkt-split-item">
+        <div class="mkt-split-pct">CA$96</div>
+        <div class="mkt-split-lbl">per accepted akène</div>
+      </div>
+    </div>
+
+    <div class="section-label">the widget</div>
+    <div class="widget-block">
+      <div class="widget-code">&lt;div data-fraise="your-slug" data-fraise-tagline="private dinners, by invitation only."&gt;&lt;/div&gt;
+&lt;script src="https://api.fraise.box/fraise-widget.js"&gt;&lt;/script&gt;</div>
+      <p class="widget-note">
+        drop one line on your website. visitors submit their name and email — you see them in your dashboard with a flag showing whether they already hold an akène.
+        the widget is MIT licensed and self-contained. no dependencies.
+      </p>
+    </div>
+
+    <button class="mkt-cta" onclick="openAuth('signup')">create an account</button>
+
+  </div>
 
   <!-- Auth panel -->
   <div id="auth-panel">
@@ -279,12 +354,14 @@
   function signOut() {
     bizToken = null; biz = null;
     localStorage.removeItem('fraise_biz_token');
+    document.getElementById('marketing-section').style.display = '';
     openAuth('login');
   }
 
   // ── Dashboard ────────────────────────────────────────────────────────────────
 
   async function showDashboard() {
+    document.getElementById('marketing-section').style.display = 'none';
     document.getElementById('auth-panel').style.display = 'none';
     document.getElementById('dashboard').style.display = '';
     document.getElementById('btn-signin').style.display = 'none';
