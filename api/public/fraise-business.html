@@ -78,8 +78,9 @@
     .btn-primary:hover { opacity: 0.8; }
     .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
     .btn-full { width: 100%; }
-    .btn-ghost { background: none; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost { font-family: 'DM Mono', monospace; font-size: 0.857rem; font-weight: 400; letter-spacing: 0.08em; background: none; color: var(--muted); border: 1px solid var(--border); padding: 0.65rem 1.5rem; cursor: pointer; transition: opacity 0.15s; }
     .btn-ghost:hover { color: var(--text); border-color: var(--text); opacity: 1; }
+    .btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
     .err-msg { font-size: 0.786rem; line-height: 1.45; color: var(--red); margin-top: 0.5rem; display: none; }
     .err-msg.on { display: block; }
     .ok-msg { font-size: 0.786rem; line-height: 1.45; color: var(--green); display: none; }
@@ -628,7 +629,11 @@
     confirmBtn.textContent = ev.status === 'confirmed' ? 'resend →' : 'confirm + notify →';
     confirmBtn.addEventListener('click', () => doConfirm(ev.id, confirmBtn));
     const confirmMsg = document.createElement('div'); confirmMsg.className = 'confirm-msg'; confirmMsg.id = `confirm-msg-${ev.id}`;
-    confirmRow.append(dateWrap, confirmBtn, confirmMsg);
+    const remindBtn = document.createElement('button'); remindBtn.className = 'btn-ghost'; remindBtn.style.cssText = 'font-size:0.68rem;padding:0.4rem 0.75rem;';
+    remindBtn.textContent = 'nudge pending →';
+    remindBtn.title = 're-send push notification to members who haven\'t responded yet';
+    remindBtn.addEventListener('click', () => doRemind(ev.id, remindBtn));
+    confirmRow.append(dateWrap, confirmBtn, remindBtn, confirmMsg);
 
     // Responses toggle
     const toggle = document.createElement('div'); toggle.className = 'claims-toggle';
@@ -813,6 +818,14 @@
     const msgEl   = document.getElementById(`confirm-msg-${eventId}`);
     msgEl.className = 'confirm-msg';
     if (!dateVal) { msgEl.className = 'confirm-msg err'; msgEl.textContent = 'enter a date first.'; return; }
+    // Sanity-check: warn if date looks like it's in the past
+    const parsed = new Date(dateVal);
+    const isLikelyPast = !isNaN(parsed.getTime()) && parsed < new Date();
+    if (isLikelyPast) {
+      msgEl.className = 'confirm-msg err';
+      msgEl.textContent = 'that date looks like it\'s in the past — double-check before confirming.';
+      return;
+    }
     btn.disabled = true; const orig = btn.textContent; btn.textContent = '—';
     try {
       const r = await fetch(API + `/api/fraise/events/${eventId}/confirm`, {
@@ -822,13 +835,31 @@
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'failed');
-      msgEl.className = 'confirm-msg ok'; msgEl.textContent = `confirmed. ${data.notified} member${data.notified === 1 ? '' : 's'} notified.`;
+      msgEl.className = 'confirm-msg ok'; msgEl.textContent = `confirmed. ${data.confirmed} member${data.confirmed === 1 ? '' : 's'} notified.`;
       btn.textContent = 'resend →';
     } catch (e) {
       msgEl.className = 'confirm-msg err'; msgEl.textContent = e.message;
       btn.textContent = orig;
     }
     btn.disabled = false;
+  }
+
+  async function doRemind(eventId, btn) {
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + `/api/fraise/events/${eventId}/invite/remind`, {
+        method: 'POST',
+        headers: { 'x-business-token': bizToken },
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'failed');
+      btn.textContent = `nudged ${data.reminded}`;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 3000);
+    } catch (e) {
+      btn.textContent = orig; btn.disabled = false;
+      alert(e.message);
+    }
   }
 
   // ── Create event ─────────────────────────────────────────────────────────────

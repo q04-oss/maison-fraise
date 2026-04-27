@@ -19,8 +19,9 @@ export default function InvitationDetailPanel() {
 
   const inv: FraiseInvitation | null = panelData?.invitation ?? activeInvitation;
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [justAccepted, setJustAccepted] = useState(false);
 
   if (!inv) {
     return (
@@ -43,8 +44,9 @@ export default function InvitationDetailPanel() {
     setError(null);
     try {
       const result = await acceptInvitation(inv.event_id);
-      updateInvitation({ status: 'accepted', responded_at: new Date().toISOString() });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setJustAccepted(true);
+      updateInvitation({ status: 'accepted', responded_at: new Date().toISOString() });
       fetchMe().then(me => { if (me) setMember(me); }).catch(() => {});
     } catch (err: any) {
       setError(err.message || 'something went wrong.');
@@ -95,7 +97,17 @@ export default function InvitationDetailPanel() {
       ) : null}
 
       {isAccepted ? (
-        <Text style={[styles.doneTitle, { color: c.text, paddingHorizontal: SPACING.lg }]}>you're in.</Text>
+        <View style={[styles.acceptedCard, { borderColor: c.border }]}>
+          <Text style={[styles.doneTitle, { color: c.text }]}>you're in.</Text>
+          {justAccepted && member && (
+            <Text style={[styles.doneSub, { color: c.muted }]}>
+              {member.credit_balance} akène{member.credit_balance !== 1 ? 's' : ''} remaining
+            </Text>
+          )}
+          <Text style={[styles.doneSub, { color: c.muted }]}>
+            you'll be notified when the date is set.
+          </Text>
+        </View>
       ) : isDeclined ? (
         <Text style={[styles.doneTitle, { color: c.muted, paddingHorizontal: SPACING.lg }]}>declined.</Text>
       ) : isPending ? (
@@ -182,7 +194,13 @@ const styles = StyleSheet.create({
     padding: SPACING.md,
     gap: 4,
   },
-  doneTitle: { fontSize: 14, fontFamily: fonts.dmMono, fontWeight: '500' },
+  acceptedCard: {
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: 6,
+  },
+  doneTitle: { fontSize: 20, fontFamily: fonts.dmMono, fontWeight: '500' },
   doneSub: { fontSize: 12, fontFamily: fonts.dmMono, lineHeight: 18 },
   note: {
     fontSize: 11,

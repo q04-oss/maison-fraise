@@ -154,6 +154,24 @@ export async function fetchMembersDirectory(): Promise<FraiseMemberPublic[]> {
   return data.members ?? [];
 }
 
+// ─── Password reset ───────────────────────────────────────────────────────────
+
+export async function forgotPassword(email: string): Promise<void> {
+  await apiFetch('/members/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(email: string, code: string, password: string): Promise<void> {
+  await apiFetch('/members/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, password }),
+  });
+}
+
 // ─── Push token ───────────────────────────────────────────────────────────────
 
 export async function updatePushToken(pushToken: string): Promise<void> {

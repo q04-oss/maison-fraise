@@ -14,6 +14,9 @@ import {
   sendFraiseWelcome,
   sendFraiseCreditsAdded,
   sendFraiseClaimConfirmation,
+  sendFraiseMemberPasswordCode,
+  sendFraiseThresholdReached,
+  sendFraisePayoutFailed,
 } from '../lib/resend';
 
 const router = Router();
@@ -182,6 +185,59 @@ router.post('/members/login', async (req: any, res: any) => {
   }
 });
 
+// POST /api/fraise/members/forgot-password — send a 6-char reset code
+router.post('/members/forgot-password', async (req: any, res: any) => {
+  const email = String(req.body?.email ?? '').trim().toLowerCase();
+  if (!email) return res.status(400).json({ error: 'email required' });
+  try {
+    const rows = await db.execute(sql`SELECT id FROM fraise_members WHERE email = ${email} LIMIT 1`);
+    const member = ((rows as any).rows ?? rows)[0] as any;
+    // Always respond OK to prevent email enumeration
+    if (member) {
+      const code = crypto.randomBytes(3).toString('hex').toUpperCase(); // 6 hex chars
+      await db.execute(sql`
+        INSERT INTO fraise_member_resets (member_id, code, expires_at)
+        VALUES (${member.id}, ${code}, now() + interval '15 minutes')
+      `);
+      sendFraiseMemberPasswordCode({ to: email, code }).catch(() => {});
+    }
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/fraise/members/reset-password — verify code, set new password
+router.post('/members/reset-password', async (req: any, res: any) => {
+  const email    = String(req.body?.email ?? '').trim().toLowerCase();
+  const code     = String(req.body?.code ?? '').trim().toUpperCase();
+  const password = String(req.body?.password ?? '');
+  if (!email || !code || password.length < 8) {
+    return res.status(400).json({ error: 'email, code, and password (8+ chars) required' });
+  }
+  try {
+    const memberRows = await db.execute(sql`SELECT id FROM fraise_members WHERE email = ${email} LIMIT 1`);
+    const member = ((memberRows as any).rows ?? memberRows)[0] as any;
+    if (!member) return res.status(400).json({ error: 'invalid code' });
+
+    const resetRows = await db.execute(sql`
+      SELECT id FROM fraise_member_resets
+      WHERE member_id = ${member.id} AND code = ${code}
+        AND expires_at > now() AND used_at IS NULL
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    const reset = ((resetRows as any).rows ?? resetRows)[0] as any;
+    if (!reset) return res.status(400).json({ error: 'invalid or expired code' });
+
+    const hash = await bcrypt.hash(password, 10);
+    await db.execute(sql`UPDATE fraise_members SET password_hash = ${hash} WHERE id = ${member.id}`);
+    await db.execute(sql`UPDATE fraise_member_resets SET used_at = now() WHERE id = ${reset.id}`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 // GET /api/fraise/members/me
 router.get('/members/me', requireMember, async (req: any, res: any) => {
   const rows = await db.execute(sql`
@@ -321,6 +377,22 @@ router.post('/members/invitations/:event_id/accept', requireMember, async (req: 
 
     if (updated.status === 'open' && updated.seats_claimed >= updated.min_seats) {
       await db.execute(sql`UPDATE fraise_events SET status = 'threshold_met' WHERE id = ${eventId}`);
+      // Notify business owner that minimum is met
+      db.execute(sql`
+        SELECT b.email, b.name FROM fraise_businesses b
+        JOIN fraise_events e ON e.business_id = b.id
+        WHERE e.id = ${eventId} LIMIT 1
+      `).then((bizRows: any) => {
+        const biz = ((bizRows as any).rows ?? bizRows)[0] as any;
+        if (biz?.email) {
+          sendFraiseThresholdReached({
+            to: biz.email,
+            businessName: biz.name,
+            eventTitle: event.title,
+            seatCount: updated.seats_claimed,
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     }
 
     const balRows = await db.execute(sql`SELECT credit_balance FROM fraise_members WHERE id = ${req.member.id} LIMIT 1`);
@@ -887,6 +959,19 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
         } catch (transferErr: any) {
           // Log but don't fail the confirmation — payout can be retried manually
           console.error('[fraise] transfer failed:', transferErr.message);
+          // Notify business owner of payout failure
+          db.execute(sql`SELECT email, name FROM fraise_businesses WHERE id = ${event.business_id ?? businessId} LIMIT 1`).then((r: any) => {
+            const biz = ((r as any).rows ?? r)[0] as any;
+            if (biz?.email) {
+              sendFraisePayoutFailed({
+                to: biz.email,
+                businessName: biz.name,
+                eventTitle: event.title,
+                confirmedCount: invitations.length,
+                amountCents: totalCents,
+              }).catch(() => {});
+            }
+          }).catch(() => {});
         }
       }
     }
@@ -1025,6 +1110,28 @@ router.post('/events/:id/cancel', requireBusiness, async (req: any, res: any) =>
     await db.execute(sql`UPDATE fraise_invitations SET status = 'declined' WHERE event_id = ${eventId} AND status IN ('accepted','confirmed','pending')`);
 
     res.json({ ok: true, returned: acceptedRows.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/fraise/events/:id/invite/remind — re-push pending invitees
+router.post('/events/:id/invite/remind', requireBusiness, async (req: any, res: any) => {
+  const eventId = parseInt(req.params.id);
+  if (isNaN(eventId)) return res.status(400).json({ error: 'invalid id' });
+  try {
+    const evRows = await db.execute(sql`SELECT id, title FROM fraise_events WHERE id = ${eventId} AND business_id = ${req.business.id} LIMIT 1`);
+    const event = ((evRows as any).rows ?? evRows)[0] as any;
+    if (!event) return res.status(404).json({ error: 'event not found' });
+
+    const pendingRows = await db.execute(sql`
+      SELECT m.push_token FROM fraise_invitations i
+      JOIN fraise_members m ON m.id = i.member_id
+      WHERE i.event_id = ${eventId} AND i.status = 'pending' AND m.push_token IS NOT NULL
+    `);
+    const pushTokens = ((pendingRows as any).rows ?? pendingRows).map((r: any) => r.push_token);
+    sendExpoPush(pushTokens, `${req.business.name}`, `reminder: you have a pending invitation — ${event.title}`, { screen: 'home' });
+    res.json({ ok: true, reminded: pushTokens.length });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }

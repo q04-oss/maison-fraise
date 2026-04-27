@@ -11,6 +11,7 @@ import { useColors, fonts, SPACING } from '../../theme';
 import {
   memberLogin, memberSignup, fraiseAppleSignin,
   setMemberToken, deleteMemberToken, fetchInvitations,
+  forgotPassword, resetPassword,
 } from '../../lib/api';
 import { PanelHeader, Card, PrimaryButton } from '../ui';
 
@@ -19,14 +20,16 @@ export default function AccountPanel() {
   const c = useColors();
   const insets = useSafeAreaInsets();
 
-  const [view, setView] = useState<'login' | 'signup'>('login');
-  const [name, setName]       = useState('');
-  const [email, setEmail]     = useState('');
+  const [view, setView] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
+  const [name, setName]         = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [resetCode, setResetCode] = useState('');
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const [codeSent, setCodeSent] = useState(false);
 
-  const reset = () => { setName(''); setEmail(''); setPassword(''); setError(null); };
+  const reset = () => { setName(''); setEmail(''); setPassword(''); setResetCode(''); setError(null); setCodeSent(false); };
 
   const handleLogin = async () => {
     setError(null);
@@ -63,6 +66,40 @@ export default function AccountPanel() {
       goHome();
     } catch (err: any) {
       setError(err.message || 'signup failed.');
+    }
+    setLoading(false);
+  };
+
+  const handleForgot = async () => {
+    setError(null);
+    if (!email.trim()) { setError('enter your email first.'); return; }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLoading(true);
+    try {
+      await forgotPassword(email.trim().toLowerCase());
+      setCodeSent(true);
+      setView('reset');
+    } catch (err: any) {
+      setError(err.message || 'could not send code.');
+    }
+    setLoading(false);
+  };
+
+  const handleReset = async () => {
+    setError(null);
+    if (!email.trim() || !resetCode.trim() || password.length < 8) {
+      setError('email, code, and new password (8+ chars) required.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setLoading(true);
+    try {
+      await resetPassword(email.trim().toLowerCase(), resetCode.trim(), password);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      reset();
+      setView('login');
+    } catch (err: any) {
+      setError(err.message || 'reset failed. check your code.');
     }
     setLoading(false);
   };
@@ -161,6 +198,86 @@ export default function AccountPanel() {
             <Text style={[styles.btnGhostText, { color: c.muted }]}>sign out</Text>
           </TouchableOpacity>
         </View>
+      ) : view === 'forgot' ? (
+        // ── Forgot password ────────────────────────────────────────────────────
+        <View style={styles.body}>
+          <Text style={[styles.subtitle, { color: c.muted }]}>
+            enter your email and we'll send a reset code.
+          </Text>
+          <View style={styles.form}>
+            <Field label="email" c={c}>
+              <TextInput
+                style={[styles.input, { backgroundColor: c.searchBg, borderColor: c.searchBorder, color: c.text, fontFamily: fonts.dmMono }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={c.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                onSubmitEditing={handleForgot}
+                returnKeyType="send"
+              />
+            </Field>
+            {error ? <Text style={[styles.errText, { color: '#C0392B' }]}>{error}</Text> : null}
+            <PrimaryButton label="send code" onPress={handleForgot} loading={loading} />
+            <TouchableOpacity onPress={() => { setView('login'); setError(null); }} activeOpacity={0.7} style={styles.declineBtn}>
+              <Text style={[styles.declineBtnText, { color: c.muted }]}>back to sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : view === 'reset' ? (
+        // ── Reset password ─────────────────────────────────────────────────────
+        <View style={styles.body}>
+          {codeSent ? (
+            <Text style={[styles.subtitle, { color: c.muted }]}>
+              code sent — check your email.
+            </Text>
+          ) : null}
+          <View style={styles.form}>
+            <Field label="email" c={c}>
+              <TextInput
+                style={[styles.input, { backgroundColor: c.searchBg, borderColor: c.searchBorder, color: c.text, fontFamily: fonts.dmMono }]}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                placeholderTextColor={c.muted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+            </Field>
+            <Field label="reset code" c={c}>
+              <TextInput
+                style={[styles.input, { backgroundColor: c.searchBg, borderColor: c.searchBorder, color: c.text, fontFamily: fonts.dmMono }]}
+                value={resetCode}
+                onChangeText={t => setResetCode(t.toUpperCase())}
+                placeholder="6-character code"
+                placeholderTextColor={c.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+              />
+            </Field>
+            <Field label="new password" c={c}>
+              <TextInput
+                style={[styles.input, { backgroundColor: c.searchBg, borderColor: c.searchBorder, color: c.text, fontFamily: fonts.dmMono }]}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="8+ characters"
+                placeholderTextColor={c.muted}
+                secureTextEntry
+                autoComplete="new-password"
+                onSubmitEditing={handleReset}
+                returnKeyType="go"
+              />
+            </Field>
+            {error ? <Text style={[styles.errText, { color: '#C0392B' }]}>{error}</Text> : null}
+            <PrimaryButton label="reset password" onPress={handleReset} loading={loading} />
+            <TouchableOpacity onPress={() => { setView('login'); setError(null); }} activeOpacity={0.7} style={styles.declineBtn}>
+              <Text style={[styles.declineBtnText, { color: c.muted }]}>back to sign in</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : (
         // ── Auth form ──────────────────────────────────────────────────────────
         <View style={styles.body}>
@@ -249,6 +366,16 @@ export default function AccountPanel() {
               onPress={view === 'login' ? handleLogin : handleSignup}
               loading={loading}
             />
+
+            {view === 'login' && (
+              <TouchableOpacity
+                onPress={() => { setError(null); setView('forgot'); }}
+                activeOpacity={0.7}
+                style={styles.declineBtn}
+              >
+                <Text style={[styles.declineBtnText, { color: c.muted }]}>forgot password?</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -336,4 +463,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C0392B',
   },
   berryMore: { fontSize: 11, fontFamily: fonts.dmMono, alignSelf: 'center' },
+  subtitle: { fontSize: 12, fontFamily: fonts.dmMono, lineHeight: 18, paddingHorizontal: SPACING.lg },
+  declineBtn: { alignItems: 'center', paddingVertical: SPACING.sm },
+  declineBtnText: { fontSize: 12, fontFamily: fonts.dmMono },
 });

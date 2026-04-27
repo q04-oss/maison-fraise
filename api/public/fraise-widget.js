@@ -118,12 +118,16 @@
       btn.disabled = true;
       btn.textContent = '—';
 
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, 8000);
+
       fetch(api + '/api/fraise/businesses/' + encodeURIComponent(slug) + '/interest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name, email: email }),
+        signal: controller.signal,
       })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (r) { clearTimeout(timeout); return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
         .then(function (res) {
           if (!res.ok) {
             err.textContent = res.data.error || 'something went wrong.';
@@ -144,10 +148,17 @@
             '</div>',
           ].join('');
         })
-        .catch(function () {
-          err.textContent = 'something went wrong. try again.';
+        .catch(function (fetchErr) {
+          clearTimeout(timeout);
           btn.disabled = false;
           btn.textContent = 'let me know →';
+          if (fetchErr && fetchErr.name === 'AbortError') {
+            err.textContent = 'taking too long — try again or visit fraise.box directly.';
+          } else if (!navigator.onLine) {
+            err.textContent = 'you appear to be offline. try again when you\'re connected.';
+          } else {
+            err.textContent = 'couldn\'t reach the server. you can also sign up at fraise.box.';
+          }
         });
     });
   }

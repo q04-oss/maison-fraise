@@ -533,6 +533,14 @@ export async function ensureSchema(): Promise<void> {
   await run('fraise_interest_idx', sql`
     CREATE INDEX IF NOT EXISTS fraise_interest_business_idx ON fraise_interest (business_id, created_at DESC)
   `);
+  await run('fraise_member_resets', sql`CREATE TABLE IF NOT EXISTS fraise_member_resets (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES fraise_members(id),
+    code TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
 
   // ── Kommune reservations — paid pre-order columns ─────────────────────────
   await run('kommune_reservations.email', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS email text`);

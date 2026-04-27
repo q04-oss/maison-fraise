@@ -166,7 +166,7 @@ export function PrimaryButton({ label, onPress, loading, disabled }: PrimaryButt
   const c = useColors();
   return (
     <TouchableOpacity
-      style={[btnStyles.btn, { backgroundColor: c.text }]}
+      style={[btnStyles.btn, { backgroundColor: c.text }, (disabled && !loading) && { opacity: 0.35 }]}
       onPress={onPress}
       activeOpacity={0.8}
       disabled={disabled || loading}

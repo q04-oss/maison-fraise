@@ -24,6 +24,7 @@ export default function CreditsPanel() {
   const [error, setError]     = useState<string | null>(null);
   const [done, setDone]       = useState(false);
   const [newBalance, setNewBalance] = useState<number | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const totalCents = qty * CREDIT_PRICE_CENTS;
   const totalDisplay = `CA$${(totalCents / 100).toFixed(0)}`;
@@ -123,10 +124,24 @@ export default function CreditsPanel() {
             <Text style={[styles.errText, { color: '#C0392B' }]}>{error}</Text>
           ) : null}
 
+          <TouchableOpacity
+            style={styles.termsRow}
+            onPress={() => setTermsAccepted(t => !t)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.termsCheck, { borderColor: termsAccepted ? c.text : c.border, backgroundColor: termsAccepted ? c.text : 'transparent' }]}>
+              {termsAccepted && <Text style={[styles.termsCheckMark, { color: c.panelBg }]}>✓</Text>}
+            </View>
+            <Text style={[styles.termsText, { color: c.muted }]}>
+              i understand: akènes are non-refundable, but returned automatically if an event is cancelled.
+            </Text>
+          </TouchableOpacity>
+
           <PrimaryButton
             label={totalDisplay}
             onPress={handleBuy}
             loading={loading}
+            disabled={!termsAccepted}
           />
 
           <Text style={[styles.note, { color: c.muted }]}>
@@ -176,4 +191,21 @@ const styles = StyleSheet.create({
   note: { fontSize: 11, fontFamily: fonts.dmMono, lineHeight: 17 },
   priceNote: { fontSize: 12, fontFamily: fonts.dmMono },
   muted: { fontSize: 13, fontFamily: fonts.dmMono },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  termsCheck: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  termsCheckMark: { fontSize: 11, fontFamily: fonts.dmMono },
+  termsText: { flex: 1, fontSize: 11, fontFamily: fonts.dmMono, lineHeight: 17 },
 });

@@ -1010,6 +1010,72 @@ export async function sendPasswordReset(params: { to: string; resetUrl: string }
 
 // ── Fraise platform emails ────────────────────────────────────────────────────
 
+export async function sendFraiseMemberPasswordCode(params: { to: string; code: string }) {
+  const { to, code } = params;
+  const content =
+    tableP('you requested a password reset for your box fraise membership.') +
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      <tr>
+        <td style="background:#1C1C1E;border-radius:10px;padding:20px 28px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:10px;color:#8E8E93;letter-spacing:3px;text-transform:uppercase;font-family:'DM Mono',monospace;">your reset code</p>
+          <p style="margin:0;font-size:32px;color:#FFFFFF;letter-spacing:8px;font-family:'Courier New',Courier,monospace;">${code}</p>
+        </td>
+      </tr>
+    </table>` +
+    tableMuted('enter this code in the app. expires in 15 minutes. if you didn\'t request a reset, ignore this email.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `your reset code — ${code}`,
+    html: tableTemplate(content, 'reset your password.'),
+  });
+}
+
+export async function sendFraiseThresholdReached(params: { to: string; businessName: string; eventTitle: string; seatCount: number }) {
+  const { to, seatCount } = params;
+  const businessName = htmlEsc(params.businessName);
+  const eventTitle = htmlEsc(params.eventTitle);
+  const content =
+    tableP(`<strong>${eventTitle.toLowerCase()}</strong> has reached its minimum.`) +
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      ${tableRow('event', eventTitle.toLowerCase())}
+      ${tableRow('acceptances', String(seatCount))}
+    </table>` +
+    tableP('you can now set a date and confirm the event from your dashboard.') +
+    tableMuted('members will be notified once you confirm a date.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `minimum reached — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, 'minimum reached.'),
+  });
+}
+
+export async function sendFraisePayoutFailed(params: { to: string; businessName: string; eventTitle: string; confirmedCount: number; amountCents: number }) {
+  const { to, confirmedCount, amountCents } = params;
+  const businessName = htmlEsc(params.businessName);
+  const eventTitle = htmlEsc(params.eventTitle);
+  const amount = `CA$${(amountCents / 100).toFixed(0)}`;
+  const content =
+    tableP(`hi ${businessName.toLowerCase()} — your payout for <strong>${eventTitle.toLowerCase()}</strong> couldn't be processed automatically.`) +
+    `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+      ${tableRow('event', eventTitle.toLowerCase())}
+      ${tableRow('confirmed guests', String(confirmedCount))}
+      ${tableRow('amount owed', amount)}
+    </table>` +
+    tableP('reply to this email and we\'ll sort it out manually within 24 hours.') +
+    tableMuted('this usually happens when your stripe connect account needs attention. check your dashboard to make sure payouts are enabled.');
+  await resend.emails.send({
+    from: 'box fraise <orders@fraise.chat>',
+    to,
+    replyTo: TABLE_REPLY_TO,
+    subject: `payout issue — ${eventTitle.toLowerCase()}`,
+    html: tableTemplate(content, 'payout needs attention.'),
+  });
+}
+
 export async function sendFraiseWelcome(params: { to: string; name: string }) {
   const { to } = params;
   const name = htmlEsc(params.name);
