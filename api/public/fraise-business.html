@@ -355,7 +355,7 @@
         <label>description</label>
         <textarea id="ce-desc" rows="3" placeholder="what's this event about?"></textarea>
         <div style="margin-top:0.4rem;">
-          <button type="button" class="btn-assist" id="btn-assist" onclick="doAssist()">write with ai</button>
+          <button type="button" class="btn-assist" id="btn-assist" onclick="doAssist()">ask dorotka</button>
           <span class="assist-msg" id="assist-msg"></span>
         </div>
       </div>
@@ -979,7 +979,7 @@
     } catch (e) {
       msg.textContent = e.message;
     }
-    btn.disabled = false; btn.textContent = 'write with ai';
+    btn.disabled = false; btn.textContent = 'ask dorotka';
   }
 
   // ── Keyboard ─────────────────────────────────────────────────────────────────
