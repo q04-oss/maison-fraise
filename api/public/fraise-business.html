@@ -379,6 +379,14 @@
       <div id="members-rows"><div class="empty-state">no members with akènes yet.</div></div>
     </div>
 
+    <!-- Widget embed -->
+    <div class="pool-section">
+      <div class="section-label">the widget</div>
+      <p style="font-size:0.786rem;color:var(--muted);line-height:1.65;margin-bottom:1.25rem;">drop one line on your website. visitors submit their name and email — they appear in your interest list above, flagged if they hold an akène.</p>
+      <div class="widget-code" id="widget-embed-code" style="cursor:pointer;user-select:all;" title="click to copy"></div>
+      <p style="font-size:0.714rem;color:var(--muted);margin-top:0.5rem;" id="widget-copy-msg"></p>
+    </div>
+
     <!-- Create event -->
     <div class="create-section">
       <div class="section-label">create event</div>
@@ -507,6 +515,18 @@
     document.getElementById('nav-biz').style.display = '';
     document.getElementById('nav-biz-name').textContent = biz.name;
     document.getElementById('dash-biz-name').textContent = biz.name;
+
+    // Personalised widget embed code
+    const embedCode = `<div data-fraise="${biz.slug}" data-fraise-tagline="private dinners, by invitation only."></div>\n<script src="https://api.fraise.box/fraise-widget.js"><\/script>`;
+    const embedEl = document.getElementById('widget-embed-code');
+    embedEl.textContent = embedCode;
+    embedEl.addEventListener('click', () => {
+      navigator.clipboard.writeText(embedCode).then(() => {
+        const msg = document.getElementById('widget-copy-msg');
+        msg.textContent = 'copied.';
+        setTimeout(() => { msg.textContent = ''; }, 2000);
+      });
+    });
     const cardLink = document.getElementById('card-download-link');
     cardLink.href = API + '/api/fraise/businesses/card';
     cardLink.setAttribute('download', 'box-fraise-card.pdf');
