@@ -317,6 +317,17 @@
   <!-- Dashboard -->
   <div id="dashboard" style="display:none;">
 
+    <!-- Table card download -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2.5rem;">
+      <div>
+        <div style="font-size:1.286rem;font-weight:500;line-height:1.55;" id="dash-biz-name"></div>
+        <div style="font-size:0.786rem;color:var(--muted);line-height:1.45;margin-top:0.2rem;">your dashboard</div>
+      </div>
+      <a id="card-download-link" href="#" style="font-family:'DM Mono',monospace;font-size:0.714rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:0.4rem 0.9rem;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text)';" onmouseout="this.style.color='var(--muted)';this.style.borderColor='var(--border)';">
+        download table card
+      </a>
+    </div>
+
     <!-- Stripe Connect banner -->
     <div class="connect-banner" id="connect-banner" style="display:none;">
       <div class="connect-banner-text">
@@ -495,6 +506,20 @@
     document.getElementById('btn-signout').style.display = '';
     document.getElementById('nav-biz').style.display = '';
     document.getElementById('nav-biz-name').textContent = biz.name;
+    document.getElementById('dash-biz-name').textContent = biz.name;
+    const cardLink = document.getElementById('card-download-link');
+    cardLink.href = API + '/api/fraise/businesses/card';
+    cardLink.setAttribute('download', 'box-fraise-card.pdf');
+    cardLink.onclick = e => {
+      e.preventDefault();
+      fetch(API + '/api/fraise/businesses/card', { headers: { 'x-business-token': bizToken } })
+        .then(r => r.blob())
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url; a.download = 'box-fraise-card.pdf';
+          a.click(); URL.revokeObjectURL(url);
+        });
+    };
     loadEvents();
     loadEarnings();
     loadInterest();

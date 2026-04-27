@@ -5,6 +5,8 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import appleSignin from 'apple-signin-auth';
 import Anthropic from '@anthropic-ai/sdk';
+import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { stripe } from '../lib/stripe';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -598,6 +600,93 @@ router.post('/events', requireBusiness, async (req: any, res: any) => {
     res.json(((rows as any).rows ?? rows)[0]);
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// GET /api/fraise/businesses/card — generate printable A4 sheet of table cards
+router.get('/businesses/card', requireBusiness, async (req: any, res: any) => {
+  try {
+    const bizName  = req.business.name as string;
+    const joinUrl  = 'https://fraise.box/join';
+
+    // Generate QR code as PNG buffer
+    const qrBuffer = await QRCode.toBuffer(joinUrl, {
+      width: 160,
+      margin: 1,
+      color: { dark: '#1C1C1E', light: '#FFFFFF' },
+    });
+
+    // A4 in points (72pt = 1 inch): 595 × 842
+    // Business card: 85mm × 55mm = 241pt × 156pt
+    // Layout: 2 columns × 4 rows = 8 cards, centred with 12pt gutters
+    const A4_W = 595, A4_H = 842;
+    const CARD_W = 241, CARD_H = 156;
+    const COLS = 2, ROWS = 4;
+    const GUTTER = 12;
+    const TOTAL_W = COLS * CARD_W + (COLS - 1) * GUTTER;
+    const TOTAL_H = ROWS * CARD_H + (ROWS - 1) * GUTTER;
+    const MARGIN_X = (A4_W - TOTAL_W) / 2;
+    const MARGIN_Y = (A4_H - TOTAL_H) / 2;
+
+    const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="box-fraise-card.pdf"`);
+    doc.pipe(res);
+
+    // Register built-in font (Courier is the closest monospace in pdfkit)
+    // Draw each card
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const x = MARGIN_X + col * (CARD_W + GUTTER);
+        const y = MARGIN_Y + row * (CARD_H + GUTTER);
+
+        // Card background
+        doc.rect(x, y, CARD_W, CARD_H).fillColor('#FFFFFF').fill();
+
+        // Card border (hairline)
+        doc.rect(x, y, CARD_W, CARD_H).strokeColor('#E5E1DA').lineWidth(0.5).stroke();
+
+        // Cut guides — small corner marks outside the card
+        const TK = 6; // tick length
+        doc.strokeColor('#CCCCCC').lineWidth(0.3);
+        // top-left
+        doc.moveTo(x - TK, y).lineTo(x - 2, y).stroke();
+        doc.moveTo(x, y - TK).lineTo(x, y - 2).stroke();
+        // top-right
+        doc.moveTo(x + CARD_W + 2, y).lineTo(x + CARD_W + TK, y).stroke();
+        doc.moveTo(x + CARD_W, y - TK).lineTo(x + CARD_W, y - 2).stroke();
+        // bottom-left
+        doc.moveTo(x - TK, y + CARD_H).lineTo(x - 2, y + CARD_H).stroke();
+        doc.moveTo(x, y + CARD_H + 2).lineTo(x, y + CARD_H + TK).stroke();
+        // bottom-right
+        doc.moveTo(x + CARD_W + 2, y + CARD_H).lineTo(x + CARD_W + TK, y + CARD_H).stroke();
+        doc.moveTo(x + CARD_W, y + CARD_H + 2).lineTo(x + CARD_W, y + CARD_H + TK).stroke();
+
+        const PAD = 16;
+
+        // "box fraise" eyebrow
+        doc.font('Courier').fontSize(6).fillColor('#8E8E93')
+          .text('BOX FRAISE', x + PAD, y + PAD, { characterSpacing: 1.5 });
+
+        // Business name
+        doc.font('Courier-Bold').fontSize(11).fillColor('#1C1C1E')
+          .text(bizName, x + PAD, y + PAD + 14, { width: CARD_W - PAD * 2 - 56 });
+
+        // Tagline
+        doc.font('Courier').fontSize(7).fillColor('#8E8E93')
+          .text('by invitation only.', x + PAD, y + CARD_H - PAD - 18, { width: CARD_W - PAD * 2 - 56 });
+
+        // QR code — right side, vertically centred
+        const QR_SIZE = 56;
+        const qrX = x + CARD_W - PAD - QR_SIZE;
+        const qrY = y + (CARD_H - QR_SIZE) / 2;
+        doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
+      }
+    }
+
+    doc.end();
+  } catch (err: any) {
+    if (!res.headersSent) res.status(500).json({ error: err.message ?? 'internal' });
   }
 });
 
