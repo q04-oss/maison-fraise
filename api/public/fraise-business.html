@@ -112,6 +112,12 @@
     /* ── Empty ── */
     .empty-state { padding-block: 2rem; font-size: 0.8rem; color: var(--muted); }
 
+    /* ── Connect banner ── */
+    .connect-banner { border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+    .connect-banner.done { border-color: var(--green); }
+    .connect-banner-text { font-size: 0.78rem; color: var(--muted); line-height: 1.6; }
+    .connect-banner-text strong { color: var(--text); font-weight: 500; display: block; margin-bottom: 0.2rem; }
+
     /* ── Earnings ── */
     .earnings-card { border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; display: flex; gap: 2rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
     .earnings-stat { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -264,6 +270,15 @@
 
   <!-- Dashboard -->
   <div id="dashboard" style="display:none;">
+
+    <!-- Stripe Connect banner -->
+    <div class="connect-banner" id="connect-banner" style="display:none;">
+      <div class="connect-banner-text">
+        <strong id="connect-title">connect your bank account</strong>
+        <span id="connect-sub">add your bank details to receive payouts when events are confirmed.</span>
+      </div>
+      <button class="btn-primary" id="connect-btn" style="font-size:0.72rem;white-space:nowrap;" onclick="doConnect()">set up payouts</button>
+    </div>
 
     <!-- Earnings -->
     <div class="section-label">earnings</div>
@@ -430,6 +445,7 @@
     loadEarnings();
     loadInterest();
     loadMembers();
+    loadConnectStatus();
   }
 
   // ── Events ───────────────────────────────────────────────────────────────────
@@ -609,6 +625,50 @@
       msg.className = 'form-msg err'; msg.textContent = e.message;
     }
     btn.disabled = false; btn.textContent = 'create event →';
+  }
+
+  // ── Stripe Connect ───────────────────────────────────────────────────────────
+
+  async function loadConnectStatus() {
+    const banner = document.getElementById('connect-banner');
+    try {
+      // Check for ?connect=done return from Stripe onboarding
+      if (new URLSearchParams(location.search).get('connect') === 'done') {
+        history.replaceState({}, '', '/business');
+      }
+      const r = await fetch(API + '/api/fraise/businesses/connect/status', { headers: { 'x-business-token': bizToken } });
+      const data = await r.json();
+      banner.style.display = '';
+      if (data.onboarded && data.payouts_enabled) {
+        banner.classList.add('done');
+        document.getElementById('connect-title').textContent = 'payouts connected';
+        document.getElementById('connect-sub').textContent = 'CA$96 per accepted akène transfers to your bank when you confirm an event.';
+        document.getElementById('connect-btn').textContent = 'manage payouts';
+      } else {
+        banner.classList.remove('done');
+        document.getElementById('connect-title').textContent = 'connect your bank account';
+        document.getElementById('connect-sub').textContent = data.connected
+          ? 'finish setting up your payout account to receive transfers.'
+          : 'add your bank details to receive CA$96 per accepted akène.';
+        document.getElementById('connect-btn').textContent = data.connected ? 'finish setup' : 'set up payouts';
+      }
+    } catch { banner.style.display = 'none'; }
+  }
+
+  async function doConnect() {
+    const btn = document.getElementById('connect-btn');
+    btn.disabled = true; btn.textContent = '—';
+    try {
+      const r = await fetch(API + '/api/fraise/businesses/connect', {
+        method: 'POST',
+        headers: { 'x-business-token': bizToken },
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'failed');
+      window.location.href = data.url;
+    } catch (e) {
+      btn.disabled = false; btn.textContent = 'try again';
+    }
   }
 
   // ── Earnings ─────────────────────────────────────────────────────────────────

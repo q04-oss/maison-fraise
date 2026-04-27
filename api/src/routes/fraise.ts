@@ -721,7 +721,94 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
       sendExpoPush(pushTokens, `${event.title}`, `date confirmed: ${eventDate}`, { screen: 'my-claims' });
     }
 
-    res.json({ ok: true, confirmed: invitations.length, event_date: eventDate, location_text: locationText, lat, lng });
+    // ── Stripe Connect payout ─────────────────────────────────────────────────
+    const BUSINESS_RATE = 9600; // CA$96 per akène
+    let transferCount = 0;
+    if (invitations.length > 0) {
+      const bizRows = await db.execute(sql`
+        SELECT stripe_connect_account_id, stripe_connect_onboarded FROM fraise_businesses WHERE id = ${event.business_id ?? businessId} LIMIT 1
+      `);
+      const bizRow = (((bizRows as any).rows ?? bizRows)[0] as any);
+      if (bizRow?.stripe_connect_account_id && bizRow?.stripe_connect_onboarded) {
+        const totalCents = invitations.length * BUSINESS_RATE;
+        try {
+          await stripe.transfers.create({
+            amount: totalCents,
+            currency: 'cad',
+            destination: bizRow.stripe_connect_account_id,
+            metadata: {
+              event_id: String(eventId),
+              confirmed_count: String(invitations.length),
+            },
+          });
+          transferCount = invitations.length;
+        } catch (transferErr: any) {
+          // Log but don't fail the confirmation — payout can be retried manually
+          console.error('[fraise] transfer failed:', transferErr.message);
+        }
+      }
+    }
+
+    res.json({ ok: true, confirmed: invitations.length, transferred: transferCount, event_date: eventDate, location_text: locationText, lat, lng });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// POST /api/fraise/businesses/connect — create/retrieve Stripe Express account + onboarding link
+router.post('/businesses/connect', requireBusiness, async (req: any, res: any) => {
+  try {
+    let accountId = req.business.stripe_connect_account_id;
+
+    if (!accountId) {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        email: req.business.email,
+        capabilities: { transfers: { requested: true } },
+        business_profile: { name: req.business.name },
+        metadata: { fraise_business_id: String(req.business.id) },
+      });
+      accountId = account.id;
+      await db.execute(sql`
+        UPDATE fraise_businesses SET stripe_connect_account_id = ${accountId} WHERE id = ${req.business.id}
+      `);
+    }
+
+    const origin = req.headers.origin || 'https://fraise.box';
+    const link = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: `${origin}/business`,
+      return_url:  `${origin}/business?connect=done`,
+      type: 'account_onboarding',
+    });
+
+    res.json({ url: link.url, account_id: accountId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
+// GET /api/fraise/businesses/connect/status — check onboarding completion
+router.get('/businesses/connect/status', requireBusiness, async (req: any, res: any) => {
+  try {
+    const accountId = req.business.stripe_connect_account_id;
+    if (!accountId) return res.json({ connected: false, onboarded: false });
+
+    const account = await stripe.accounts.retrieve(accountId);
+    const onboarded = account.details_submitted && !account.requirements?.currently_due?.length;
+
+    if (onboarded && !req.business.stripe_connect_onboarded) {
+      await db.execute(sql`
+        UPDATE fraise_businesses SET stripe_connect_onboarded = true WHERE id = ${req.business.id}
+      `);
+    }
+
+    res.json({
+      connected: true,
+      onboarded: !!onboarded,
+      payouts_enabled: account.payouts_enabled,
+      account_id: accountId,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
