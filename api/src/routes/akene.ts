@@ -534,4 +534,54 @@ router.patch('/events/:id/set-date', requireUser, async (req: Request, res: Resp
   }
 });
 
+// ── GET /api/akene/events/mine ────────────────────────────────────────────────
+
+router.get('/events/mine', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT ae.id, ae.title, ae.description, ae.event_date, ae.capacity, ae.status,
+             ae.created_at,
+             COUNT(ai.id) FILTER (WHERE ai.status = 'accepted')::int AS accepted_count,
+             COUNT(ai.id) FILTER (WHERE ai.status = 'waitlisted')::int AS waitlist_count
+      FROM akene_events ae
+      LEFT JOIN akene_invitations ai ON ai.event_id = ae.id
+      WHERE ae.created_by_user_id = ${userId}
+      GROUP BY ae.id
+      ORDER BY ae.created_at DESC
+    `);
+    res.json(((rows as any).rows ?? rows).map((r: any) => ({
+      id:            r.id,
+      title:         r.title,
+      description:   r.description,
+      eventDate:     r.event_date,
+      capacity:      r.capacity,
+      acceptedCount: r.accepted_count,
+      waitlistCount: r.waitlist_count,
+      status:        r.status,
+      createdAt:     r.created_at,
+    })));
+  } catch { res.status(500).json({ error: 'internal' }); }
+});
+
+// ── GET /api/akene/purchases/mine ─────────────────────────────────────────────
+
+router.get('/purchases/mine', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  try {
+    const rows = await db.execute(sql`
+      SELECT id, quantity, amount_cents, purchased_at
+      FROM akene_purchases
+      WHERE user_id = ${userId} AND confirmed = true
+      ORDER BY purchased_at DESC
+    `);
+    res.json(((rows as any).rows ?? rows).map((r: any) => ({
+      id:          r.id,
+      quantity:    r.quantity,
+      amountCents: r.amount_cents,
+      purchasedAt: r.purchased_at,
+    })));
+  } catch { res.status(500).json({ error: 'internal' }); }
+});
+
 export default router;
