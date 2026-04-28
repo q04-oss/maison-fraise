@@ -527,6 +527,15 @@ export async function ensureSchema(): Promise<void> {
   await run('kommune_reservations.order_json', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS order_json jsonb`);
   await run('kommune_reservations.event_id', sql`ALTER TABLE kommune_reservations ADD COLUMN IF NOT EXISTS event_id integer REFERENCES table_events(id)`);
 
+  await run('device_attestations', sql`CREATE TABLE IF NOT EXISTS device_attestations (
+    id SERIAL PRIMARY KEY,
+    key_id TEXT NOT NULL UNIQUE,
+    attestation TEXT NOT NULL,
+    challenge TEXT,
+    user_id INTEGER REFERENCES users(id),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )`);
+
   // Rename fraise_businesses → business_accounts
   await run('rename.fraise_businesses', sql`
     DO $$ BEGIN

@@ -238,4 +238,24 @@ router.get('/', requireUser, async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/devices/attest — store App Attest key ID and attestation for a device
+// The attestation proves the request came from a genuine, unmodified Box Fraise build.
+// Full verification against Apple's servers can be added; for now we record the key.
+router.post('/attest', async (req: Request, res: Response) => {
+  const { key_id, attestation, challenge } = req.body;
+  if (!key_id || !attestation) return res.status(400).json({ error: 'key_id and attestation required' });
+  const userId = (req as any).userId ?? null;
+
+  try {
+    await db.execute(sql`
+      INSERT INTO device_attestations (key_id, attestation, challenge, user_id, created_at)
+      VALUES (${key_id}, ${attestation}, ${challenge ?? null}, ${userId}, now())
+      ON CONFLICT (key_id) DO UPDATE SET attestation = EXCLUDED.attestation, user_id = EXCLUDED.user_id
+    `);
+    res.json({ ok: true });
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
 export default router;

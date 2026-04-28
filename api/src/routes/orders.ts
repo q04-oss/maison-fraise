@@ -682,5 +682,37 @@ router.post('/:nfc_token/collect', requireDevice, async (req: Request, res: Resp
   }
 });
 
+// POST /api/orders/clip — guest order from App Clip (no auth required)
+router.post('/clip', async (req: any, res: any) => {
+  const { location_slug, variety_id, quantity = 1 } = req.body;
+  if (!location_slug || !variety_id) {
+    return res.status(400).json({ error: 'location_slug and variety_id required' });
+  }
+  try {
+    const bizRows = await db.execute(sql`
+      SELECT id FROM businesses WHERE slug = ${location_slug} AND approved_by_admin = true LIMIT 1
+    `);
+    const biz = ((bizRows as any).rows ?? bizRows)[0] as any;
+    if (!biz) return res.status(404).json({ error: 'location not found' });
+
+    const varRows = await db.execute(sql`
+      SELECT id, price_cents FROM varieties WHERE id = ${variety_id} AND active = true LIMIT 1
+    `);
+    const variety = ((varRows as any).rows ?? varRows)[0] as any;
+    if (!variety) return res.status(404).json({ error: 'variety not found' });
+
+    const qty = Math.min(Math.max(parseInt(quantity), 1), 4);
+    const intent = await stripe.paymentIntents.create({
+      amount: variety.price_cents * qty,
+      currency: 'cad',
+      automatic_payment_methods: { enabled: true },
+      metadata: { location_id: biz.id, variety_id, quantity: qty, source: 'app_clip' },
+    });
+    res.json({ id: 0, client_secret: intent.client_secret });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? 'internal' });
+  }
+});
+
 export default router;
 // @final-audit
