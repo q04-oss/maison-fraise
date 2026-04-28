@@ -145,6 +145,12 @@ app.use('/api/gift-note', aiLimiter);
 app.use('/api/ask', aiLimiter);
 app.use('/api/ar-poem', aiLimiter);
 
+// Key endpoint rate limiting — tight windows to prevent challenge farming and key spam
+const keysChallengeLimiter = rateLimit({ windowMs: 60 * 60_000, max: 10, standardHeaders: true, legacyHeaders: false });
+app.use('/api/keys/challenge', keysChallengeLimiter);
+const keysRegisterLimiter = rateLimit({ windowMs: 24 * 60 * 60_000, max: 5, standardHeaders: true, legacyHeaders: false });
+app.use('/api/keys/register', keysRegisterLimiter);
+
 // Raw body for Stripe webhook — must be registered before express.json()
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
@@ -157,26 +163,78 @@ app.use((req, _res, next) => {
   next();
 });
 
-// HMAC validation — enforced only on requests that present X-Fraise-Client: ios
-const _FRAISE_SIGNING_KEY = Buffer.from('fraise-request-signing-v1', 'utf8');
-const _FRAISE_MAX_SKEW = 300; // seconds
+// ─── HMAC request signing ─────────────────────────────────────────────────────
+// Every iOS request includes:
+//   X-Fraise-Client: ios
+//   X-Fraise-Ts:     Unix timestamp (seconds)
+//   X-Fraise-Sig:    HMAC-SHA256(method + path + ts + body, deviceKey) base64
+//   X-Fraise-Attest-Key: App Attest key ID (present after attestation)
+//
+// Key resolution:
+//   1. If X-Fraise-Attest-Key present and device is attested → per-device HMAC key
+//   2. Otherwise → shared fallback (pre-attestation bootstrap only)
+//
+// Replay prevention: each (sig, ts) pair is cached for the validity window.
+// NOTE: nonce cache is in-process — for multi-instance deploys, move to Redis.
 
-app.use('/api', (req: any, res: any, next: any) => {
+const _FRAISE_SHARED_KEY = Buffer.from(process.env.FRAISE_HMAC_SHARED_KEY ?? 'fraise-request-signing-v1', 'utf8');
+const _FRAISE_MAX_SKEW   = 300; // seconds
+
+// Map<sig, expiresAtMs> — entries pruned every minute
+const _nonceCache = new Map<string, number>();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, exp] of _nonceCache) if (exp < now) _nonceCache.delete(k);
+}, 60_000).unref();
+
+app.use('/api', async (req: any, res: any, next: any) => {
   if (req.headers['x-fraise-client'] !== 'ios') return next();
+
+  // Auth endpoints: HMAC key can't be registered until after sign-in completes.
+  // Apple Sign In tokens provide the auth guarantee here.
+  if (req.path.startsWith('/auth/')) return next();
 
   const ts  = req.headers['x-fraise-ts']  as string | undefined;
   const sig = req.headers['x-fraise-sig'] as string | undefined;
   if (!ts || !sig) return res.status(401).json({ error: 'missing signature' });
 
+  // Timestamp window check
   const tsNum = parseInt(ts, 10);
   if (isNaN(tsNum) || Math.abs(Math.floor(Date.now() / 1000) - tsNum) > _FRAISE_MAX_SKEW) {
     return res.status(401).json({ error: 'request expired' });
   }
 
+  // Replay check — sig is deterministic for a given request so it's a safe nonce
+  if (_nonceCache.has(sig)) {
+    return res.status(401).json({ error: 'request replayed' });
+  }
+
   const bodyBuf: Buffer = req.rawBody ?? Buffer.alloc(0);
   const requestPath = req.originalUrl.split('?')[0];
   const message = Buffer.concat([Buffer.from(`${req.method}${requestPath}${ts}`, 'utf8'), bodyBuf]);
-  const expected = createHmac('sha256', _FRAISE_SIGNING_KEY).update(message).digest('base64');
+
+  // Determine signing key: per-device if attested, shared fallback otherwise
+  const attestKeyId = req.headers['x-fraise-attest-key'] as string | undefined;
+  let signingKey: Buffer = _FRAISE_SHARED_KEY;
+
+  if (attestKeyId) {
+    try {
+      const rows = await db.execute(sql`
+        SELECT hmac_key FROM device_attestations
+        WHERE key_id = ${attestKeyId} AND hmac_key IS NOT NULL
+        LIMIT 1
+      `);
+      const row = ((rows as any).rows ?? rows)[0] as any;
+      if (row?.hmac_key) {
+        signingKey = Buffer.from(row.hmac_key, 'base64');
+      }
+      // If key ID present but not yet registered (attestation race), use shared fallback
+    } catch {
+      // DB error — fail safe: continue with shared key
+    }
+  }
+
+  const expected = createHmac('sha256', signingKey).update(message).digest('base64');
 
   try {
     const eBuf = Buffer.from(expected, 'base64');
@@ -188,6 +246,8 @@ app.use('/api', (req: any, res: any, next: any) => {
     return res.status(401).json({ error: 'invalid signature' });
   }
 
+  // Cache nonce — prevents replay within the validity window
+  _nonceCache.set(sig, Date.now() + _FRAISE_MAX_SKEW * 1000);
   next();
 });
 

@@ -238,22 +238,36 @@ router.get('/', requireUser, async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/devices/attest — store App Attest key ID and attestation for a device
-// The attestation proves the request came from a genuine, unmodified Box Fraise build.
-// Full verification against Apple's servers can be added; for now we record the key.
+// POST /api/devices/attest — register App Attest key and store the device's HMAC signing key.
+// hmacKey: base64-encoded 32-byte per-device HMAC key (generated in Keychain on first launch).
+// The server uses this key to validate X-Fraise-Sig on all subsequent requests from this device,
+// replacing the shared fallback key and providing per-device request integrity.
 router.post('/attest', async (req: Request, res: Response) => {
-  const { key_id, attestation, challenge } = req.body;
+  const { key_id, attestation, challenge, hmac_key } = req.body;
   if (!key_id || !attestation) return res.status(400).json({ error: 'key_id and attestation required' });
   const userId = (req as any).userId ?? null;
 
+  // Validate hmac_key if provided: must be a 32-byte base64-encoded value
+  if (hmac_key) {
+    const keyBytes = Buffer.from(hmac_key, 'base64');
+    if (keyBytes.length !== 32) {
+      return res.status(400).json({ error: 'hmac_key must be 32 bytes base64-encoded' });
+    }
+  }
+
   try {
     await db.execute(sql`
-      INSERT INTO device_attestations (key_id, attestation, challenge, user_id, created_at)
-      VALUES (${key_id}, ${attestation}, ${challenge ?? null}, ${userId}, now())
-      ON CONFLICT (key_id) DO UPDATE SET attestation = EXCLUDED.attestation, user_id = EXCLUDED.user_id
+      INSERT INTO device_attestations (key_id, attestation, challenge, user_id, hmac_key, created_at)
+      VALUES (${key_id}, ${attestation}, ${challenge ?? null}, ${userId}, ${hmac_key ?? null}, now())
+      ON CONFLICT (key_id) DO UPDATE
+        SET attestation = EXCLUDED.attestation,
+            user_id     = EXCLUDED.user_id,
+            hmac_key    = COALESCE(EXCLUDED.hmac_key, device_attestations.hmac_key)
     `);
+    logger.info(`App Attest registered: keyID ${String(key_id).slice(0, 8)}… userId=${userId}`);
     res.json({ ok: true });
-  } catch {
+  } catch (err) {
+    logger.error('devices/attest error', err);
     res.status(500).json({ error: 'internal' });
   }
 });

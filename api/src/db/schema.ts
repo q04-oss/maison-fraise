@@ -913,11 +913,33 @@ export const messages = pgTable('messages', {
 export const userKeys = pgTable('user_keys', {
   id: serial('id').primaryKey(),
   user_id: integer('user_id').notNull().references(() => users.id).unique(),
-  identity_key: text('identity_key').notNull(),          // X25519 public key, base64
-  signed_pre_key: text('signed_pre_key').notNull(),      // X25519 public key, base64
-  signed_pre_key_sig: text('signed_pre_key_sig').notNull(), // Ed25519 signature, base64
+  identity_key: text('identity_key').notNull(),             // X25519 DH public key, base64
+  identity_signing_key: text('identity_signing_key'),       // Ed25519 signing public key, base64
+  signed_pre_key: text('signed_pre_key').notNull(),         // X25519 public key, base64
+  signed_pre_key_sig: text('signed_pre_key_sig').notNull(), // Ed25519 signature over SPK, base64
   created_at: timestamp('created_at').notNull().defaultNow(),
   updated_at: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Proof-of-possession challenges — consumed exactly once during key registration
+export const keyChallenges = pgTable('key_challenges', {
+  id: serial('id').primaryKey(),
+  user_id: integer('user_id').notNull().references(() => users.id),
+  challenge: text('challenge').notNull(),   // base64-encoded 32 random bytes
+  expires_at: timestamp('expires_at').notNull(),
+  used: boolean('used').notNull().default(false),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+});
+
+// App Attest key registrations — stores per-device HMAC signing key
+export const deviceAttestations = pgTable('device_attestations', {
+  id: serial('id').primaryKey(),
+  key_id: text('key_id').notNull().unique(),
+  attestation: text('attestation').notNull(),
+  challenge: text('challenge'),
+  user_id: integer('user_id').references(() => users.id),
+  hmac_key: text('hmac_key'),  // base64-encoded 32-byte per-device HMAC key
+  created_at: timestamp('created_at').notNull().defaultNow(),
 });
 
 export const oneTimePreKeys = pgTable('one_time_pre_keys', {
