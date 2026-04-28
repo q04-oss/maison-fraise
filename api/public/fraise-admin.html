@@ -86,9 +86,9 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" onclick="showTab('members')">members</button>
-      <button class="tab" onclick="showTab('businesses')">businesses</button>
-      <button class="tab" onclick="showTab('events')">events</button>
+      <button class="tab active" onclick="showTab('members', event)">members</button>
+      <button class="tab" onclick="showTab('businesses', event)">businesses</button>
+      <button class="tab" onclick="showTab('events', event)">events</button>
     </div>
 
     <div class="tab-panel active" id="tab-members">
@@ -141,11 +141,11 @@
     } catch { err.classList.add('on'); }
   }
 
-  function showTab(name) {
+  function showTab(name, evt) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
-    event.currentTarget.classList.add('active');
+    evt.currentTarget.classList.add('active');
   }
 
   async function loadAll() {

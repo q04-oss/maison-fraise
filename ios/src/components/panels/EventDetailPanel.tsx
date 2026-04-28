@@ -69,8 +69,8 @@ export default function EventDetailPanel() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const result = await claimEvent(ev.id);
-      setMember({ ...member, credit_balance: result.credit_balance });
-      setClaims([...claims, {
+      setMember(prev => prev ? { ...prev, credit_balance: result.credit_balance } : prev);
+      setClaims(prev => [...prev, {
         id: Date.now(),
         status: 'claimed',
         created_at: new Date().toISOString(),
@@ -86,7 +86,7 @@ export default function EventDetailPanel() {
         business_name: ev.business_name,
         business_slug: ev.business_slug,
       }]);
-      setEvents(events.map(e => e.id === ev.id
+      setEvents(prev => prev.map(e => e.id === ev.id
         ? { ...e, seats_claimed: result.seats_claimed }
         : e
       ));

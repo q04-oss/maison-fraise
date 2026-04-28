@@ -70,6 +70,8 @@ export default function AccountPanel() {
 
   const handleAppleSignIn = async () => {
     if (loading) return;
+    setLoading(true);
+    setError(null);
     try {
       const cred = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -77,10 +79,9 @@ export default function AccountPanel() {
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
+      if (!cred.identityToken) throw new Error('apple did not return an identity token.');
       const fullName = [cred.fullName?.givenName, cred.fullName?.familyName].filter(Boolean).join(' ');
-      setLoading(true);
-      setError(null);
-      const data = await memberAppleSignIn(cred.identityToken!, fullName, cred.email ?? '');
+      const data = await memberAppleSignIn(cred.identityToken, fullName, cred.email ?? '');
       await setMemberToken(data.token);
       setMember(data);
       const claims = await fetchMyClaims();
@@ -90,8 +91,9 @@ export default function AccountPanel() {
       if (err.code !== 'ERR_REQUEST_CANCELED') {
         setError(err.message || 'apple sign in failed.');
       }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSignOut = () => {

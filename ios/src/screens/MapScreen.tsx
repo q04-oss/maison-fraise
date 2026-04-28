@@ -83,7 +83,7 @@ export default function MapScreen() {
       jumpToPanel('my-claims');
       setTimeout(() => TrueSheet.resize(SHEET_NAME, 2), 350);
     }
-  }, [pendingScreen]);
+  }, [pendingScreen, clearPendingScreen, jumpToPanel]);
 
   // ── Map event pins ─────────────────────────────────────────────────────────
 

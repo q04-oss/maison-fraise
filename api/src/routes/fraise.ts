@@ -27,6 +27,10 @@ function confirmToken(): string {
   return crypto.randomBytes(20).toString('hex');
 }
 
+function escHtml(s: string): string {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────────
 
 async function requireMember(req: any, res: any, next: NextFunction) {
@@ -457,99 +461,123 @@ router.post('/events', requireMemberBusiness, async (req: any, res: any) => {
   }
 });
 
-// POST /api/fraise/events/:id/claim — member claims a spot
+// POST /api/fraise/events/:id/claim — member claims a spot (atomic CTE)
 router.post('/events/:id/claim', requireMember, async (req: any, res: any) => {
   const eventId = parseInt(req.params.id);
   if (isNaN(eventId)) return res.status(400).json({ error: 'invalid id' });
   try {
-    // Load event
-    const evRows = await db.execute(sql`SELECT id, status, max_seats, seats_claimed, price_cents, title, business_id FROM fraise_events WHERE id = ${eventId} LIMIT 1`);
-    const event = ((evRows as any).rows ?? evRows)[0] as any;
-    if (!event) return res.status(404).json({ error: 'event not found' });
-    if (!['open', 'threshold_met'].includes(event.status)) {
-      return res.status(400).json({ error: 'event is not open for claims' });
-    }
-    if (event.seats_claimed >= event.max_seats) {
-      return res.status(400).json({ error: 'event is full' });
-    }
+    const result = await db.execute(sql`
+      WITH
+      check_and_claim AS (
+        INSERT INTO fraise_claims (member_id, event_id)
+        SELECT ${req.member.id}, ${eventId}
+        FROM fraise_events e, fraise_members m
+        WHERE e.id = ${eventId}
+          AND e.status IN ('open', 'threshold_met')
+          AND e.seats_claimed < e.max_seats
+          AND m.id = ${req.member.id}
+          AND m.credit_balance >= 1
+        ON CONFLICT (member_id, event_id) DO NOTHING
+        RETURNING id
+      ),
+      deduct_credit AS (
+        UPDATE fraise_members SET credit_balance = credit_balance - 1
+        WHERE id = ${req.member.id} AND EXISTS (SELECT 1 FROM check_and_claim)
+        RETURNING credit_balance
+      ),
+      update_seats AS (
+        UPDATE fraise_events SET seats_claimed = seats_claimed + 1
+        WHERE id = ${eventId} AND EXISTS (SELECT 1 FROM check_and_claim)
+        RETURNING seats_claimed, min_seats, status
+      )
+      SELECT
+        (SELECT id    FROM check_and_claim) AS claim_id,
+        (SELECT credit_balance FROM deduct_credit) AS credit_balance,
+        (SELECT seats_claimed  FROM update_seats)  AS seats_claimed,
+        (SELECT min_seats      FROM update_seats)  AS min_seats,
+        (SELECT status         FROM update_seats)  AS status
+    `);
 
-    // Check member credit
-    const memRows = await db.execute(sql`SELECT credit_balance FROM fraise_members WHERE id = ${req.member.id} LIMIT 1`);
-    const member = ((memRows as any).rows ?? memRows)[0] as any;
-    if (member.credit_balance < 1) {
-      return res.status(402).json({ error: 'insufficient credits' });
-    }
+    const row = ((result as any).rows ?? result)[0] as any;
 
-    // Check for duplicate claim
-    const dup = await db.execute(sql`SELECT id FROM fraise_claims WHERE member_id = ${req.member.id} AND event_id = ${eventId} LIMIT 1`);
-    if (((dup as any).rows ?? dup).length) {
+    if (!row?.claim_id) {
+      // Claim was not inserted — diagnose why
+      const evRows = await db.execute(sql`SELECT status, max_seats, seats_claimed FROM fraise_events WHERE id = ${eventId} LIMIT 1`);
+      const ev = ((evRows as any).rows ?? evRows)[0] as any;
+      if (!ev) return res.status(404).json({ error: 'event not found' });
+      if (!['open', 'threshold_met'].includes(ev.status)) return res.status(400).json({ error: 'event is not open for claims' });
+      if (ev.seats_claimed >= ev.max_seats) return res.status(400).json({ error: 'event is full' });
+      const memRows = await db.execute(sql`SELECT credit_balance FROM fraise_members WHERE id = ${req.member.id} LIMIT 1`);
+      const mem = ((memRows as any).rows ?? memRows)[0] as any;
+      if (mem?.credit_balance < 1) return res.status(402).json({ error: 'insufficient credits' });
       return res.status(409).json({ error: 'already claimed this event' });
     }
 
-    // Atomically decrement credit and increment seats_claimed
-    await db.execute(sql`
-      UPDATE fraise_members SET credit_balance = credit_balance - 1 WHERE id = ${req.member.id} AND credit_balance >= 1
-    `);
-    await db.execute(sql`
-      INSERT INTO fraise_claims (member_id, event_id) VALUES (${req.member.id}, ${eventId})
-    `);
-    const newSeats = await db.execute(sql`
-      UPDATE fraise_events SET seats_claimed = seats_claimed + 1 WHERE id = ${eventId}
-      RETURNING seats_claimed, min_seats, status
-    `);
-    const updated = ((newSeats as any).rows ?? newSeats)[0] as any;
-
-    // Auto-advance to threshold_met
-    if (updated.status === 'open' && updated.seats_claimed >= updated.min_seats) {
-      await db.execute(sql`UPDATE fraise_events SET status = 'threshold_met' WHERE id = ${eventId}`);
+    // Auto-advance to threshold_met if needed (idempotent)
+    if (row.status === 'open' && row.seats_claimed >= row.min_seats) {
+      await db.execute(sql`UPDATE fraise_events SET status = 'threshold_met' WHERE id = ${eventId} AND status = 'open'`);
     }
 
-    // Get updated balance
-    const balRows = await db.execute(sql`SELECT credit_balance FROM fraise_members WHERE id = ${req.member.id} LIMIT 1`);
-    const balance = (((balRows as any).rows ?? balRows)[0] as any).credit_balance;
-
-    // Business name for email
-    const bizRows = await db.execute(sql`SELECT name FROM fraise_businesses WHERE id = ${event.business_id} LIMIT 1`);
+    // Send confirmation email
+    const evRows = await db.execute(sql`SELECT title, business_id FROM fraise_events WHERE id = ${eventId} LIMIT 1`);
+    const ev = ((evRows as any).rows ?? evRows)[0] as any;
+    const bizRows = await db.execute(sql`SELECT name FROM fraise_businesses WHERE id = ${ev.business_id} LIMIT 1`);
     const bizName = (((bizRows as any).rows ?? bizRows)[0] as any)?.name ?? '';
+    sendFraiseClaimConfirmation({ to: req.member.email, name: req.member.name, eventTitle: ev.title, businessName: bizName, creditBalance: row.credit_balance }).catch(() => {});
 
-    sendFraiseClaimConfirmation({ to: req.member.email, name: req.member.name, eventTitle: event.title, businessName: bizName, creditBalance: balance }).catch(() => {});
-    res.json({ ok: true, credit_balance: balance, seats_claimed: updated.seats_claimed });
+    res.json({ ok: true, credit_balance: row.credit_balance, seats_claimed: row.seats_claimed });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
 });
 
-// POST /api/fraise/events/:id/decline — member releases claim, credit returned
+// POST /api/fraise/events/:id/decline — member releases claim, credit returned (atomic CTE)
 router.post('/events/:id/decline', requireMember, async (req: any, res: any) => {
   const eventId = parseInt(req.params.id);
   if (isNaN(eventId)) return res.status(400).json({ error: 'invalid id' });
   try {
-    const claimRows = await db.execute(sql`
-      SELECT id, status FROM fraise_claims
-      WHERE member_id = ${req.member.id} AND event_id = ${eventId}
-      LIMIT 1
+    const result = await db.execute(sql`
+      WITH
+      decline_claim AS (
+        UPDATE fraise_claims SET status = 'declined', declined_at = now()
+        WHERE member_id = ${req.member.id}
+          AND event_id = ${eventId}
+          AND status NOT IN ('declined', 'attended')
+        RETURNING id
+      ),
+      return_credit AS (
+        UPDATE fraise_members SET credit_balance = credit_balance + 1
+        WHERE id = ${req.member.id} AND EXISTS (SELECT 1 FROM decline_claim)
+        RETURNING credit_balance
+      ),
+      release_seat AS (
+        UPDATE fraise_events SET seats_claimed = GREATEST(seats_claimed - 1, 0)
+        WHERE id = ${eventId} AND EXISTS (SELECT 1 FROM decline_claim)
+        RETURNING seats_claimed, min_seats, status
+      )
+      SELECT
+        (SELECT id             FROM decline_claim) AS claim_id,
+        (SELECT credit_balance FROM return_credit) AS credit_balance,
+        (SELECT seats_claimed  FROM release_seat)  AS seats_claimed,
+        (SELECT min_seats      FROM release_seat)  AS min_seats,
+        (SELECT status         FROM release_seat)  AS event_status
     `);
-    const claim = ((claimRows as any).rows ?? claimRows)[0] as any;
-    if (!claim) return res.status(404).json({ error: 'no claim found' });
-    if (['declined', 'attended'].includes(claim.status)) {
+
+    const row = ((result as any).rows ?? result)[0] as any;
+
+    if (!row?.claim_id) {
+      const claimRows = await db.execute(sql`SELECT status FROM fraise_claims WHERE member_id = ${req.member.id} AND event_id = ${eventId} LIMIT 1`);
+      const claim = ((claimRows as any).rows ?? claimRows)[0] as any;
+      if (!claim) return res.status(404).json({ error: 'no claim found' });
       return res.status(400).json({ error: 'claim already closed' });
     }
 
-    await db.execute(sql`UPDATE fraise_claims SET status = 'declined', declined_at = now() WHERE id = ${claim.id}`);
-    await db.execute(sql`UPDATE fraise_members SET credit_balance = credit_balance + 1 WHERE id = ${req.member.id}`);
-    await db.execute(sql`
-      UPDATE fraise_events SET seats_claimed = GREATEST(seats_claimed - 1, 0) WHERE id = ${eventId}
-    `);
-    // Re-open if was threshold_met and now below threshold
-    await db.execute(sql`
-      UPDATE fraise_events SET status = 'open'
-      WHERE id = ${eventId} AND status = 'threshold_met'
-        AND seats_claimed < min_seats
-    `);
+    // Re-open if was threshold_met but now below threshold (idempotent)
+    if (row.event_status === 'threshold_met' && row.seats_claimed < row.min_seats) {
+      await db.execute(sql`UPDATE fraise_events SET status = 'open' WHERE id = ${eventId} AND status = 'threshold_met'`);
+    }
 
-    const balRows = await db.execute(sql`SELECT credit_balance FROM fraise_members WHERE id = ${req.member.id} LIMIT 1`);
-    const balance = (((balRows as any).rows ?? balRows)[0] as any).credit_balance;
-    res.json({ ok: true, credit_returned: true, credit_balance: balance });
+    res.json({ ok: true, credit_returned: true, credit_balance: row.credit_balance });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? 'internal' });
   }
@@ -648,12 +676,36 @@ router.post('/events/:id/confirm', async (req: any, res: any) => {
 
 // ── Claim token actions (from email links) ────────────────────────────────────
 
+const PAGE_STYLE = `*{box-sizing:border-box;margin:0;padding:0}html{background:#fff;font-family:'DM Mono',monospace;font-size:14px;-webkit-font-smoothing:antialiased}body{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:2rem}main{max-width:400px;width:100%}.eyebrow{font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:#8A8880;margin-bottom:0.5rem}h1{font-size:1rem;font-weight:500;margin-bottom:1rem}p{font-size:0.78rem;color:#8A8880;line-height:1.7}a{color:#1A1A18;text-underline-offset:3px}button{margin-top:1.5rem;background:#1A1A18;color:#fff;border:none;border-radius:9999px;padding:0.6rem 1.5rem;font-family:'DM Mono',monospace;font-size:0.78rem;cursor:pointer;letter-spacing:0.05em}button:hover{opacity:0.85}`;
+
 function claimResponsePage(heading: string, body: string): string {
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${heading} — fraise.box</title><style>*{box-sizing:border-box;margin:0;padding:0}html{background:#fff;font-family:'DM Mono',monospace;font-size:14px;-webkit-font-smoothing:antialiased}body{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:2rem}main{max-width:400px;width:100%}.eyebrow{font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:#8A8880;margin-bottom:0.5rem}h1{font-size:1rem;font-weight:500;margin-bottom:1rem}p{font-size:0.78rem;color:#8A8880;line-height:1.7}a{color:#1A1A18;text-underline-offset:3px}</style></head><body><main><div class="eyebrow">fraise.box</div><h1>${heading}</h1><p>${body}</p></main></body></html>`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escHtml(heading)} — fraise.box</title><style>${PAGE_STYLE}</style></head><body><main><div class="eyebrow">fraise.box</div><h1>${escHtml(heading)}</h1><p>${escHtml(body)}</p></main></body></html>`;
 }
 
-// GET /api/fraise/claims/confirm/:token
+function claimActionPage(heading: string, body: string, action: string, buttonLabel: string): string {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${escHtml(heading)} — fraise.box</title><style>${PAGE_STYLE}</style></head><body><main><div class="eyebrow">fraise.box</div><h1>${escHtml(heading)}</h1><p>${escHtml(body)}</p><form method="POST" action="${escHtml(action)}"><button type="submit">${escHtml(buttonLabel)}</button></form></main></body></html>`;
+}
+
+// GET /api/fraise/claims/confirm/:token — show confirmation form (safe for email prefetch)
 router.get('/claims/confirm/:token', async (req: any, res: any) => {
+  const t = String(req.params.token ?? '').trim();
+  if (!t) return res.status(400).send(claimResponsePage('invalid link', 'this confirmation link is not valid.'));
+  try {
+    const rows = await db.execute(sql`
+      SELECT c.status FROM fraise_claims c WHERE c.confirm_token = ${t} LIMIT 1
+    `);
+    const claim = ((rows as any).rows ?? rows)[0] as any;
+    if (!claim) return res.send(claimResponsePage('link not found', 'this link has already been used or does not exist.'));
+    if (claim.status === 'confirmed') return res.send(claimResponsePage("already confirmed.", `you're already confirmed. see you there.`));
+    if (claim.status === 'declined') return res.send(claimResponsePage('already declined', 'you already released this spot. your credit was returned.'));
+    res.send(claimActionPage("confirm your spot.", "tap below to confirm you're coming.", `/api/fraise/claims/confirm/${t}`, 'confirm →'));
+  } catch (err: any) {
+    res.status(500).send(claimResponsePage('error', "something went wrong. reply to your email and we'll sort it."));
+  }
+});
+
+// POST /api/fraise/claims/confirm/:token — commit confirmation
+router.post('/claims/confirm/:token', async (req: any, res: any) => {
   const t = String(req.params.token ?? '').trim();
   if (!t) return res.status(400).send(claimResponsePage('invalid link', 'this confirmation link is not valid.'));
   try {
@@ -667,17 +719,33 @@ router.get('/claims/confirm/:token', async (req: any, res: any) => {
     if (!claim) return res.send(claimResponsePage('link not found', 'this link has already been used or does not exist.'));
     if (claim.status === 'confirmed') return res.send(claimResponsePage("already confirmed.", `you're already confirmed. see you there.`));
     if (claim.status === 'declined') return res.send(claimResponsePage('already declined', 'you already released this spot. your credit was returned.'));
-    await db.execute(sql`
-      UPDATE fraise_claims SET status = 'confirmed', confirmed_at = now(), confirm_token = NULL WHERE id = ${claim.id}
-    `);
+    await db.execute(sql`UPDATE fraise_claims SET status = 'confirmed', confirmed_at = now(), confirm_token = NULL WHERE id = ${claim.id}`);
     res.send(claimResponsePage("you're confirmed.", `see you there, ${claim.name.split(' ')[0]}. we'll be in touch with any details closer to the date.`));
   } catch (err: any) {
-    res.status(500).send(claimResponsePage('error', 'something went wrong. reply to your email and we\'ll sort it.'));
+    res.status(500).send(claimResponsePage('error', "something went wrong. reply to your email and we'll sort it."));
   }
 });
 
-// GET /api/fraise/claims/decline/:token — releases spot, returns credit
+// GET /api/fraise/claims/decline/:token — show decline form (safe for email prefetch)
 router.get('/claims/decline/:token', async (req: any, res: any) => {
+  const t = String(req.params.token ?? '').trim();
+  if (!t) return res.status(400).send(claimResponsePage('invalid link', 'this decline link is not valid.'));
+  try {
+    const rows = await db.execute(sql`
+      SELECT c.status FROM fraise_claims c WHERE c.confirm_token = ${t} LIMIT 1
+    `);
+    const claim = ((rows as any).rows ?? rows)[0] as any;
+    if (!claim) return res.send(claimResponsePage('link not found', 'this link has already been used or does not exist.'));
+    if (claim.status === 'declined') return res.send(claimResponsePage('already released', 'your credit was already returned. use it on the next event.'));
+    if (claim.status === 'confirmed') return res.send(claimResponsePage('already confirmed', 'you already confirmed this spot. reply to your email if you need to cancel.'));
+    res.send(claimActionPage('release your spot?', "your credit will be returned to your balance. this can't be undone.", `/api/fraise/claims/decline/${t}`, 'yes, release my spot'));
+  } catch (err: any) {
+    res.status(500).send(claimResponsePage('error', "something went wrong. reply to your email and we'll sort it."));
+  }
+});
+
+// POST /api/fraise/claims/decline/:token — commit decline, return credit
+router.post('/claims/decline/:token', async (req: any, res: any) => {
   const t = String(req.params.token ?? '').trim();
   if (!t) return res.status(400).send(claimResponsePage('invalid link', 'this decline link is not valid.'));
   try {
@@ -691,14 +759,12 @@ router.get('/claims/decline/:token', async (req: any, res: any) => {
     if (!claim) return res.send(claimResponsePage('link not found', 'this link has already been used or does not exist.'));
     if (claim.status === 'declined') return res.send(claimResponsePage('already released', 'your credit was already returned. use it on the next event.'));
     if (claim.status === 'confirmed') return res.send(claimResponsePage('already confirmed', 'you already confirmed this spot. reply to your email if you need to cancel.'));
-
     await db.execute(sql`UPDATE fraise_claims SET status = 'declined', declined_at = now(), confirm_token = NULL WHERE id = ${claim.id}`);
     await db.execute(sql`UPDATE fraise_members SET credit_balance = credit_balance + 1 WHERE id = ${claim.member_id}`);
     await db.execute(sql`UPDATE fraise_events SET seats_claimed = GREATEST(seats_claimed - 1, 0) WHERE id = ${claim.event_id}`);
-
     res.send(claimResponsePage('spot released.', `no problem, ${claim.name.split(' ')[0]}. your credit has been returned — it'll be there for the next event.`));
   } catch (err: any) {
-    res.status(500).send(claimResponsePage('error', 'something went wrong. reply to your email and we\'ll sort it.'));
+    res.status(500).send(claimResponsePage('error', "something went wrong. reply to your email and we'll sort it."));
   }
 });
 
