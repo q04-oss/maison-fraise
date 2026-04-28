@@ -2,6 +2,7 @@ import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
+import { createHmac, timingSafeEqual } from 'crypto';
 import path from 'path';
 import varietiesRouter from './routes/varieties';
 import { locationsRouter, slotsRouter, timeSlotsPublicRouter } from './routes/locations';
@@ -143,10 +144,46 @@ app.use('/api/ar-poem', aiLimiter);
 // Raw body for Stripe webhook — must be registered before express.json()
 app.use('/api/stripe/webhook', express.raw({ type: 'application/json' }));
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req: any, _res: any, buf: Buffer) => { req.rawBody = buf; },
+}));
 
 app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`);
+  next();
+});
+
+// HMAC validation — enforced only on requests that present X-Fraise-Client: ios
+const _FRAISE_SIGNING_KEY = Buffer.from('fraise-request-signing-v1', 'utf8');
+const _FRAISE_MAX_SKEW = 300; // seconds
+
+app.use('/api', (req: any, res: any, next: any) => {
+  if (req.headers['x-fraise-client'] !== 'ios') return next();
+
+  const ts  = req.headers['x-fraise-ts']  as string | undefined;
+  const sig = req.headers['x-fraise-sig'] as string | undefined;
+  if (!ts || !sig) return res.status(401).json({ error: 'missing signature' });
+
+  const tsNum = parseInt(ts, 10);
+  if (isNaN(tsNum) || Math.abs(Math.floor(Date.now() / 1000) - tsNum) > _FRAISE_MAX_SKEW) {
+    return res.status(401).json({ error: 'request expired' });
+  }
+
+  const bodyBuf: Buffer = req.rawBody ?? Buffer.alloc(0);
+  const requestPath = req.originalUrl.split('?')[0];
+  const message = Buffer.concat([Buffer.from(`${req.method}${requestPath}${ts}`, 'utf8'), bodyBuf]);
+  const expected = createHmac('sha256', _FRAISE_SIGNING_KEY).update(message).digest('base64');
+
+  try {
+    const eBuf = Buffer.from(expected, 'base64');
+    const aBuf = Buffer.from(sig, 'base64');
+    if (eBuf.length !== aBuf.length || !timingSafeEqual(eBuf, aBuf)) {
+      return res.status(401).json({ error: 'invalid signature' });
+    }
+  } catch {
+    return res.status(401).json({ error: 'invalid signature' });
+  }
+
   next();
 });
 
@@ -293,6 +330,33 @@ app.post('/api/upload', express.json({ limit: '50mb' }), requireUser, async (req
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
+// Apple App Site Association — required for Universal Links and App Clips
+app.get('/.well-known/apple-app-site-association', (_req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.json({
+    applinks: {
+      apps: [],
+      details: [{
+        appIDs: ['X96F7X388X.com.boxfraise.app'],
+        components: [
+          { '/': '/order*',   comment: 'Order panel deep link' },
+          { '/': '/popups*',  comment: 'Popups panel deep link' },
+          { '/': '/popup/*',  comment: 'Specific popup deep link' },
+          { '/': '/profile*', comment: 'Profile panel deep link' },
+          { '/': '/verify*',  comment: 'NFC verify deep link' },
+          { '/': '/history*', comment: 'Order history deep link' },
+        ],
+      }],
+    },
+    appclips: {
+      apps: ['X96F7X388X.com.boxfraise.app.Clip'],
+    },
+    webcredentials: {
+      apps: ['X96F7X388X.com.boxfraise.app'],
+    },
+  });
+});
+
 // Rajzyngier Research — serve when request comes from rajzyngier.co
 app.use((req, res, next) => {
   const host = req.hostname;
@@ -309,16 +373,16 @@ app.use((req, res, next) => {
 
 app.use(express.static(path.join(__dirname, '../public')));
 
-app.get('/shop', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/shop.html'));
-});
-
 app.get('/paper', (_req, res) => {
   res.sendFile(path.join(__dirname, '../public/paper.html'));
 });
 
-app.get('/operator', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../public/operator.html'));
+app.get('/backstage', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/backstage.html'));
+});
+
+app.get('/business/:slug', (_req, res) => {
+  res.sendFile(path.join(__dirname, '../public/fraise-business.html'));
 });
 
 app.get('/chocolatier', (_req, res) => {
