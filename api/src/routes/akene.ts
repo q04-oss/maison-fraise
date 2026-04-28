@@ -42,67 +42,60 @@ db.execute(sql`
     event_id INTEGER NOT NULL REFERENCES akene_events(id),
     user_id INTEGER NOT NULL REFERENCES users(id),
     sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at TIMESTAMPTZ,
     responded_at TIMESTAMPTZ,
     status TEXT NOT NULL DEFAULT 'pending',
     UNIQUE(event_id, user_id)
   )
 `).catch(() => {});
 
-// ── Rank helper ───────────────────────────────────────────────────────────────
-// rank_score = Σ(quantity × days_held) × (1 + events_attended × 0.1)
-// Rewards holding more akène for longer and attending more events.
+db.execute(sql`ALTER TABLE akene_invitations ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ`).catch(() => {});
 
-const rankCte = sql`
-  WITH holdings AS (
-    SELECT user_id,
-           SUM(quantity) AS akene_held,
-           SUM(quantity * EXTRACT(EPOCH FROM (now() - purchased_at)) / 86400.0) AS time_score
-    FROM akene_purchases
-    WHERE confirmed = true
-    GROUP BY user_id
-  ),
-  attended AS (
-    SELECT user_id, COUNT(*) AS events_attended
-    FROM akene_invitations
-    WHERE status = 'accepted'
-    GROUP BY user_id
-  )
-  SELECT
-    u.id,
-    u.display_name,
-    COALESCE(h.akene_held, 0)::int                                        AS akene_held,
-    COALESCE(a.events_attended, 0)::int                                   AS events_attended,
-    ROUND(
-      COALESCE(h.time_score, 0) * (1 + COALESCE(a.events_attended, 0) * 0.1)
-    )::bigint                                                              AS rank_score
-  FROM users u
-  JOIN holdings h ON h.user_id = u.id
-  LEFT JOIN attended a ON a.user_id = u.id
-  ORDER BY rank_score DESC
-`;
+// ── Rank SQL helper ───────────────────────────────────────────────────────────
+// rank_score = Σ(quantity × days_held) × (1 + events_attended × 0.1)
+
+function rankQuery() {
+  return sql`
+    WITH holdings AS (
+      SELECT user_id,
+             SUM(quantity)::int AS akene_held,
+             SUM(quantity * EXTRACT(EPOCH FROM (now() - purchased_at)) / 86400.0) AS time_score
+      FROM akene_purchases WHERE confirmed = true
+      GROUP BY user_id
+    ),
+    attended AS (
+      SELECT user_id, COUNT(*)::int AS events_attended
+      FROM akene_invitations WHERE status = 'accepted'
+      GROUP BY user_id
+    ),
+    scored AS (
+      SELECT u.id, u.display_name,
+             h.akene_held,
+             COALESCE(a.events_attended, 0) AS events_attended,
+             ROUND(h.time_score * (1 + COALESCE(a.events_attended, 0) * 0.1))::bigint AS rank_score
+      FROM users u
+      JOIN holdings h ON h.user_id = u.id
+      LEFT JOIN attended a ON a.user_id = u.id
+    )
+    SELECT *, ROW_NUMBER() OVER (ORDER BY rank_score DESC) AS rank_position
+    FROM scored
+  `;
+}
 
 // ── GET /api/akene/my ─────────────────────────────────────────────────────────
 
 router.get('/my', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
   try {
-    const rows = await db.execute(sql`
-      WITH ranked AS (${rankCte})
-      SELECT *, ROW_NUMBER() OVER () AS rank_position
-      FROM ranked
-    `);
-    const all = (rows as any).rows ?? rows;
+    const rows = await db.execute(rankQuery());
+    const all  = (rows as any).rows ?? rows;
     const mine = all.find((r: any) => r.id === userId);
-
-    if (!mine) {
-      return res.json({ akeneHeld: 0, rankScore: 0, rankPosition: null, eventsAttended: 0 });
-    }
-
+    if (!mine) return res.json({ akeneHeld: 0, rankScore: 0, rankPosition: null, eventsAttended: 0, totalHolders: all.length });
     const pos = all.findIndex((r: any) => r.id === userId) + 1;
     res.json({
       akeneHeld:      mine.akene_held,
       eventsAttended: mine.events_attended,
-      rankScore:      mine.rank_score,
+      rankScore:      Number(mine.rank_score),
       rankPosition:   pos,
       totalHolders:   all.length,
     });
@@ -116,21 +109,110 @@ router.get('/my', requireUser, async (req: Request, res: Response) => {
 
 router.get('/leaderboard', requireUser, async (req: Request, res: Response) => {
   try {
-    const rows = await db.execute(sql`
-      WITH ranked AS (${rankCte})
-      SELECT display_name, akene_held, events_attended, rank_score,
-             ROW_NUMBER() OVER () AS rank_position
-      FROM ranked
-      LIMIT 100
+    const rows = await db.execute(rankQuery());
+    const all  = ((rows as any).rows ?? rows).slice(0, 100);
+    res.json(all.map((r: any, i: number) => ({
+      id:             r.id,
+      displayName:    r.display_name,
+      akeneHeld:      r.akene_held,
+      eventsAttended: r.events_attended,
+      rankScore:      Number(r.rank_score),
+      rankPosition:   i + 1,
+    })));
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ── GET /api/akene/holders/:userId ────────────────────────────────────────────
+
+router.get('/holders/:userId', requireUser, async (req: Request, res: Response) => {
+  const targetId = parseInt(req.params.userId);
+  try {
+    const rows = await db.execute(rankQuery());
+    const all  = (rows as any).rows ?? rows;
+    const idx  = all.findIndex((r: any) => r.id === targetId);
+    if (idx === -1) { res.status(404).json({ error: 'not found' }); return; }
+    const r = all[idx];
+    res.json({
+      displayName:    r.display_name,
+      akeneHeld:      r.akene_held,
+      eventsAttended: r.events_attended,
+      rankScore:      Number(r.rank_score),
+      rankPosition:   idx + 1,
+      totalHolders:   all.length,
+    });
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ── GET /api/akene/events/:id ─────────────────────────────────────────────────
+
+router.get('/events/:id', requireUser, async (req: Request, res: Response) => {
+  const eventId = parseInt(req.params.id);
+  try {
+    const row = ((await db.execute(sql`
+      SELECT ae.id, ae.title, ae.description, ae.event_date, ae.capacity,
+             ae.status, ae.created_at,
+             b.name AS business_name,
+             COUNT(ai.id) FILTER (WHERE ai.status = 'accepted')::int AS accepted_count
+      FROM akene_events ae
+      LEFT JOIN businesses b ON b.id = ae.business_id
+      LEFT JOIN akene_invitations ai ON ai.event_id = ae.id
+      WHERE ae.id = ${eventId}
+      GROUP BY ae.id, b.name
+    `)) as any).rows?.[0];
+    if (!row) { res.status(404).json({ error: 'not found' }); return; }
+    res.json({
+      id:           row.id,
+      title:        row.title,
+      description:  row.description,
+      eventDate:    row.event_date,
+      capacity:     row.capacity,
+      acceptedCount: row.accepted_count,
+      status:       row.status,
+      businessName: row.business_name,
+    });
+  } catch {
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ── GET /api/akene/events/:id/attendees ───────────────────────────────────────
+
+router.get('/events/:id/attendees', requireUser, async (req: Request, res: Response) => {
+  const eventId = parseInt(req.params.id);
+  try {
+    // Get accepted user IDs first
+    const invRows = await db.execute(sql`
+      SELECT user_id FROM akene_invitations
+      WHERE event_id = ${eventId} AND status = 'accepted'
     `);
-    res.json((rows as any).rows ?? rows);
+    const acceptedIds: number[] = ((invRows as any).rows ?? invRows).map((r: any) => r.user_id);
+    if (acceptedIds.length === 0) { res.json([]); return; }
+
+    // Get their ranks from the full ranked list
+    const rows = await db.execute(rankQuery());
+    const all  = (rows as any).rows ?? rows;
+    const attendees = all
+      .map((r: any, i: number) => ({ ...r, rankPosition: i + 1 }))
+      .filter((r: any) => acceptedIds.includes(r.id))
+      .map((r: any) => ({
+        id:             r.id,
+        displayName:    r.display_name,
+        akeneHeld:      r.akene_held,
+        eventsAttended: r.events_attended,
+        rankPosition:   r.rankPosition,
+      }));
+
+    res.json(attendees);
   } catch {
     res.status(500).json({ error: 'internal' });
   }
 });
 
 // ── POST /api/akene/purchase ──────────────────────────────────────────────────
-// Creates a Stripe payment intent for one or more akène (CA$120 each).
 
 router.post('/purchase', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
@@ -138,8 +220,7 @@ router.post('/purchase', requireUser, async (req: Request, res: Response) => {
   const amountCents = quantity * 12000;
   try {
     const intent = await stripe.paymentIntents.create({
-      amount: amountCents,
-      currency: 'cad',
+      amount: amountCents, currency: 'cad',
       automatic_payment_methods: { enabled: true },
       metadata: { user_id: String(userId), quantity: String(quantity), type: 'akene' },
     });
@@ -155,7 +236,6 @@ router.post('/purchase', requireUser, async (req: Request, res: Response) => {
 });
 
 // ── POST /api/akene/purchase/confirm ─────────────────────────────────────────
-// Called by iOS after StripePaymentSheet reports .completed.
 
 router.post('/purchase/confirm', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
@@ -163,17 +243,13 @@ router.post('/purchase/confirm', requireUser, async (req: Request, res: Response
   if (!payment_intent_id) { res.status(400).json({ error: 'payment_intent_id required' }); return; }
   try {
     const intent = await stripe.paymentIntents.retrieve(payment_intent_id);
-    if (intent.status !== 'succeeded') {
-      res.status(402).json({ error: 'payment not confirmed' }); return;
-    }
+    if (intent.status !== 'succeeded') { res.status(402).json({ error: 'payment not confirmed' }); return; }
     await db.execute(sql`
       UPDATE akene_purchases SET confirmed = true
-      WHERE stripe_payment_intent_id = ${payment_intent_id}
-        AND user_id = ${userId}
+      WHERE stripe_payment_intent_id = ${payment_intent_id} AND user_id = ${userId}
     `);
     res.json({ ok: true });
-  } catch (err) {
-    logger.error('akene/purchase/confirm: ' + String(err));
+  } catch {
     res.status(500).json({ error: 'internal' });
   }
 });
@@ -185,17 +261,34 @@ router.get('/invitations', requireUser, async (req: Request, res: Response) => {
   try {
     const rows = await db.execute(sql`
       SELECT
-        ai.id, ai.status, ai.sent_at, ai.responded_at,
-        ae.id AS event_id, ae.title, ae.description,
-        ae.event_date, ae.capacity, ae.status AS event_status,
-        b.name AS business_name
+        ai.id, ai.status, ai.sent_at, ai.expires_at, ai.responded_at,
+        ae.id AS event_id, ae.title, ae.description, ae.event_date,
+        ae.capacity, ae.status AS event_status,
+        b.name AS business_name,
+        COUNT(ai2.id) FILTER (WHERE ai2.status = 'accepted')::int AS accepted_count
       FROM akene_invitations ai
       JOIN akene_events ae ON ae.id = ai.event_id
       LEFT JOIN businesses b ON b.id = ae.business_id
+      LEFT JOIN akene_invitations ai2 ON ai2.event_id = ae.id
       WHERE ai.user_id = ${userId}
+      GROUP BY ai.id, ae.id, b.name
       ORDER BY ai.sent_at DESC
     `);
-    res.json((rows as any).rows ?? rows);
+    res.json(((rows as any).rows ?? rows).map((r: any) => ({
+      id:            r.id,
+      status:        r.status,
+      sentAt:        r.sent_at,
+      expiresAt:     r.expires_at,
+      respondedAt:   r.responded_at,
+      eventId:       r.event_id,
+      title:         r.title,
+      description:   r.description,
+      eventDate:     r.event_date,
+      capacity:      r.capacity,
+      acceptedCount: r.accepted_count,
+      eventStatus:   r.event_status,
+      businessName:  r.business_name,
+    })));
   } catch {
     res.status(500).json({ error: 'internal' });
   }
@@ -207,25 +300,38 @@ router.post('/invitations/:id/accept', requireUser, async (req: Request, res: Re
   const userId = (req as any).userId as number;
   const id = parseInt(req.params.id);
   try {
-    const invRow = ((await db.execute(sql`
-      SELECT ai.id, ai.status, ai.event_id, ae.capacity,
-             (SELECT COUNT(*) FROM akene_invitations WHERE event_id = ai.event_id AND status = 'accepted') AS accepted_count
+    const inv = ((await db.execute(sql`
+      SELECT ai.id, ai.status, ai.event_id, ai.expires_at,
+             ae.capacity,
+             COUNT(ai2.id) FILTER (WHERE ai2.status = 'accepted')::int AS accepted_count
       FROM akene_invitations ai
       JOIN akene_events ae ON ae.id = ai.event_id
+      LEFT JOIN akene_invitations ai2 ON ai2.event_id = ai.event_id
       WHERE ai.id = ${id} AND ai.user_id = ${userId}
+      GROUP BY ai.id, ae.capacity
       LIMIT 1
     `)) as any).rows?.[0];
 
-    if (!invRow)                                  { res.status(404).json({ error: 'not found' }); return; }
-    if (invRow.status !== 'pending')              { res.status(409).json({ error: 'already responded' }); return; }
-    if (invRow.accepted_count >= invRow.capacity) { res.status(409).json({ error: 'event full' }); return; }
+    if (!inv)                                    { res.status(404).json({ error: 'not found' }); return; }
+    if (inv.status !== 'pending')                { res.status(409).json({ error: 'already responded' }); return; }
+    if (inv.expires_at && new Date(inv.expires_at) < new Date()) {
+      res.status(410).json({ error: 'invitation expired' }); return;
+    }
+    if (inv.accepted_count >= inv.capacity) {
+      // Event full — move to waitlist
+      await db.execute(sql`
+        UPDATE akene_invitations SET status = 'waitlisted', responded_at = now()
+        WHERE id = ${id} AND user_id = ${userId}
+      `);
+      res.status(200).json({ ok: true, waitlisted: true });
+      return;
+    }
 
     await db.execute(sql`
-      UPDATE akene_invitations
-      SET status = 'accepted', responded_at = now()
+      UPDATE akene_invitations SET status = 'accepted', responded_at = now()
       WHERE id = ${id} AND user_id = ${userId}
     `);
-    res.json({ ok: true });
+    res.json({ ok: true, waitlisted: false });
   } catch {
     res.status(500).json({ error: 'internal' });
   }
@@ -237,11 +343,38 @@ router.post('/invitations/:id/decline', requireUser, async (req: Request, res: R
   const userId = (req as any).userId as number;
   const id = parseInt(req.params.id);
   try {
+    const inv = ((await db.execute(sql`
+      SELECT event_id FROM akene_invitations WHERE id = ${id} AND user_id = ${userId}
+    `)) as any).rows?.[0];
+    if (!inv) { res.status(404).json({ error: 'not found' }); return; }
+
     await db.execute(sql`
-      UPDATE akene_invitations
-      SET status = 'declined', responded_at = now()
-      WHERE id = ${id} AND user_id = ${userId} AND status = 'pending'
+      UPDATE akene_invitations SET status = 'declined', responded_at = now()
+      WHERE id = ${id} AND user_id = ${userId} AND status IN ('pending', 'accepted')
     `);
+
+    // Promote first waitlisted user if this person was accepted
+    const waiter = ((await db.execute(sql`
+      SELECT ai.id, u.push_token
+      FROM akene_invitations ai JOIN users u ON u.id = ai.user_id
+      WHERE ai.event_id = ${inv.event_id} AND ai.status = 'waitlisted'
+      ORDER BY ai.responded_at ASC LIMIT 1
+    `)) as any).rows?.[0];
+
+    if (waiter) {
+      await db.execute(sql`
+        UPDATE akene_invitations SET status = 'accepted', responded_at = now()
+        WHERE id = ${waiter.id}
+      `);
+      if (waiter.push_token) {
+        sendPushNotification(waiter.push_token, {
+          title: 'a seat opened up',
+          body: 'you\'ve been moved off the waitlist. you\'re going.',
+          data: { screen: 'akene' },
+        }).catch(() => {});
+      }
+    }
+
     res.json({ ok: true });
   } catch {
     res.status(500).json({ error: 'internal' });
@@ -249,7 +382,6 @@ router.post('/invitations/:id/decline', requireUser, async (req: Request, res: R
 });
 
 // ── POST /api/akene/events ────────────────────────────────────────────────────
-// Staff / shop users create events and push invitations.
 
 router.post('/events', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
@@ -275,7 +407,6 @@ router.post('/events', requireUser, async (req: Request, res: Response) => {
 });
 
 // ── POST /api/akene/events/:id/invite ────────────────────────────────────────
-// Push invitations to the top N ranked akène holders (or specify user_ids).
 
 router.post('/events/:id/invite', requireUser, async (req: Request, res: Response) => {
   const userId = (req as any).userId as number;
@@ -291,46 +422,42 @@ router.post('/events/:id/invite', requireUser, async (req: Request, res: Respons
     let targets: { id: number; push_token: string | null }[];
 
     if (Array.isArray(user_ids) && user_ids.length > 0) {
-      const rows = await db.execute(sql`
-        SELECT id, push_token FROM users WHERE id = ANY(${user_ids}::int[])
-      `);
+      const rows = await db.execute(sql`SELECT id, push_token FROM users WHERE id = ANY(${user_ids}::int[])`);
       targets = (rows as any).rows ?? rows;
     } else {
-      // Invite the top `count` akène holders by rank score
-      const rows = await db.execute(sql`
-        WITH ranked AS (
-          SELECT user_id,
-                 SUM(quantity * EXTRACT(EPOCH FROM (now() - purchased_at)) / 86400.0) AS score
-          FROM akene_purchases WHERE confirmed = true
-          GROUP BY user_id
-          ORDER BY score DESC
-          LIMIT ${count}
-        )
-        SELECT u.id, u.push_token
-        FROM users u JOIN ranked r ON r.user_id = u.id
-      `);
-      targets = (rows as any).rows ?? rows;
+      const rows = await db.execute(rankQuery());
+      targets = ((rows as any).rows ?? rows)
+        .slice(0, count)
+        .map((r: any) => ({ id: r.id, push_token: null }));
+
+      // Fetch push tokens
+      const ids = targets.map((t: any) => t.id);
+      if (ids.length) {
+        const tokenRows = await db.execute(sql`SELECT id, push_token FROM users WHERE id = ANY(${ids}::int[])`);
+        const tokenMap = new Map(((tokenRows as any).rows ?? tokenRows).map((r: any) => [r.id, r.push_token]));
+        targets = targets.map((t: any) => ({ ...t, push_token: tokenMap.get(t.id) ?? null }));
+      }
     }
 
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
     let sent = 0;
     for (const t of targets) {
       try {
         await db.execute(sql`
-          INSERT INTO akene_invitations (event_id, user_id)
-          VALUES (${eventId}, ${t.id})
+          INSERT INTO akene_invitations (event_id, user_id, expires_at)
+          VALUES (${eventId}, ${t.id}, ${expiresAt})
           ON CONFLICT (event_id, user_id) DO NOTHING
         `);
         sent++;
         if (t.push_token) {
           sendPushNotification(t.push_token, {
             title: 'you\'ve been invited',
-            body: 'an evening is being planned. open box fraise to accept.',
+            body: 'an evening is being planned. you have 48 hours to accept.',
             data: { screen: 'akene' },
           }).catch(() => {});
         }
       } catch {}
     }
-
     res.json({ sent });
   } catch (err) {
     logger.error('akene/invite: ' + String(err));
