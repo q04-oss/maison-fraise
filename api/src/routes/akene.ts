@@ -331,7 +331,29 @@ router.post('/invitations/:id/accept', requireUser, async (req: Request, res: Re
       UPDATE akene_invitations SET status = 'accepted', responded_at = now()
       WHERE id = ${id} AND user_id = ${userId}
     `);
-    res.json({ ok: true, waitlisted: false });
+
+    // Check if event just became fully seated
+    const newCount = inv.accepted_count + 1;
+    if (newCount >= inv.capacity) {
+      await db.execute(sql`
+        UPDATE akene_events SET status = 'seated' WHERE id = ${inv.event_id} AND status = 'inviting'
+      `);
+      // Notify the business creator
+      const creator = ((await db.execute(sql`
+        SELECT u.push_token FROM akene_events ae
+        JOIN users u ON u.id = ae.created_by_user_id
+        WHERE ae.id = ${inv.event_id} LIMIT 1
+      `)) as any).rows?.[0];
+      if (creator?.push_token) {
+        sendPushNotification(creator.push_token, {
+          title: 'all seats filled',
+          body: 'every seat has been accepted. set a date to confirm the evening.',
+          data: { screen: 'akene' },
+        }).catch(() => {});
+      }
+    }
+
+    res.json({ ok: true, waitlisted: false, seated: newCount >= inv.capacity });
   } catch {
     res.status(500).json({ error: 'internal' });
   }
@@ -461,6 +483,53 @@ router.post('/events/:id/invite', requireUser, async (req: Request, res: Respons
     res.json({ sent });
   } catch (err) {
     logger.error('akene/invite: ' + String(err));
+    res.status(500).json({ error: 'internal' });
+  }
+});
+
+// ── PATCH /api/akene/events/:id/set-date ─────────────────────────────────────
+// Business sets date once all seats are filled. Transitions to 'confirmed'
+// and notifies all accepted guests.
+
+router.patch('/events/:id/set-date', requireUser, async (req: Request, res: Response) => {
+  const userId = (req as any).userId as number;
+  const eventId = parseInt(req.params.id);
+  const { event_date } = req.body;
+  if (!event_date) { res.status(400).json({ error: 'event_date required' }); return; }
+  try {
+    const shopRow = ((await db.execute(sql`
+      SELECT id FROM users WHERE id = ${userId} AND (is_shop = true OR is_dorotka = true)
+    `)) as any).rows?.[0];
+    if (!shopRow) { res.status(403).json({ error: 'shop access required' }); return; }
+
+    await db.execute(sql`
+      UPDATE akene_events
+      SET event_date = ${event_date}, status = 'confirmed'
+      WHERE id = ${eventId} AND status IN ('seated', 'inviting')
+    `);
+
+    // Notify all accepted guests
+    const guests = ((await db.execute(sql`
+      SELECT u.push_token FROM akene_invitations ai
+      JOIN users u ON u.id = ai.user_id
+      WHERE ai.event_id = ${eventId} AND ai.status = 'accepted'
+        AND u.push_token IS NOT NULL
+    `)) as any).rows ?? [];
+
+    const dateLabel = new Date(event_date).toLocaleDateString('en-CA', {
+      month: 'long', day: 'numeric',
+    });
+
+    for (const g of guests) {
+      sendPushNotification(g.push_token, {
+        title: 'evening confirmed',
+        body: `the date is set: ${dateLabel}. see you there.`,
+        data: { screen: 'akene' },
+      }).catch(() => {});
+    }
+
+    res.json({ ok: true });
+  } catch {
     res.status(500).json({ error: 'internal' });
   }
 });
