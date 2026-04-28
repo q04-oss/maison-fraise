@@ -546,5 +546,10 @@ export async function ensureSchema(): Promise<void> {
   `);
   await run('business_accounts.apple_id', sql`ALTER TABLE business_accounts ADD COLUMN IF NOT EXISTS apple_id TEXT UNIQUE`);
 
+  // ── Messaging ─────────────────────────────────────────────────────────────────
+  await run('users.status', sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`);
+  await run('orders.menu_item_id', sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES business_menu_items(id)`);
+  await run('orders.variety_id_nullable', sql`ALTER TABLE orders ALTER COLUMN variety_id DROP NOT NULL`);
+
   logger.info('ensureSchema complete');
 }

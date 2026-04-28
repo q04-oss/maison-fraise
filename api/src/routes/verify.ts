@@ -139,6 +139,16 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       harvest_date: varieties.harvest_date,
     }).from(varieties).where(eq(varieties.id, order.variety_id));
 
+    // Look up the shop user for this pickup location
+    const shopRow = ((await db.execute(sql`
+      SELECT u.user_code AS business_user_code, b.name AS business_name
+      FROM users u
+      JOIN businesses b ON b.id = u.business_id
+      WHERE u.is_shop = true
+        AND u.business_id = (SELECT business_id FROM locations WHERE id = ${order.location_id})
+      LIMIT 1
+    `)) as any).rows?.[0] ?? null;
+
     const tier = effectiveTier(tierFromBalance(newBalance), varietyCeiling);
     res.json({
       verified: true, user_id,
@@ -155,6 +165,9 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
       lifetime_days: Math.floor(newLifetime / 86400),
       streak_weeks: newStreak,
       streak_milestone: newStreak > prevStreak && newStreak % 4 === 0,
+      // Business contact
+      business_user_code: shopRow?.business_user_code ?? null,
+      business_name: shopRow?.business_name ?? null,
     });
   } catch (err: any) {
     if (err?.code === 'already_used') {
