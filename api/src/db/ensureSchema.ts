@@ -551,5 +551,17 @@ export async function ensureSchema(): Promise<void> {
   await run('orders.menu_item_id', sql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS menu_item_id INTEGER REFERENCES business_menu_items(id)`);
   await run('orders.variety_id_nullable', sql`ALTER TABLE orders ALTER COLUMN variety_id DROP NOT NULL`);
 
+  // ── Dorotka — official co-op channel ─────────────────────────────────────────
+  await run('users.fraise_chat_email', sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS fraise_chat_email TEXT UNIQUE`);
+  await run('users_user_code_unique', sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS users_user_code_unique
+    ON users (user_code) WHERE user_code IS NOT NULL
+  `);
+  await run('dorotka_insert', sql`
+    INSERT INTO users (display_name, user_code, is_dorotka, verified, fraise_chat_email)
+    SELECT 'Dorotka', 'dorotka', true, true, 'dorotka@fraise.chat'
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE user_code = 'dorotka')
+  `);
+
   logger.info('ensureSchema complete');
 }

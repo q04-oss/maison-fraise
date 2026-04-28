@@ -29,7 +29,8 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
 
     const now = new Date();
 
-    const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj }).from(users).where(eq(users.id, user_id));
+    const [currentUser] = await db.select({ user_code: users.user_code, is_dj: users.is_dj, verified: users.verified }).from(users).where(eq(users.id, user_id));
+    const isFirstVerification = !currentUser?.verified;
     const fraiseChatEmail = currentUser?.user_code ? `${currentUser.user_code}@fraise.chat` : null;
 
     // Read variety's time credits and tier ceiling before transaction
@@ -116,6 +117,27 @@ router.post('/nfc', requireUser, async (req: Request, res: Response) => {
         weight: 5,
       });
     });
+
+    // Dorotka — auto-add and send welcome on first verification
+    if (isFirstVerification) {
+      const dorotkaRow = ((await db.execute(sql`
+        SELECT id FROM users WHERE user_code = 'dorotka' LIMIT 1
+      `)) as any).rows?.[0];
+      if (dorotkaRow) {
+        const [ua, ub] = user_id < dorotkaRow.id
+          ? [user_id, dorotkaRow.id] : [dorotkaRow.id, user_id];
+        await db.execute(sql`
+          INSERT INTO connections (user_a_id, user_b_id, met_at)
+          VALUES (${ua}, ${ub}, now()) ON CONFLICT DO NOTHING
+        `);
+        const address = fraiseChatEmail ?? `${user_id}@fraise.chat`;
+        const welcome = `welcome to fraise. you've been verified.\n\nyour address is ${address}. keep it — it's permanent.\n\ni'm dorotka. i run the co-op. i'll be in touch when something matters.\n\n— d`;
+        await db.execute(sql`
+          INSERT INTO platform_messages (sender_id, recipient_id, encrypted_body, message_type)
+          VALUES (${dorotkaRow.id}, ${user_id}, ${welcome}, 'official')
+        `);
+      }
+    }
 
     // Create per-user forwarding rule in ImprovMX
     if (fraiseChatEmail && currentUser?.user_code) {

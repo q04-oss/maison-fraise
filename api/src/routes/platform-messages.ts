@@ -107,7 +107,7 @@ router.get('/threads', requireUser, async (req: Request, res: Response) => {
         lm.contact_id, lm.id AS last_message_id, lm.encrypted_body,
         lm.message_type, lm.sent_at AS last_message_at, lm.sender_id AS last_sender_id,
         COALESCE(un.cnt, 0) AS unread_count,
-        u.display_name AS name, u.user_code, u.is_shop,
+        u.display_name AS name, u.user_code, u.is_shop, u.is_dorotka,
         c.met_at
       FROM last_msgs lm
       JOIN users u ON u.id = lm.contact_id
