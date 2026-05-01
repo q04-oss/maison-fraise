@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Lora } from "next/font/google";
+import { connection } from "next/server";
 import "./globals.css";
 
 const lora = Lora({
@@ -20,11 +21,15 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Opts every page into dynamic rendering so Next.js reads the per-request
+  // CSP header set by proxy.ts and stamps the nonce onto all generated tags.
+  await connection();
+
   return (
     <html lang="en" className={lora.variable}>
       <body>{children}</body>

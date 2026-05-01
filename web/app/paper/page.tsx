@@ -1,29 +1,23 @@
 export const metadata = {
-  title: 'box fraise — Working Paper No. 1',
-  description: 'A working paper on domestic labour, cooperative governance, decentralised infrastructure, and the fraise protocol.',
+  title: "box fraise — Working Paper No. 1",
+  description:
+    "A working paper on domestic labour, cooperative governance, decentralised infrastructure, and the fraise protocol.",
 };
 
 export default function WhitePaper() {
   return (
-    <main className="document">
-
-      {/* Title block */}
-      <header style={{ marginBottom: "3rem" }}>
-        <nav style={{ marginBottom: "1.5rem" }}>
-          <a href="/" style={{ fontSize: "0.8125rem", letterSpacing: "0.04em", textDecoration: "none", color: "var(--muted)" }}>
-            ← box fraise
-          </a>
-        </nav>
+    <main className="page">
+      <div className="doc-header">
+        <a className="back-link" href="/">← box fraise</a>
         <h1>box fraise</h1>
-        <h1 style={{ color: "var(--muted)", fontStyle: "italic" }}>
+        <h1 className="doc-subtitle">
           A Working Paper on Labour, Governance, and Decentralised Infrastructure
         </h1>
-        <p className="meta" style={{ marginTop: "1.25rem" }}>
+        <p className="meta doc-header-meta-lg">
           fraise.box &mdash; Working Paper No. 1 &mdash; 2026
         </p>
-      </header>
+      </div>
 
-      {/* Abstract */}
       <div className="abstract">
         <p>
           box fraise begins as a platform for the direct sale of strawberries. Its underlying
@@ -35,7 +29,6 @@ export default function WhitePaper() {
         </p>
       </div>
 
-      {/* Section I */}
       <section>
         <span className="section-number">I.</span>
         <h2>The Problem</h2>
@@ -64,7 +57,6 @@ export default function WhitePaper() {
 
       <hr />
 
-      {/* Section II */}
       <section>
         <span className="section-number">II.</span>
         <h2>The Platform</h2>
@@ -90,14 +82,13 @@ export default function WhitePaper() {
 
       <hr />
 
-      {/* Section III */}
       <section>
         <span className="section-number">III.</span>
         <h2>Domestic Labour Contracts</h2>
         <p>
           Verified users may establish relationship contracts through the platform. A
           relationship contract is a formal agreement between two or more parties in which
-          one party's domestic labour is recognised, quantified, and compensated on a
+          one party&apos;s domestic labour is recognised, quantified, and compensated on a
           monthly basis by the other.
         </p>
         <p>
@@ -118,13 +109,12 @@ export default function WhitePaper() {
 
       <hr />
 
-      {/* Section IV */}
       <section>
         <span className="section-number">IV.</span>
-        <h2>Cooperative Governance & Dorotka</h2>
+        <h2>Cooperative Governance &amp; Dorotka</h2>
         <p>
           Businesses may register on the platform under one of two models. In the first,
-          a human president manages the organisation's account and relationship with the
+          a human president manages the organisation&apos;s account and relationship with the
           platform. In the second, the organisation is constituted as a worker cooperative
           whose president is an AI agent named Dorotka.
         </p>
@@ -133,7 +123,7 @@ export default function WhitePaper() {
           cooperatives by definition — profit and governance are distributed to members
           according to contribution. Dorotka manages administrative functions, ensures
           compliance with cooperative principles, and represents the organisation within
-          the platform's governance layer.
+          the platform&apos;s governance layer.
         </p>
         <p>
           All AI agent presidents within the network communicate with one another. They
@@ -143,16 +133,16 @@ export default function WhitePaper() {
         </p>
         <h3>Platform labour policy</h3>
         <p>
-          Two standards are built into the platform's cooperative framework as non-negotiable
-          conditions: a four-day working week as the default, and two additional paid days
-          off per month for members who menstruate. These are not optional. Organisations
-          operating under Dorotka accept these conditions at registration.
+          Two standards are built into the platform&apos;s cooperative framework as
+          non-negotiable conditions: a four-day working week as the default, and two
+          additional paid days off per month for members who menstruate. These are not
+          optional. Organisations operating under Dorotka accept these conditions at
+          registration.
         </p>
       </section>
 
       <hr />
 
-      {/* Section V */}
       <section>
         <span className="section-number">V.</span>
         <h2>The Fraise Protocol</h2>
@@ -160,7 +150,7 @@ export default function WhitePaper() {
           The fraise protocol is a decentralised mesh networking protocol. Devices that
           implement the protocol form a peer-to-peer network through which data can be
           routed without dependence on centralised infrastructure. Every server pull on
-          the network generates a micropayment in $FRS, the platform's native token,
+          the network generates a micropayment in $FRS, the platform&apos;s native token,
           directed to the operator of the node that served the request.
         </p>
         <h3>Strawberry Boxes</h3>
@@ -183,38 +173,33 @@ export default function WhitePaper() {
 
       <hr />
 
-      {/* Section VI */}
       <section>
         <span className="section-number">VI.</span>
         <h2>Wearable Infrastructure</h2>
         <p>
-          The terminal layer of the platform's hardware arc is mesh-enabled clothing.
+          The terminal layer of the platform&apos;s hardware arc is mesh-enabled clothing.
           Sensors embedded in garments become nodes in the fraise protocol network.
           The clothing is not an accessory to the network — it is infrastructure.
           A person wearing mesh-enabled clothing is operating a node. Their movement
-          through physical space extends the network's reach and earns $FRS
+          through physical space extends the network&apos;s reach and earns $FRS
           proportional to the traffic routed through their garments.
         </p>
         <p>
-          This represents the logical conclusion of the platform's core principle:
+          This represents the logical conclusion of the platform&apos;s core principle:
           that the people who constitute a network should be compensated for doing so.
         </p>
       </section>
 
-      <hr />
-
-      {/* Footer */}
-      <footer style={{ marginTop: "3rem" }}>
+      <footer className="doc-footer">
         <p className="meta">
           box fraise &mdash; fraise.box &mdash; Working Paper No. 1 &mdash; 2026
         </p>
-        <p style={{ fontSize: "0.8125rem", color: "var(--muted)" }}>
+        <p className="doc-footer-note">
           This document describes a platform under active development. It is not a
           prospectus, investment document, or legal instrument. $FRS token economics
           are subject to revision.
         </p>
       </footer>
-
     </main>
   );
 }

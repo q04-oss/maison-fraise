@@ -1,56 +1,43 @@
 export const metadata = {
-  title: 'box fraise — support',
-  description: 'Support Box Fraise.',
+  title: "box fraise — support",
+  description: "Support box fraise.",
 };
 
 export default function SupportPage() {
   return (
-    <main className="document">
-      <header style={{ marginBottom: '3rem' }}>
-        <nav style={{ marginBottom: '2rem' }}>
-          <a href="/" style={{ fontSize: '0.8125rem', letterSpacing: '0.04em', textDecoration: 'none', color: 'var(--muted)' }}>
-            ← box fraise
-          </a>
-        </nav>
+    <main className="page">
+      <div className="doc-header">
+        <a className="back-link" href="/">← box fraise</a>
         <h1>support</h1>
-        <p className="meta" style={{ marginTop: '0.75rem' }}>
+        <p className="meta">
           Independent, local, and built from scratch.
         </p>
-      </header>
+      </div>
 
       <hr />
 
-      <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        <p style={{ color: 'var(--muted)', lineHeight: 1.75, maxWidth: '48ch' }}>
-          Box Fraise is a small platform built to support local businesses, cooperative ownership, and community commerce.
-          If you believe in what we're building, a contribution helps keep it going.
+      <div className="support-body">
+        <p className="support-para">
+          box fraise is a small platform built to support local businesses,
+          cooperative ownership, and community commerce. If you believe in what
+          we&apos;re building, a contribution helps keep it going.
         </p>
-
-        <p style={{ color: 'var(--muted)', lineHeight: 1.75, maxWidth: '48ch' }}>
-          Donations are made through the app. You can also support a specific business directly from their page.
+        <p className="support-para">
+          Donations are made through the app. You can also support a specific
+          business directly from their page.
         </p>
-
-        <a
-          href="https://testflight.apple.com/join/zJG1Wc5Y"
-          style={{
-            display: 'inline-block',
-            fontSize: '0.8125rem',
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            textDecoration: 'none',
-            border: '1px solid var(--text)',
-            padding: '0.6rem 1.25rem',
-            color: 'var(--text)',
-            alignSelf: 'flex-start',
-          }}
-        >
+        <p className="support-para">
+          For security disclosures or technical questions, reply to any
+          transactional email you&apos;ve received from fraise.box, or reach out
+          through the app.
+        </p>
+        <a className="btn btn-primary" href="https://testflight.apple.com/join/zJG1Wc5Y">
           Get the app →
         </a>
       </div>
 
-      <hr style={{ marginTop: '4rem' }} />
-      <footer style={{ marginTop: '2rem' }}>
-        <p className="meta">box fraise — fraise.box — 2026</p>
+      <footer className="doc-footer">
+        <p className="meta">box fraise &mdash; fraise.box &mdash; 2026</p>
       </footer>
     </main>
   );

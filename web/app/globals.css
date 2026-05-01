@@ -468,3 +468,80 @@ hr {
   line-height: 1.75;
   max-width: 58ch;
 }
+
+/* ── Inline-style replacements ────────────────────────────────────────────── */
+/* These classes replace style={{...}} attributes on JSX elements so that
+   style-src 'unsafe-inline' is not needed in the Content-Security-Policy.    */
+
+/* Meta paragraph that appears after the h1 in doc headers */
+.doc-header .meta { margin-top: 0.75rem; }
+
+/* Paper page: two h1 elements precede the meta, so it needs extra breathing room */
+.doc-header-meta-lg { margin-top: 1.25rem; }
+
+/* Subtitle h1 on the paper page (the italic working-paper subtitle) */
+.doc-subtitle {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Footnote-style paragraph in doc footers (below the primary .meta line) */
+.doc-footer-note {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin-top: 0.75rem;
+}
+
+/* ── Shop page ───────────────────────────────────────────────────────────── */
+
+.product-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-item {
+  border-top: 1px solid var(--border);
+  padding-block: 2rem;
+}
+
+.product-title {
+  margin: 0 0 0.5rem;
+}
+
+.product-desc {
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 0.75rem;
+}
+
+.product-cta {
+  margin-top: 2rem;
+}
+
+/* ── Shortcuts page ──────────────────────────────────────────────────────── */
+
+/* The example code in the intro paragraph (/shortcuts notation) */
+.shortcut-example-code {
+  font-size: 0.75rem;
+}
+
+/* Monospaced command name in the property key column */
+.shortcut-command-code {
+  font-size: 0.8125rem;
+  font-family: "SF Mono", "Fira Code", Consolas, monospace;
+}
+
+/* ── Support page ─────────────────────────────────────────────────────────── */
+
+.support-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.support-para {
+  color: var(--muted);
+  line-height: 1.75;
+}
